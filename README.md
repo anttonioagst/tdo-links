@@ -28,6 +28,8 @@ O projeto ja inclui `railway.json`. No Railway, configure:
 - `TELEGRAM_CHAT_ID`
 - `TELEGRAM_DRY_RUN=false` quando quiser publicar de verdade
 - `X_DRY_RUN=true` no MVP
+- `AMAZON_AFFILIATE_TAG` ou tags por canal: `AMAZON_AFFILIATE_TAG_TELEGRAM`, `AMAZON_AFFILIATE_TAG_X`, `AMAZON_AFFILIATE_TAG_ADMIN`
+- `AMAZON_CREATOR_URL` se usar sua pagina de creator/loja Amazon em campanhas
 
 O start command e `npm start` e o healthcheck e `/api/health`.
 
@@ -40,3 +42,11 @@ O start command e `npm start` e o healthcheck e `/api/health`.
 
 Publicacao Telegram real exige `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` e `TELEGRAM_DRY_RUN=false`.
 X fica em modo aquisicao/dry-run no MVP.
+
+## Amazon Associados
+
+- Gere links com seu ID de Associado pelo SiteStripe, Link pelo App ou tags de rastreamento validas.
+- Cadastre no Portal de Associados cada site, rede social ou canal usado para enviar trafego para a Amazon.
+- Use IDs de rastreamento separados por canal/campanha para comparar resultados nos relatorios.
+- O dashboard marca posts Amazon com preco/desconto para revisao humana, porque promocoes e valores podem expirar.
+- Mantenha a divulgacao de afiliado clara em posts com link rastreavel.

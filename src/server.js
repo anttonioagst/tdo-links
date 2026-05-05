@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { cloneDraftForRetest, createAnalyticsReport, publishApprovedX, refreshOfferAffiliateUrls, regenerateDraftCopy, runPublishPipeline, runScrapePipeline } from "./agents.js";
+import { buildAffiliateUrl } from "./links.js";
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -18,7 +19,7 @@ export function createApp({ db, config, publicDir }) {
         return;
       }
       if (url.pathname.startsWith("/go/")) {
-        await handleRedirect(req, res, url, db);
+        await handleRedirect(req, res, url, db, config);
         return;
       }
       await serveStatic(res, publicDir, url.pathname === "/" ? "/index.html" : url.pathname);
@@ -101,7 +102,7 @@ async function handleApi(req, res, url, db, config) {
   sendJson(res, 404, { error: "not_found" });
 }
 
-async function handleRedirect(req, res, url, db) {
+async function handleRedirect(req, res, url, db, config) {
   if (url.pathname.startsWith("/go/offer/")) {
     const offerId = decodeURIComponent(url.pathname.replace("/go/offer/", ""));
     const offer = db.state.offers.find((item) => item.id === offerId);
@@ -121,7 +122,7 @@ async function handleRedirect(req, res, url, db) {
       country: ""
     });
     await db.save();
-    res.writeHead(302, { location: offer.affiliateUrl });
+    res.writeHead(302, { location: buildAffiliateUrl(offer, config, "admin") });
     res.end();
     return;
   }
@@ -145,7 +146,7 @@ async function handleRedirect(req, res, url, db) {
     country: ""
   });
   await db.save();
-  res.writeHead(302, { location: offer.affiliateUrl });
+  res.writeHead(302, { location: buildAffiliateUrl(offer, config, draft.channel) });
   res.end();
 }
 

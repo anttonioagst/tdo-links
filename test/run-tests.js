@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runPublishPipeline, runScrapePipeline } from "../src/agents.js";
+import { createDraftsForOffer, runPublishPipeline, runScrapePipeline } from "../src/agents.js";
 import { validatePost, validateXAcquisitionPost } from "../src/compliance.js";
 import { loadConfig } from "../src/config.js";
 import { JsonDb } from "../src/db.js";
+import { buildAffiliateUrl } from "../src/links.js";
 import { dedupeOffers, scoreOffer, statusForScore } from "../src/scoring.js";
 import { parseAmazonSearch } from "../src/scrapers.js";
 
@@ -65,6 +66,41 @@ test("blocks posts without disclosure", () => {
 test("accepts X deal copy with price and tracked link", () => {
   const result = validateXAcquisitionPost("🚨 Super Promoção:\nSSD por R$ 99,90\nAd Amazon: https://example.com/go/x1");
   assert.equal(result.ok, true);
+});
+
+test("uses Amazon tracking tags per channel", () => {
+  const offer = { store: "amazon", originalUrl: "https://www.amazon.com.br/dp/B0TEST1234?ref=x" };
+  const config = {
+    amazonAffiliateTag: "default-20",
+    amazonAffiliateTagTelegram: "telegram-20",
+    amazonAffiliateTagAdmin: "admin-20"
+  };
+  assert.equal(new URL(buildAffiliateUrl(offer, config, "telegram")).searchParams.get("tag"), "telegram-20");
+  assert.equal(new URL(buildAffiliateUrl(offer, config, "admin")).searchParams.get("tag"), "admin-20");
+  assert.equal(new URL(buildAffiliateUrl(offer, config, "x")).searchParams.get("tag"), "default-20");
+});
+
+test("keeps Amazon price posts in review because promo information can expire", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318", AMAZON_AFFILIATE_TAG: "default-20" });
+    const draft = createDraftsForOffer(db, {
+      id: "offer_test",
+      store: "amazon",
+      title: "SSD NVMe Teste 1TB",
+      currentPrice: 349.9,
+      previousPrice: 529.9,
+      originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+      score: 95,
+      status: "auto_ready"
+    }, config);
+    assert.equal(draft.status, "needs_review");
+    assert.ok(draft.warnings.includes("amazon_dynamic_price_review"));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("scrape to draft to publish dry-run pipeline", async () => {

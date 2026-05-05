@@ -246,7 +246,7 @@ function Sidebar({ isExpanded, isHovered, isMobileOpen, setIsHovered, setIsMobil
           <div className="mb-6 rounded-2xl bg-gray-50 px-4 py-5 text-center dark:bg-white/[0.03]">
             <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">TDO Links Admin</h3>
             <p className="mb-4 text-xs leading-5 text-gray-500 dark:text-gray-400">Pipeline de ofertas, aprovacao e cliques rastreaveis.</p>
-            <button type="button" onClick={() => go("operation")} className="inline-flex h-9 items-center justify-center rounded-lg bg-brand-500 px-4 text-xs font-medium text-white transition hover:bg-brand-600">Abrir operacao</button>
+            <button type="button" onClick={() => go("operation")} className="inline-flex h-9 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-xs font-medium text-white transition hover:bg-brand-600">Abrir operacao</button>
           </div>
         ) : null}
       </div>
@@ -340,7 +340,7 @@ function Header({ appMenuOpen, darkMode, inputRef, query, setAppMenuOpen, setDar
             </div>
           </div>
         </div>
-        <div className={`${appMenuOpen ? "flex" : "hidden"} w-full items-center justify-between gap-4 px-5 py-4 shadow-theme-md lg:flex lg:justify-end lg:px-0 lg:shadow-none`}>
+        <div className={`${appMenuOpen ? "flex" : "hidden"} w-full flex-wrap items-center justify-between gap-3 px-4 py-4 shadow-theme-md lg:flex lg:flex-nowrap lg:justify-end lg:px-0 lg:shadow-none`}>
           <div className="flex items-center gap-2 2xsm:gap-3">
             <button type="button" onClick={() => setDarkMode((value) => !value)} className="flex size-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white">
               {darkMode ? <Sun className="size-5" /> : <Moon className="size-5" />}
@@ -350,13 +350,13 @@ function Header({ appMenuOpen, darkMode, inputRef, query, setAppMenuOpen, setDar
               <Bell className="size-5" />
             </button>
           </div>
-          <button type="button" className="flex items-center text-gray-700 dark:text-gray-400">
+          <button type="button" className="flex min-w-0 items-center text-gray-700 dark:text-gray-400">
             <span className="mr-3 grid size-11 place-items-center rounded-full bg-brand-500 text-sm font-semibold text-white">A</span>
-            <span className="mr-1 block text-left">
-              <span className="block text-sm font-medium text-gray-700 dark:text-gray-400">Antonio</span>
-              <span className="block text-xs text-gray-500 dark:text-gray-400">{state.settings.mode}</span>
+            <span className="mr-1 block min-w-0 text-left">
+              <span className="block truncate text-sm font-medium text-gray-700 dark:text-gray-400">Antonio</span>
+              <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{state.settings.mode}</span>
             </span>
-            <ChevronDown className="size-5 text-gray-400" />
+            <ChevronDown className="size-5 shrink-0 text-gray-400" />
           </button>
         </div>
       </div>
@@ -417,8 +417,8 @@ function Metric({ icon: Icon, label, value, badge, color }) {
       <div className="flex size-12 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800">
         <Icon className="size-6 text-gray-800 dark:text-white/90" />
       </div>
-      <div className="mt-5 flex items-end justify-between">
-        <div>
+      <div className="mt-5 flex items-end justify-between gap-3">
+        <div className="min-w-0">
           <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
           <h4 className="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90">{value}</h4>
         </div>
@@ -431,12 +431,12 @@ function Metric({ icon: Icon, label, value, badge, color }) {
 function SalesChart({ data, period, setPeriod }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
-      <div className="mb-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Monthly Sales</h3>
           <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">Atividade por horario no periodo selecionado.</p>
         </div>
-        <select value={period} onChange={(event) => setPeriod(event.target.value)} className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-theme-sm text-gray-700 shadow-theme-xs outline-hidden dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+        <select value={period} onChange={(event) => setPeriod(event.target.value)} className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-theme-sm text-gray-700 shadow-theme-xs outline-hidden dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 sm:w-auto">
           {periods.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </select>
       </div>
@@ -449,9 +449,9 @@ function TargetCard({ data, setView }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-white/[0.03]">
       <div className="px-5 pt-5 sm:px-6 sm:pt-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-3">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Monthly Target</h3>
-          <button type="button" onClick={() => setView(data.rec.action.view)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.05] dark:hover:text-gray-300">
+          <button type="button" onClick={() => setView(data.rec.action.view)} className="shrink-0 rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.05] dark:hover:text-gray-300">
             <ExternalLink className="size-5" />
           </button>
         </div>
@@ -468,7 +468,7 @@ function TargetCard({ data, setView }) {
       </div>
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
         <p className="text-theme-sm font-medium text-gray-800 dark:text-white/90">{data.rec.title}</p>
-        <button type="button" onClick={() => setView(data.rec.action.view)} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-theme-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+        <button type="button" onClick={() => setView(data.rec.action.view)} className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-theme-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
           {data.rec.action.label}
         </button>
       </div>
@@ -513,11 +513,11 @@ function RecentOffers({ state, data }) {
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Recent Orders</h3>
-        <div className="flex items-center gap-3">
-          <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <button className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
             <SlidersHorizontal className="size-5" /> Filter
           </button>
-          <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+          <button className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
             See all
           </button>
         </div>
@@ -556,10 +556,10 @@ function ActionPanel({ data, loading, api, action }) {
   return (
     <Panel title="Quick Actions" count={`${data.pending} pendentes`}>
       <div className="space-y-3">
-        <Button loading={loading.scrape} onClick={() => action("scrape", () => api("/api/run/scrape", { method: "POST" }), "Ofertas coletadas")}><Search className="size-4" /> Buscar ofertas</Button>
-        <Button loading={loading.publish} onClick={() => action("publish", () => api("/api/run/publish", { method: "POST" }), "Publicacao executada")}><Send className="size-4" /> Publicar elegiveis</Button>
-        <Button variant="outline" loading={loading.report} onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}><BarChart3 className="size-4" /> Gerar relatorio</Button>
-        <Button variant="outline" loading={loading.refreshAffiliates} onClick={() => action("refreshAffiliates", () => api("/api/run/refresh-affiliates", { method: "POST" }), "Links recalculados")}><RefreshCcw className="size-4" /> Recalcular afiliados</Button>
+        <Button className="w-full" loading={loading.scrape} onClick={() => action("scrape", () => api("/api/run/scrape", { method: "POST" }), "Ofertas coletadas")}><Search className="size-4" /> Buscar ofertas</Button>
+        <Button className="w-full" loading={loading.publish} onClick={() => action("publish", () => api("/api/run/publish", { method: "POST" }), "Publicacao executada")}><Send className="size-4" /> Publicar elegiveis</Button>
+        <Button className="w-full" variant="outline" loading={loading.report} onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}><BarChart3 className="size-4" /> Gerar relatorio</Button>
+        <Button className="w-full" variant="outline" loading={loading.refreshAffiliates} onClick={() => action("refreshAffiliates", () => api("/api/run/refresh-affiliates", { method: "POST" }), "Links recalculados")}><RefreshCcw className="size-4" /> Recalcular afiliados</Button>
       </div>
     </Panel>
   );
@@ -580,6 +580,11 @@ function DraftCard({ draft, offer, loading, api, action }) {
         {draft.channel === "x" ? <Zap className="size-5 text-gray-400" /> : <Send className="size-5 text-gray-400" />}
       </div>
       <textarea value={text} onChange={(event) => setText(event.target.value)} rows={7} className="w-full resize-y rounded-lg border border-gray-200 bg-gray-50 p-3 text-theme-sm leading-5 text-gray-700 outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300" />
+      {draft.warnings?.length ? (
+        <div className="mt-3 rounded-lg border border-warning-200 bg-warning-50 px-3 py-2 text-theme-xs leading-5 text-warning-700 dark:border-warning-500/20 dark:bg-warning-500/10 dark:text-warning-300">
+          {draft.warnings.map(warningLabel).join(" ")}
+        </div>
+      ) : null}
       {draft.rejectionReason ? <p className="mt-2 text-theme-xs text-error-500">{draft.rejectionReason}</p> : null}
       <div className="mt-4 flex flex-wrap gap-2">
         {actions.includes("approve") ? <Button size="sm" loading={loading[`approve-${draft.id}`]} onClick={() => action(`approve-${draft.id}`, () => api(`/api/drafts/${draft.id}/approve`, { method: "POST" }), "Draft aprovado")}><CheckCircle2 className="size-4" /> Aprovar</Button> : null}
@@ -600,9 +605,11 @@ function Offers({ state, data, offers }) {
       </div>
       <div className="col-span-12">
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Ofertas</h3>
-            <Badge color={data.missingAffiliate ? "warning" : "success"}>{data.missingAffiliate} afiliado pendente</Badge>
+            <div className="sm:shrink-0">
+              <Badge color={data.missingAffiliate ? "warning" : "success"}>{data.missingAffiliate} afiliado pendente</Badge>
+            </div>
           </div>
           <OfferTable offers={offers} clicksByOffer={state.metrics.clicksByOffer} />
         </div>
@@ -669,18 +676,18 @@ function Config({ state, data, loading, api, action }) {
 function OfferTable({ offers, clicksByOffer }) {
   return (
     <div className="max-w-full overflow-x-auto">
-      <table className="min-w-full">
+      <table className="min-w-[720px]">
         <thead className="border-y border-gray-100 dark:border-gray-800">
           <tr>
             {["Products", "Category", "Price", "Status"].map((header) => (
-              <th key={header} className="py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{header}</th>
+              <th key={header} className="px-3 py-3 text-start text-theme-xs font-medium text-gray-500 first:pl-0 last:pr-0 dark:text-gray-400">{header}</th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
           {offers.map((offer) => (
             <tr key={offer.id}>
-              <td className="py-3">
+              <td className="py-3 pr-3">
                 <a href={`/go/offer/${offer.id}`} target="_blank" rel="noreferrer" className="flex items-center gap-3">
                   <ProductThumb offer={offer} />
                   <div>
@@ -689,9 +696,9 @@ function OfferTable({ offers, clicksByOffer }) {
                   </div>
                 </a>
               </td>
-              <td className="py-3 text-theme-sm text-gray-500 dark:text-gray-400">{offer.category || "Tech"}</td>
-              <td className="py-3 text-theme-sm text-gray-500 dark:text-gray-400">{money(offer.currentPrice)}</td>
-              <td className="py-3 text-theme-sm text-gray-500 dark:text-gray-400"><Badge color={badgeColor(offer.status)}>{statusLabel(offer.status)}</Badge></td>
+              <td className="px-3 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{offer.category || "Tech"}</td>
+              <td className="px-3 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{money(offer.currentPrice)}</td>
+              <td className="py-3 pl-3 text-theme-sm text-gray-500 dark:text-gray-400"><Badge color={badgeColor(offer.status)}>{statusLabel(offer.status)}</Badge></td>
             </tr>
           ))}
         </tbody>
@@ -704,9 +711,9 @@ function OfferTable({ offers, clicksByOffer }) {
 function Panel({ title, count, children }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{title}</h3>
-        {count ? <span className="text-theme-sm text-gray-500 dark:text-gray-400">{count}</span> : null}
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <h3 className="min-w-0 text-lg font-semibold text-gray-800 dark:text-white/90">{title}</h3>
+        {count ? <span className="shrink-0 text-theme-sm text-gray-500 dark:text-gray-400">{count}</span> : null}
       </div>
       {children}
     </div>
@@ -781,7 +788,7 @@ function Button({ children, loading, variant = "primary", size = "md", className
   }[variant];
   const sizeClass = size === "sm" ? "h-9 px-3 text-theme-xs" : "h-11 px-4 text-theme-sm";
   return (
-    <button type="button" disabled={loading || props.disabled} className={`inline-flex items-center justify-center gap-2 rounded-lg font-medium transition disabled:cursor-not-allowed disabled:opacity-70 ${variantClass} ${sizeClass} ${className}`} {...props}>
+    <button type="button" disabled={loading || props.disabled} className={`inline-flex min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition disabled:cursor-not-allowed disabled:opacity-70 [&>svg]:shrink-0 ${variantClass} ${sizeClass} ${className}`} {...props}>
       {loading ? <Loader2 className="size-4 animate-spin" /> : null}
       {children}
     </button>
@@ -796,7 +803,7 @@ function Badge({ color = "brand", children }) {
     brand: "bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400",
     gray: "bg-gray-100 text-gray-700 dark:bg-white/[0.03] dark:text-gray-400"
   }[color] || "bg-brand-50 text-brand-500";
-  return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-theme-xs font-medium ${classes}`}>{children}</span>;
+  return <span className={`inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-0.5 text-theme-xs font-medium ${classes}`}>{children}</span>;
 }
 
 function EmptyState({ title, text }) {
@@ -923,6 +930,11 @@ function badgeColor(status) {
     failed: "error",
     blocked: "error"
   }[status] || "gray";
+}
+function warningLabel(warning) {
+  return {
+    amazon_dynamic_price_review: "Amazon: revise preco/desconto antes de publicar, pois informacoes promocionais podem expirar."
+  }[warning] || warning;
 }
 function barClass(tone) {
   return { success: "bg-success-500", brand: "bg-brand-500", info: "bg-blue-light-500", critical: "bg-error-500", gray: "bg-gray-400" }[tone] || "bg-brand-500";
