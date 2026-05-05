@@ -1,0 +1,409 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f1113;
+  --panel: #17191c;
+  --panel-soft: #1d2024;
+  --line: #2b3036;
+  --text: #f4f5f6;
+  --muted: #9ba1aa;
+  --faint: #6f7680;
+  --green: #28c97a;
+  --green-bg: #10291d;
+  --orange: #ff9a2e;
+  --orange-bg: #302111;
+  --red: #ff4d63;
+  --red-bg: #32161c;
+  --gray-bg: #24272c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at 20% 0%, rgba(180, 35, 54, 0.14), transparent 28rem), var(--bg);
+  color: var(--text);
+  font-family: "Geist", "Geist Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+select,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  background: #f4f1eb;
+  border: 1px solid #f4f1eb;
+  color: #111315;
+  cursor: pointer;
+  font-weight: 750;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+button.secondary {
+  background: #20242a;
+  border-color: #343a42;
+  color: var(--text);
+}
+
+button.danger {
+  background: var(--red-bg);
+  border-color: #6e2532;
+  color: #ff9aaa;
+}
+
+.topbar {
+  align-items: center;
+  background: rgba(16, 18, 20, 0.96);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 24px 32px;
+}
+
+.eyebrow,
+.sectionLabel {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  font-size: 28px;
+  margin-bottom: 0;
+}
+
+h2 {
+  font-size: 18px;
+  margin-bottom: 0;
+}
+
+h3 {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+.searchBox {
+  max-width: 420px;
+  width: 36vw;
+}
+
+.searchBox input {
+  background: #111316;
+  border: 1px solid var(--line);
+  color: var(--text);
+  outline: 0;
+  padding: 12px 14px;
+  width: 100%;
+}
+
+main {
+  display: grid;
+  gap: 18px;
+  margin: 0 auto;
+  max-width: 1360px;
+  padding: 22px;
+}
+
+.attention,
+.metric,
+.controlPanel,
+.panel,
+.draftCard,
+.offerCard,
+.alertItem,
+.reportCard {
+  background: rgba(23, 25, 28, 0.96);
+  border: 1px solid var(--line);
+}
+
+.attention {
+  align-items: center;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  padding: 20px;
+}
+
+.attention.ready {
+  border-color: rgba(40, 201, 122, 0.5);
+}
+
+.attention.warning {
+  border-color: rgba(255, 154, 46, 0.55);
+}
+
+.attention.critical {
+  border-color: rgba(255, 77, 99, 0.55);
+}
+
+.attention p {
+  color: var(--muted);
+  margin-bottom: 0;
+}
+
+.nextAction {
+  background: #111316;
+  border: 1px solid var(--line);
+  min-width: 280px;
+  padding: 14px;
+}
+
+.nextAction span {
+  color: var(--faint);
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.metrics {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+}
+
+.metric {
+  padding: 16px;
+}
+
+.metric strong {
+  display: block;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 30px;
+  margin-bottom: 6px;
+}
+
+.metric span,
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.controlPanel {
+  align-items: end;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 20px;
+}
+
+.modeControl {
+  display: grid;
+  gap: 8px;
+}
+
+.modeControl span {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+select {
+  background: #111316;
+  border: 1px solid var(--line);
+  color: var(--text);
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.actions,
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions {
+  grid-column: 1 / -1;
+}
+
+.contentGrid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.65fr);
+}
+
+.sideColumn {
+  display: grid;
+  gap: 18px;
+}
+
+.panel {
+  padding: 18px;
+}
+
+.panelHeader,
+.cardTop {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.badge,
+.status,
+.channel,
+.mono {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
+.badge,
+.status {
+  display: inline-flex;
+  font-weight: 800;
+  padding: 5px 8px;
+  text-transform: uppercase;
+}
+
+.badge.neutral,
+.status.archived,
+.status.rejected {
+  background: var(--gray-bg);
+  color: var(--muted);
+}
+
+.status.auto_ready,
+.status.approved,
+.status.published {
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.status.needs_review {
+  background: var(--orange-bg);
+  color: var(--orange);
+}
+
+.status.failed,
+.status.blocked {
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.list.compact {
+  gap: 10px;
+}
+
+.draftCard,
+.offerCard,
+.alertItem,
+.reportCard {
+  padding: 14px;
+}
+
+.draftCard textarea {
+  background: #101215;
+  border: 1px solid var(--line);
+  color: var(--text);
+  margin: 6px 0 10px;
+  min-height: 118px;
+  padding: 10px;
+  resize: vertical;
+  width: 100%;
+}
+
+.offerCard {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 58px 1fr;
+}
+
+.offerImage {
+  background: #101215;
+  border: 1px solid var(--line);
+  height: 58px;
+  object-fit: cover;
+  width: 58px;
+}
+
+.offerImage.empty {
+  align-items: center;
+  color: var(--faint);
+  display: grid;
+  justify-items: center;
+}
+
+.okText {
+  color: var(--green);
+  font-size: 13px;
+  margin-bottom: 0;
+}
+
+.dangerText {
+  color: var(--red);
+  font-size: 13px;
+  margin-bottom: 0;
+}
+
+.alertItem {
+  display: grid;
+  gap: 5px;
+}
+
+.alertItem.ready {
+  border-color: rgba(40, 201, 122, 0.4);
+}
+
+.alertItem.warning {
+  border-color: rgba(255, 154, 46, 0.45);
+}
+
+.alertItem.critical {
+  border-color: rgba(255, 77, 99, 0.45);
+}
+
+.alertItem span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.reportCard p:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 980px) {
+  .topbar,
+  .attention,
+  .controlPanel {
+    align-items: stretch;
+    flex-direction: column;
+    grid-template-columns: 1fr;
+  }
+
+  .searchBox,
+  .nextAction {
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .contentGrid,
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+}

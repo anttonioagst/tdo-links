@@ -1,0 +1,191 @@
+import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import { extname, join } from "node:path";
+import { cloneDraftForRetest, createAnalyticsReport, publishApprovedX, refreshOfferAffiliateUrls, regenerateDraftCopy, runPublishPipeline, runScrapePipeline } from "./agents.js";
+
+const mimeTypes = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8"
+};
+
+export function createApp({ db, config, publicDir }) {
+  return createServer(async (req, res) => {
+    try {
+      const url = new URL(req.url, config.publicBaseUrl);
+      if (url.pathname.startsWith("/api/")) {
+        await handleApi(req, res, url, db, config);
+        return;
+      }
+      if (url.pathname.startsWith("/go/")) {
+        await handleRedirect(req, res, url, db);
+        return;
+      }
+      await serveStatic(res, publicDir, url.pathname === "/" ? "/index.html" : url.pathname);
+    } catch (error) {
+      sendJson(res, 500, { error: "internal_error", detail: error.message });
+    }
+  });
+}
+
+async function handleApi(req, res, url, db, config) {
+  if (req.method === "GET" && url.pathname === "/api/state") {
+    sendJson(res, 200, publicState(db));
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/api/health") {
+    sendJson(res, 200, { ok: true, service: "affiliate-deal-agents-mvp", time: new Date().toISOString() });
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/run/scrape") {
+    sendJson(res, 200, await runScrapePipeline(db, config));
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/run/publish") {
+    const telegram = await runPublishPipeline(db, config);
+    const x = await publishApprovedX(db, config);
+    sendJson(res, 200, { telegram, x });
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/run/report") {
+    const report = createAnalyticsReport(db);
+    await db.save();
+    sendJson(res, 200, report);
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/run/refresh-affiliates") {
+    refreshOfferAffiliateUrls(db, config);
+    await db.save();
+    sendJson(res, 200, { refreshed: db.state.offers.length });
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/settings") {
+    const body = await readJson(req);
+    db.state.settings = { ...db.state.settings, ...body };
+    await db.save();
+    sendJson(res, 200, db.state.settings);
+    return;
+  }
+  const draftMatch = url.pathname.match(/^\/api\/drafts\/([^/]+)\/(approve|reject|edit|regenerate|clone)$/);
+  if (req.method === "POST" && draftMatch) {
+    const [, draftId, action] = draftMatch;
+    const body = await readJson(req);
+    const draft = db.state.drafts.find((item) => item.id === draftId);
+    if (!draft) {
+      sendJson(res, 404, { error: "draft_not_found" });
+      return;
+    }
+    if (action === "approve") draft.status = "approved";
+    if (action === "reject") {
+      draft.status = "rejected";
+      draft.rejectionReason = body.reason || "Rejeitado manualmente.";
+    }
+    if (action === "edit") {
+      draft.text = body.text || draft.text;
+      draft.status = "needs_review";
+    }
+    if (action === "regenerate") {
+      regenerateDraftCopy(db, draftId, config);
+    }
+    if (action === "clone") {
+      const cloned = cloneDraftForRetest(db, draftId, config);
+      await db.save();
+      sendJson(res, cloned ? 200 : 400, cloned || { error: "draft_not_cloneable" });
+      return;
+    }
+    draft.updatedAt = new Date().toISOString();
+    await db.save();
+    sendJson(res, 200, draft);
+    return;
+  }
+  sendJson(res, 404, { error: "not_found" });
+}
+
+async function handleRedirect(req, res, url, db) {
+  if (url.pathname.startsWith("/go/offer/")) {
+    const offerId = decodeURIComponent(url.pathname.replace("/go/offer/", ""));
+    const offer = db.state.offers.find((item) => item.id === offerId);
+    if (!offer) {
+      res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      res.end("Oferta nao encontrada.");
+      return;
+    }
+    db.state.clicks.unshift({
+      id: db.nextId("click"),
+      shortCode: `offer:${offer.id}`,
+      channel: "admin",
+      offerId: offer.id,
+      timestamp: new Date().toISOString(),
+      userAgent: req.headers["user-agent"] || "",
+      referer: req.headers.referer || "",
+      country: ""
+    });
+    await db.save();
+    res.writeHead(302, { location: offer.affiliateUrl });
+    res.end();
+    return;
+  }
+
+  const shortCode = decodeURIComponent(url.pathname.replace("/go/", ""));
+  const draft = db.state.drafts.find((item) => item.shortCode === shortCode);
+  const offer = draft ? db.state.offers.find((item) => item.id === draft.offerId) : null;
+  if (!draft || !offer) {
+    res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+    res.end("Link expirado ou invalido.");
+    return;
+  }
+  db.state.clicks.unshift({
+    id: db.nextId("click"),
+    shortCode,
+    channel: draft.channel,
+    offerId: offer.id,
+    timestamp: new Date().toISOString(),
+    userAgent: req.headers["user-agent"] || "",
+    referer: req.headers.referer || "",
+    country: ""
+  });
+  await db.save();
+  res.writeHead(302, { location: offer.affiliateUrl });
+  res.end();
+}
+
+async function serveStatic(res, publicDir, pathname) {
+  const safePath = pathname.replace(/^\/+/, "").replace(/\.\./g, "");
+  const filePath = join(publicDir, safePath);
+  const body = await readFile(filePath);
+  res.writeHead(200, { "content-type": mimeTypes[extname(filePath)] || "application/octet-stream" });
+  res.end(body);
+}
+
+function publicState(db) {
+  const clicksByOffer = Object.fromEntries(
+    db.state.offers.map((offer) => [offer.id, db.state.clicks.filter((click) => click.offerId === offer.id).length])
+  );
+  return {
+    offers: db.state.offers,
+    drafts: db.state.drafts,
+    clicks: db.state.clicks,
+    reports: db.state.reports,
+    settings: db.state.settings,
+    publishLog: db.state.publishLog.slice(0, 20),
+    metrics: {
+      offers: db.state.offers.length,
+      drafts: db.state.drafts.length,
+      clicks: db.state.clicks.length,
+      published: db.state.drafts.filter((draft) => draft.status === "published").length,
+      clicksByOffer
+    }
+  };
+}
+
+async function readJson(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  if (!chunks.length) return {};
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+function sendJson(res, status, payload) {
+  res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(payload));
+}

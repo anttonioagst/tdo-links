@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TDO Links Admin</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Painel administrativo</p>
+        <h1>TDO Links Admin</h1>
+      </div>
+      <div class="searchBox">
+        <input id="searchInput" placeholder="Buscar ofertas ou drafts..." />
+      </div>
+    </header>
+
+    <main>
+      <section class="attention" id="attentionPanel"></section>
+
+      <section class="metrics" id="metrics"></section>
+
+      <section class="controlPanel">
+        <div>
+          <p class="sectionLabel">Controle de automacao</p>
+          <h2>Operacao do sistema</h2>
+          <p class="muted">Use as acoes abaixo para coletar ofertas reais, publicar no Telegram e gerar analises.</p>
+        </div>
+        <label class="modeControl">
+          <span>Modo</span>
+          <select id="modeSelect">
+            <option value="limited">Automatico limitado</option>
+            <option value="manual">Manual</option>
+            <option value="paused">Pausado</option>
+          </select>
+        </label>
+        <div class="actions">
+          <button id="scrapeBtn">Buscar ofertas</button>
+          <button id="publishBtn">Publicar elegiveis</button>
+          <button id="reportBtn" class="secondary">Gerar relatorio</button>
+        </div>
+      </section>
+
+      <section class="contentGrid">
+        <section class="panel queuePanel">
+          <div class="panelHeader">
+            <div>
+              <p class="sectionLabel">Fila de publicacao</p>
+              <h2>Drafts</h2>
+            </div>
+            <span id="draftSummary" class="badge neutral">0 pendentes</span>
+          </div>
+          <div id="drafts" class="list"></div>
+        </section>
+
+        <aside class="sideColumn">
+          <section class="panel">
+            <div class="panelHeader">
+              <div>
+                <p class="sectionLabel">Radar de ofertas</p>
+                <h2>Ofertas rastreadas</h2>
+              </div>
+            </div>
+            <div id="offers" class="list compact"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panelHeader">
+              <div>
+                <p class="sectionLabel">Saude do sistema</p>
+                <h2>Alertas</h2>
+              </div>
+            </div>
+            <div id="alerts" class="list compact"></div>
+          </section>
+        </aside>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
+          <div>
+            <p class="sectionLabel">Analise do agente</p>
+            <h2>Relatorios</h2>
+          </div>
+        </div>
+        <div id="reports" class="list reports"></div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
