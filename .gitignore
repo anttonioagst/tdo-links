@@ -3,3 +3,4 @@ node_modules/
 data/*.json
 *.log
 dist/
+free-react-tailwind-admin-dashboard-main/
