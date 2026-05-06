@@ -187,7 +187,7 @@ export default function App() {
         <main className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
           <PageTitle view={view} />
           {view === "overview" && <Overview state={state} data={data} setPeriod={setPeriod} period={period} setView={setView} />}
-          {view === "operation" && <Operation state={state} data={data} drafts={drafts} loading={loading} api={api} action={action} />}
+            {view === "operation" && <Operation state={state} data={data} drafts={drafts} loading={loading} api={api} action={action} />}
             {view === "offers" && <Offers state={state} data={data} offers={offers} loading={loading} api={api} action={action} />}
           {view === "ai" && <Reports state={state} data={data} loading={loading} api={api} action={action} />}
           {view === "config" && <Config state={state} data={data} loading={loading} api={api} action={action} />}
@@ -560,6 +560,7 @@ function ActionPanel({ data, loading, api, action }) {
         <Button className="w-full" variant="outline" loading={loading.report} onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}><BarChart3 className="size-4" /> Gerar relatorio</Button>
         <Button className="w-full" variant="outline" loading={loading.refreshAffiliates} onClick={() => action("refreshAffiliates", () => api("/api/run/refresh-affiliates", { method: "POST" }), "Links recalculados")}><RefreshCcw className="size-4" /> Recalcular afiliados</Button>
       </div>
+      <p className="mt-3 text-theme-xs leading-5 text-gray-500 dark:text-gray-400">Se nada sair no Telegram, consulte Configuracao no Railway: `TELEGRAM_DRY_RUN=false`, token e chat id precisam estar preenchidos.</p>
     </Panel>
   );
 }
@@ -706,7 +707,7 @@ function OfferTable({ offers, clicksByOffer, loading, api, action }) {
       <table className="min-w-[980px]">
         <thead className="border-y border-gray-100 dark:border-gray-800">
           <tr>
-            {["Products", "Category", "Price", "Status", "Affiliate"].map((header) => (
+            {["Products", "Category", "Price", "Status", "Affiliate", "Open"].map((header) => (
               <th key={header} className="px-3 py-3 text-start text-theme-xs font-medium text-gray-500 first:pl-0 last:pr-0 dark:text-gray-400">{header}</th>
             ))}
           </tr>
@@ -715,7 +716,7 @@ function OfferTable({ offers, clicksByOffer, loading, api, action }) {
           {offers.map((offer) => (
             <tr key={offer.id}>
               <td className="py-3 pr-3">
-                <a href={`/go/offer/${offer.id}`} target="_blank" rel="noreferrer" className="flex items-center gap-3">
+                <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="flex items-center gap-3">
                   <ProductThumb offer={offer} />
                   <div>
                     <p className="line-clamp-2 max-w-[360px] text-theme-sm font-medium text-gray-800 dark:text-white/90">{offer.title}</p>
@@ -728,6 +729,11 @@ function OfferTable({ offers, clicksByOffer, loading, api, action }) {
               <td className="px-3 py-3 text-theme-sm text-gray-500 dark:text-gray-400"><Badge color={badgeColor(offer.status)}>{statusLabel(offer.status)}</Badge></td>
               <td className="py-3 pl-3 text-theme-sm text-gray-500 dark:text-gray-400">
                 {api && action ? <InlineAffiliateForm offer={offer} loading={loading} api={api} action={action} /> : <Badge color={offer.affiliateReady ? "success" : "warning"}>{offer.affiliateReady ? "Pronto" : "Pendente"}</Badge>}
+              </td>
+              <td className="py-3 pl-3 text-theme-sm text-gray-500 dark:text-gray-400">
+                <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 text-theme-xs font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03]">
+                  <ExternalLink className="size-4" /> Abrir
+                </a>
               </td>
             </tr>
           ))}
@@ -965,6 +971,7 @@ function storeLabel(store) { return { amazon: "Amazon", mercado_livre: "Mercado 
 function channelLabel(channel) { return { telegram: "Telegram", x: "Twitter/X", admin: "Admin" }[channel] || channel || "Canal"; }
 function modeLabel(mode) { return { limited: "Automatico limitado", manual: "Manual", paused: "Pausado" }[mode] || mode; }
 function offerImages(offer) { return [...new Set([...(offer?.imageUrls || []), offer?.imageUrl].filter(Boolean))].slice(0, 4); }
+function offerOpenUrl(offer) { return offer?.affiliateSource === "manual" && offer.affiliateUrl ? offer.affiliateUrl : `/go/offer/${offer.id}`; }
 function statusTone(label) { return label === "Pronto" || label === "Publicado" ? "success" : label === "Revisao" ? "brand" : label === "Arquivado" ? "gray" : "critical"; }
 function channelTone(label) { return label === "Amazon" ? "brand" : label === "Mercado Livre" ? "info" : label === "Telegram" ? "success" : "gray"; }
 function categoryTone(label) { return label.length % 3 === 0 ? "brand" : label.length % 2 === 0 ? "info" : "success"; }

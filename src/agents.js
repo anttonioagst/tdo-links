@@ -124,7 +124,10 @@ export async function maybeCreateXDraft(db, config) {
 }
 
 export async function runPublishPipeline(db, config) {
-  if (db.state.settings.mode === "paused") return { published: 0, skipped: "paused" };
+  if (db.state.settings.mode === "paused") {
+    console.log("publish_skipped", JSON.stringify({ reason: "paused" }));
+    return { published: 0, skipped: "paused" };
+  }
   const autoAllowed = db.state.settings.mode === "limited";
   const eligible = db.state.drafts.filter((draft) => {
     if (draft.publishedAt || draft.status === "published") return false;
@@ -132,11 +135,26 @@ export async function runPublishPipeline(db, config) {
     if (draft.status === "approved") return true;
     return autoAllowed && draft.status === "auto_ready";
   });
+  console.log("publish_pipeline", JSON.stringify({
+    mode: db.state.settings.mode,
+    autoAllowed,
+    eligible: eligible.length,
+    telegramDryRun: config.telegramDryRun,
+    hasBotToken: Boolean(config.telegramBotToken),
+    hasChatId: Boolean(config.telegramChatId)
+  }));
 
   let published = 0;
   for (const draft of eligible) {
     const offer = db.state.offers.find((item) => item.id === draft.offerId);
     const result = await publishTelegram(draft, config, offer);
+    console.log("telegram_publish_result", JSON.stringify({
+      draftId: draft.id,
+      ok: result.ok,
+      dryRun: result.dryRun,
+      detail: result.detail,
+      providerMessageId: result.providerMessageId || null
+    }));
     db.state.publishLog.unshift({
       id: db.nextId("pub"),
       draftId: draft.id,

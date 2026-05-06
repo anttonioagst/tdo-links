@@ -38,6 +38,20 @@ async function handleApi(req, res, url, db, config) {
     sendJson(res, 200, { ok: true, service: "affiliate-deal-agents-mvp", time: new Date().toISOString() });
     return;
   }
+  if (req.method === "GET" && url.pathname === "/api/diagnostics") {
+    sendJson(res, 200, {
+      publicBaseUrl: config.publicBaseUrl,
+      telegram: {
+        dryRun: config.telegramDryRun,
+        hasBotToken: Boolean(config.telegramBotToken),
+        hasChatId: Boolean(config.telegramChatId)
+      },
+      x: {
+        dryRun: config.xDryRun
+      }
+    });
+    return;
+  }
   if (req.method === "POST" && url.pathname === "/api/run/scrape") {
     sendJson(res, 200, await runScrapePipeline(db, config));
     return;
