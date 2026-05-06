@@ -1,4 +1,5 @@
 export function buildAffiliateUrl(offer, config, channel = "") {
+  if (offer.affiliateSource === "manual" && offer.affiliateUrl && /^https?:\/\//.test(offer.affiliateUrl)) return offer.affiliateUrl;
   if (!offer.originalUrl && offer.affiliateUrl && /^https?:\/\//.test(offer.affiliateUrl)) return offer.affiliateUrl;
   const url = new URL(offer.originalUrl);
   const amazonTag = amazonTrackingTag(config, channel);

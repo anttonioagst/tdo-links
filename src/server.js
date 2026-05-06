@@ -67,6 +67,27 @@ async function handleApi(req, res, url, db, config) {
     sendJson(res, 200, db.state.settings);
     return;
   }
+  const offerAffiliateMatch = url.pathname.match(/^\/api\/offers\/([^/]+)\/affiliate$/);
+  if (req.method === "POST" && offerAffiliateMatch) {
+    const [, offerId] = offerAffiliateMatch;
+    const body = await readJson(req);
+    const offer = db.state.offers.find((item) => item.id === offerId);
+    if (!offer) {
+      sendJson(res, 404, { error: "offer_not_found" });
+      return;
+    }
+    if (!/^https:\/\/(www\.)?amazon\.com\.br\/|^https:\/\/amzn\.to\//.test(body.affiliateUrl || "")) {
+      sendJson(res, 400, { error: "invalid_affiliate_url" });
+      return;
+    }
+    offer.affiliateUrl = body.affiliateUrl.trim();
+    offer.affiliateReady = true;
+    offer.affiliateSource = "manual";
+    offer.updatedAt = new Date().toISOString();
+    await db.save();
+    sendJson(res, 200, offer);
+    return;
+  }
   const draftMatch = url.pathname.match(/^\/api\/drafts\/([^/]+)\/(approve|reject|edit|regenerate|clone)$/);
   if (req.method === "POST" && draftMatch) {
     const [, draftId, action] = draftMatch;

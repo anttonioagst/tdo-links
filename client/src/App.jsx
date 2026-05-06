@@ -188,7 +188,7 @@ export default function App() {
           <PageTitle view={view} />
           {view === "overview" && <Overview state={state} data={data} setPeriod={setPeriod} period={period} setView={setView} />}
           {view === "operation" && <Operation state={state} data={data} drafts={drafts} loading={loading} api={api} action={action} />}
-          {view === "offers" && <Offers state={state} data={data} offers={offers} />}
+            {view === "offers" && <Offers state={state} data={data} offers={offers} loading={loading} api={api} action={action} />}
           {view === "ai" && <Reports state={state} data={data} loading={loading} api={api} action={action} />}
           {view === "config" && <Config state={state} data={data} loading={loading} api={api} action={action} />}
         </main>
@@ -529,24 +529,23 @@ function RecentOffers({ state, data }) {
 
 function Operation({ state, data, drafts, loading, api, action }) {
   return (
-    <div className="grid grid-cols-12 gap-4 md:gap-6">
-      <div className="col-span-12 xl:col-span-4">
-        <ActionPanel data={data} loading={loading} api={api} action={action} />
-      </div>
-      <div className="col-span-12 xl:col-span-8">
-        <div className="grid gap-4 md:grid-cols-2">
-          {draftColumns.map(([column, title]) => (
-            <Panel key={column} title={title} count={`${drafts.filter((draft) => draftColumn(draft) === column).length}`}>
-              <div className="space-y-4">
-                {drafts.filter((draft) => draftColumn(draft) === column).map((draft) => {
+    <div className="space-y-4 md:space-y-6">
+      <ActionPanel data={data} loading={loading} api={api} action={action} />
+      <div className="grid gap-4 xl:grid-cols-3">
+        {draftColumns.map(([column, title]) => {
+          const columnDrafts = drafts.filter((draft) => draftColumn(draft) === column);
+          return (
+            <Panel key={column} title={title} count={`${columnDrafts.length}`}>
+              <div className="max-h-[760px] space-y-4 overflow-y-auto pr-1 custom-scrollbar">
+                {columnDrafts.map((draft) => {
                   const offer = state.offers.find((item) => item.id === draft.offerId);
                   return <DraftCard key={draft.id} draft={draft} offer={offer} loading={loading} api={api} action={action} />;
                 })}
-                {!drafts.filter((draft) => draftColumn(draft) === column).length ? <EmptyState title="Fila vazia" text="Nenhum draft neste status." /> : null}
+                {!columnDrafts.length ? <EmptyState title="Fila vazia" text="Nenhum draft neste status." /> : null}
               </div>
             </Panel>
-          ))}
-        </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -555,7 +554,7 @@ function Operation({ state, data, drafts, loading, api, action }) {
 function ActionPanel({ data, loading, api, action }) {
   return (
     <Panel title="Quick Actions" count={`${data.pending} pendentes`}>
-      <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Button className="w-full" loading={loading.scrape} onClick={() => action("scrape", () => api("/api/run/scrape", { method: "POST" }), "Ofertas coletadas")}><Search className="size-4" /> Buscar ofertas</Button>
         <Button className="w-full" loading={loading.publish} onClick={() => action("publish", () => api("/api/run/publish", { method: "POST" }), "Publicacao executada")}><Send className="size-4" /> Publicar elegiveis</Button>
         <Button className="w-full" variant="outline" loading={loading.report} onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}><BarChart3 className="size-4" /> Gerar relatorio</Button>
@@ -567,7 +566,9 @@ function ActionPanel({ data, loading, api, action }) {
 
 function DraftCard({ draft, offer, loading, api, action }) {
   const [text, setText] = useState(draft.text);
+  const [affiliateUrl, setAffiliateUrl] = useState(offer?.affiliateSource === "manual" ? offer.affiliateUrl || "" : "");
   useEffect(() => setText(draft.text), [draft.text]);
+  useEffect(() => setAffiliateUrl(offer?.affiliateSource === "manual" ? offer.affiliateUrl || "" : ""), [offer?.affiliateUrl, offer?.affiliateSource]);
   const actions = draftActionsForStatus(draft.status);
   return (
     <article className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -586,6 +587,32 @@ function DraftCard({ draft, offer, loading, api, action }) {
         </div>
       ) : null}
       {draft.rejectionReason ? <p className="mt-2 text-theme-xs text-error-500">{draft.rejectionReason}</p> : null}
+      {offer ? (
+        <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-theme-xs font-medium text-gray-700 dark:text-gray-300">Link afiliado oficial</span>
+            <Badge color={offer.affiliateSource === "manual" ? "success" : "warning"}>{offer.affiliateSource === "manual" ? "SiteStripe salvo" : "Pendente"}</Badge>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={affiliateUrl}
+              onChange={(event) => setAffiliateUrl(event.target.value)}
+              placeholder="Cole o link do SiteStripe ou amzn.to"
+              className="h-10 min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-theme-sm text-gray-700 outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300"
+            />
+            <Button
+              size="sm"
+              className="h-10 sm:w-auto"
+              variant="outline"
+              loading={loading[`affiliate-${offer.id}`]}
+              disabled={!affiliateUrl.trim()}
+              onClick={() => action(`affiliate-${offer.id}`, () => api(`/api/offers/${offer.id}/affiliate`, { method: "POST", body: { affiliateUrl } }), "Link afiliado salvo")}
+            >
+              Salvar link
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         {actions.includes("approve") ? <Button size="sm" loading={loading[`approve-${draft.id}`]} onClick={() => action(`approve-${draft.id}`, () => api(`/api/drafts/${draft.id}/approve`, { method: "POST" }), "Draft aprovado")}><CheckCircle2 className="size-4" /> Aprovar</Button> : null}
         {actions.includes("edit") ? <Button size="sm" variant="outline" loading={loading[`edit-${draft.id}`]} onClick={() => action(`edit-${draft.id}`, () => api(`/api/drafts/${draft.id}/edit`, { method: "POST", body: { text } }), "Draft salvo")}><FileText className="size-4" /> Salvar</Button> : null}
@@ -597,7 +624,7 @@ function DraftCard({ draft, offer, loading, api, action }) {
   );
 }
 
-function Offers({ state, data, offers }) {
+function Offers({ state, data, offers, loading, api, action }) {
   return (
     <div className="grid grid-cols-12 gap-4 md:gap-6">
       <div className="col-span-12">
@@ -611,7 +638,7 @@ function Offers({ state, data, offers }) {
               <Badge color={data.missingAffiliate ? "warning" : "success"}>{data.missingAffiliate} afiliado pendente</Badge>
             </div>
           </div>
-          <OfferTable offers={offers} clicksByOffer={state.metrics.clicksByOffer} />
+          <OfferTable offers={offers} clicksByOffer={state.metrics.clicksByOffer} loading={loading} api={api} action={action} />
         </div>
       </div>
     </div>
@@ -673,13 +700,13 @@ function Config({ state, data, loading, api, action }) {
   );
 }
 
-function OfferTable({ offers, clicksByOffer }) {
+function OfferTable({ offers, clicksByOffer, loading, api, action }) {
   return (
     <div className="max-w-full overflow-x-auto">
-      <table className="min-w-[720px]">
+      <table className="min-w-[980px]">
         <thead className="border-y border-gray-100 dark:border-gray-800">
           <tr>
-            {["Products", "Category", "Price", "Status"].map((header) => (
+            {["Products", "Category", "Price", "Status", "Affiliate"].map((header) => (
               <th key={header} className="px-3 py-3 text-start text-theme-xs font-medium text-gray-500 first:pl-0 last:pr-0 dark:text-gray-400">{header}</th>
             ))}
           </tr>
@@ -698,12 +725,39 @@ function OfferTable({ offers, clicksByOffer }) {
               </td>
               <td className="px-3 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{offer.category || "Tech"}</td>
               <td className="px-3 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{money(offer.currentPrice)}</td>
-              <td className="py-3 pl-3 text-theme-sm text-gray-500 dark:text-gray-400"><Badge color={badgeColor(offer.status)}>{statusLabel(offer.status)}</Badge></td>
+              <td className="px-3 py-3 text-theme-sm text-gray-500 dark:text-gray-400"><Badge color={badgeColor(offer.status)}>{statusLabel(offer.status)}</Badge></td>
+              <td className="py-3 pl-3 text-theme-sm text-gray-500 dark:text-gray-400">
+                {api && action ? <InlineAffiliateForm offer={offer} loading={loading} api={api} action={action} /> : <Badge color={offer.affiliateReady ? "success" : "warning"}>{offer.affiliateReady ? "Pronto" : "Pendente"}</Badge>}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
       {!offers.length ? <EmptyState title="Nenhuma oferta" text="Execute a coleta para popular a tabela." /> : null}
+    </div>
+  );
+}
+
+function InlineAffiliateForm({ offer, loading, api, action }) {
+  const [affiliateUrl, setAffiliateUrl] = useState(offer.affiliateSource === "manual" ? offer.affiliateUrl || "" : "");
+  useEffect(() => setAffiliateUrl(offer.affiliateSource === "manual" ? offer.affiliateUrl || "" : ""), [offer.affiliateUrl, offer.affiliateSource]);
+  return (
+    <div className="flex min-w-[260px] items-center gap-2">
+      <input
+        value={affiliateUrl}
+        onChange={(event) => setAffiliateUrl(event.target.value)}
+        placeholder="SiteStripe/amzn.to"
+        className="h-9 min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-theme-xs text-gray-700 outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300"
+      />
+      <Button
+        size="sm"
+        variant={offer.affiliateSource === "manual" ? "outline" : "primary"}
+        loading={loading?.[`affiliate-${offer.id}`]}
+        disabled={!affiliateUrl.trim()}
+        onClick={() => action(`affiliate-${offer.id}`, () => api(`/api/offers/${offer.id}/affiliate`, { method: "POST", body: { affiliateUrl } }), "Link afiliado salvo")}
+      >
+        Salvar
+      </Button>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { validatePost, validateXAcquisitionPost } from "../src/compliance.js";
 import { loadConfig } from "../src/config.js";
 import { JsonDb } from "../src/db.js";
 import { buildAffiliateUrl } from "../src/links.js";
+import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, statusForScore } from "../src/scoring.js";
 import { parseAmazonSearch } from "../src/scrapers.js";
 
@@ -103,6 +104,34 @@ test("keeps Amazon price posts in review because promo information can expire", 
   }
 });
 
+test("saves manual Amazon affiliate links and prioritizes them", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "offer_manual",
+      store: "amazon",
+      title: "Produto Manual",
+      originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+      affiliateUrl: "https://www.amazon.com.br/dp/B0TEST1234?tag=default-20",
+      affiliateReady: false
+    });
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318", AMAZON_AFFILIATE_TAG: "default-20" });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/offers/offer_manual/affiliate",
+      body: { affiliateUrl: "https://amzn.to/42cFr9f" }
+    });
+    assert.equal(response.status, 200);
+    assert.equal(db.state.offers[0].affiliateSource, "manual");
+    assert.equal(buildAffiliateUrl(db.state.offers[0], config, "telegram"), "https://amzn.to/42cFr9f");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("scrape to draft to publish dry-run pipeline", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   try {
@@ -161,3 +190,25 @@ for (const { name, fn } of tests) {
 
 if (failed) process.exit(1);
 console.log(`${tests.length} tests passed`);
+
+function request(app, { method = "GET", path = "/", body = null }) {
+  return new Promise((resolve, reject) => {
+    app.listen(0, "127.0.0.1", () => {
+      const { port } = app.address();
+      const payload = body ? JSON.stringify(body) : "";
+      const req = globalThis.fetch(`http://127.0.0.1:${port}${path}`, {
+        method,
+        headers: { "content-type": "application/json" },
+        body: payload || undefined
+      });
+      req.then(async (response) => {
+        const text = await response.text();
+        app.close();
+        resolve({ status: response.status, text });
+      }).catch((error) => {
+        app.close();
+        reject(error);
+      });
+    });
+  });
+}
