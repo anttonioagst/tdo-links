@@ -428,6 +428,51 @@ test("manual affiliate route refreshes validation score breakdown and status", a
   }
 });
 
+test("refresh affiliates route refreshes validation score breakdown and status", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "offer_refresh_affiliates",
+      store: "amazon",
+      title: "SSD NVMe",
+      currentPrice: 349.9,
+      previousPrice: 529.9,
+      discountPercent: 34,
+      rating: 4.8,
+      reviewCount: 1200,
+      originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+      scrapedAt: new Date().toISOString(),
+      inStock: true,
+      category: "tech",
+      affiliateReady: false,
+      validationStatus: "blocked",
+      validationReasons: ["affiliate_not_ready"],
+      publishable: false,
+      score: 0,
+      status: "blocked"
+    });
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      AMAZON_AFFILIATE_TAG: "default-20"
+    });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/run/refresh-affiliates"
+    });
+    assert.equal(response.status, 200);
+    assert.equal(db.state.offers[0].affiliateReady, true);
+    assert.equal(db.state.offers[0].validationStatus, "ready");
+    assert.equal(db.state.offers[0].publishable, true);
+    assert.ok(db.state.offers[0].scoreBreakdown.reliability > 0);
+    assert.notEqual(db.state.offers[0].status, "blocked");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("publish pipeline records failed details when Telegram fetch throws", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   const originalFetch = globalThis.fetch;

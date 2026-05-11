@@ -117,11 +117,12 @@ export function cloneDraftForRetest(db, draftId, config) {
 }
 
 export function refreshOfferAffiliateUrls(db, config) {
-  for (const offer of db.state.offers) {
+  db.state.offers = db.state.offers.map((offer) => {
     offer.affiliateUrl = buildAffiliateUrl(offer, config);
     offer.affiliateReady = hasAffiliateConfig(offer, config);
     offer.updatedAt = new Date().toISOString();
-  }
+    return refreshOfferDecision(offer, db, config);
+  });
 }
 
 export async function maybeCreateXDraft(db, config) {
