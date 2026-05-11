@@ -21,26 +21,30 @@ export async function runScrapePipeline(db, config) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    const validatedOffer = applyValidation(scoredOffer, config);
-    const performance = { clicks: db.state.clicks.filter((click) => click.offerId === validatedOffer.id).length };
-    const score = scoreOfferDetailed(validatedOffer, performance);
-    validatedOffer.score = score.total;
-    validatedOffer.scoreBreakdown = score.components;
-    validatedOffer.status = validatedOffer.publishable
-      ? statusForScore(validatedOffer.score, db.state.settings)
-      : validatedOffer.validationStatus === "blocked"
-        ? "blocked"
-        : "needs_review";
-    return validatedOffer;
+    return refreshOfferDecision(scoredOffer, db, config);
   });
 
   db.state.offers.unshift(...incoming);
   for (const offer of incoming) {
-    if (offer.status !== "archived") createDraftsForOffer(db, offer, config);
+    if (!["archived", "blocked"].includes(offer.status)) createDraftsForOffer(db, offer, config);
   }
   await maybeCreateXDraft(db, config);
   await db.save();
   return { found: rawOffers.length, inserted: incoming.length, scrape: getLastScrapeMeta() };
+}
+
+export function refreshOfferDecision(offer, db, config) {
+  const validatedOffer = applyValidation(offer, config);
+  const performance = { clicks: db.state.clicks.filter((click) => click.offerId === validatedOffer.id).length };
+  const score = scoreOfferDetailed(validatedOffer, performance);
+  validatedOffer.score = score.total;
+  validatedOffer.scoreBreakdown = score.components;
+  validatedOffer.status = validatedOffer.publishable
+    ? statusForScore(validatedOffer.score, db.state.settings)
+    : validatedOffer.validationStatus === "blocked"
+      ? "blocked"
+      : "needs_review";
+  return validatedOffer;
 }
 
 export function createDraftsForOffer(db, offer, config) {
@@ -122,7 +126,7 @@ export function refreshOfferAffiliateUrls(db, config) {
 
 export async function maybeCreateXDraft(db, config) {
   const [topOffer] = db.state.offers
-    .filter((offer) => offer.status !== "archived")
+    .filter((offer) => !["archived", "blocked"].includes(offer.status))
     .sort((a, b) => b.score - a.score)
     .slice(0, 1);
   if (!topOffer) return null;
@@ -157,6 +161,25 @@ export async function runPublishPipeline(db, config) {
   const results = [];
   for (const draft of eligible) {
     const offer = db.state.offers.find((item) => item.id === draft.offerId);
+    if (!offer || offer.publishable !== true || offer.validationStatus !== "ready") {
+      const detail = {
+        draftId: draft.id,
+        offerId: draft.offerId,
+        channel: draft.channel,
+        ok: false,
+        dryRun: false,
+        providerMessageId: null,
+        reason: "offer_not_publishable",
+        detail: "offer_not_publishable: validate affiliate and price before publishing.",
+        outcome: "skipped"
+      };
+      results.push(detail);
+      draft.lastPublishResult = detail;
+      draft.publishAttempts = [...(draft.publishAttempts || []), detail].slice(-10);
+      draft.rejectionReason = detail.detail;
+      draft.updatedAt = new Date().toISOString();
+      continue;
+    }
     const result = await publishTelegram(draft, config, offer);
     console.log("telegram_publish_result", JSON.stringify({
       draftId: draft.id,
@@ -202,7 +225,7 @@ export async function runPublishPipeline(db, config) {
     published,
     failed: results.filter((item) => item.outcome === "failed").length,
     dryRun: results.filter((item) => item.dryRun).length,
-    skipped: 0,
+    skipped: results.filter((item) => item.outcome === "skipped").length,
     results
   };
 }

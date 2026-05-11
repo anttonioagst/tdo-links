@@ -1,11 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
-import { cloneDraftForRetest, createAnalyticsReport, publishApprovedX, refreshOfferAffiliateUrls, regenerateDraftCopy, runPublishPipeline, runScrapePipeline } from "./agents.js";
+import { cloneDraftForRetest, createAnalyticsReport, publishApprovedX, refreshOfferAffiliateUrls, refreshOfferDecision, regenerateDraftCopy, runPublishPipeline, runScrapePipeline } from "./agents.js";
 import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
 import { testTelegram } from "./publishers/telegram.js";
-import { applyValidation } from "./validation.js";
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -91,8 +90,8 @@ async function handleApi(req, res, url, db, config) {
   if (req.method === "POST" && offerAffiliateMatch) {
     const [, offerId] = offerAffiliateMatch;
     const body = await readJson(req);
-    const offer = db.state.offers.find((item) => item.id === offerId);
-    if (!offer) {
+    const offerIndex = db.state.offers.findIndex((item) => item.id === offerId);
+    if (offerIndex === -1) {
       sendJson(res, 404, { error: "offer_not_found" });
       return;
     }
@@ -100,12 +99,15 @@ async function handleApi(req, res, url, db, config) {
       sendJson(res, 400, { error: "invalid_affiliate_url" });
       return;
     }
-    offer.affiliateUrl = body.affiliateUrl.trim();
-    offer.affiliateReady = true;
-    offer.affiliateSource = "manual";
-    offer.updatedAt = new Date().toISOString();
+    db.state.offers[offerIndex] = refreshOfferDecision({
+      ...db.state.offers[offerIndex],
+      affiliateUrl: body.affiliateUrl.trim(),
+      affiliateReady: true,
+      affiliateSource: "manual",
+      updatedAt: new Date().toISOString()
+    }, db, config);
     await db.save();
-    sendJson(res, 200, offer);
+    sendJson(res, 200, db.state.offers[offerIndex]);
     return;
   }
   const offerValidateMatch = url.pathname.match(/^\/api\/offers\/([^/]+)\/validate$/);
@@ -116,7 +118,7 @@ async function handleApi(req, res, url, db, config) {
       sendJson(res, 404, { error: "offer_not_found" });
       return;
     }
-    db.state.offers[offerIndex] = applyValidation(db.state.offers[offerIndex], config);
+    db.state.offers[offerIndex] = refreshOfferDecision(db.state.offers[offerIndex], db, config);
     await db.save();
     sendJson(res, 200, db.state.offers[offerIndex]);
     return;

@@ -301,6 +301,133 @@ test("compound score returns total and named components", () => {
   assert.ok(result.components.performance > 0);
 });
 
+test("blocked offer cannot publish even when draft is approved", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      TELEGRAM_DRY_RUN: "true"
+    });
+    db.state.offers.push({
+      id: "offer_blocked_publish",
+      store: "amazon",
+      title: "Produto Bloqueado",
+      originalUrl: "https://www.amazon.com.br/dp/B0BLOCKED1",
+      currentPrice: 349.9,
+      inStock: true,
+      validationStatus: "blocked",
+      validationReasons: ["affiliate_not_ready"],
+      publishable: false
+    });
+    db.state.drafts.push({
+      id: "draft_blocked_publish",
+      offerId: "offer_blocked_publish",
+      channel: "telegram",
+      text: "Oferta bloqueada\nhttps://x.test/go/abc",
+      status: "approved",
+      publishedAt: null,
+      providerMessageId: null
+    });
+    const publish = await runPublishPipeline(db, config);
+    assert.equal(publish.published, 0);
+    assert.equal(publish.skipped, 1);
+    assert.equal(publish.results.length, 1);
+    assert.equal(publish.results[0].outcome, "skipped");
+    assert.equal(publish.results[0].reason, "offer_not_publishable");
+    assert.match(publish.results[0].detail, /offer_not_publishable/);
+    assert.notEqual(db.state.drafts[0].status, "published");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("validate route refreshes validation score breakdown and status", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "offer_validate_refresh",
+      store: "amazon",
+      title: "SSD NVMe",
+      currentPrice: 349.9,
+      previousPrice: 529.9,
+      discountPercent: 34,
+      rating: 4.8,
+      reviewCount: 1200,
+      originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+      affiliateUrl: "https://amzn.to/42cFr9f",
+      affiliateSource: "manual",
+      affiliateReady: true,
+      scrapedAt: new Date().toISOString(),
+      inStock: true,
+      category: "tech",
+      validationStatus: "blocked",
+      publishable: false,
+      score: 0,
+      status: "blocked"
+    });
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/offers/offer_validate_refresh/validate"
+    });
+    assert.equal(response.status, 200);
+    assert.equal(db.state.offers[0].validationStatus, "ready");
+    assert.equal(db.state.offers[0].publishable, true);
+    assert.ok(db.state.offers[0].score > 0);
+    assert.ok(db.state.offers[0].scoreBreakdown.reliability > 0);
+    assert.notEqual(db.state.offers[0].status, "blocked");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("manual affiliate route refreshes validation score breakdown and status", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "offer_affiliate_refresh",
+      store: "amazon",
+      title: "SSD NVMe",
+      currentPrice: 349.9,
+      previousPrice: 529.9,
+      discountPercent: 34,
+      rating: 4.8,
+      reviewCount: 1200,
+      originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+      scrapedAt: new Date().toISOString(),
+      inStock: true,
+      category: "tech",
+      validationStatus: "blocked",
+      publishable: false,
+      score: 0,
+      status: "blocked"
+    });
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/offers/offer_affiliate_refresh/affiliate",
+      body: { affiliateUrl: "https://amzn.to/42cFr9f" }
+    });
+    assert.equal(response.status, 200);
+    assert.equal(db.state.offers[0].affiliateSource, "manual");
+    assert.equal(db.state.offers[0].validationStatus, "ready");
+    assert.equal(db.state.offers[0].publishable, true);
+    assert.ok(db.state.offers[0].score > 0);
+    assert.ok(db.state.offers[0].scoreBreakdown.reliability > 0);
+    assert.notEqual(db.state.offers[0].status, "blocked");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("publish pipeline records failed details when Telegram fetch throws", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   const originalFetch = globalThis.fetch;
@@ -320,7 +447,9 @@ test("publish pipeline records failed details when Telegram fetch throws", async
       id: "offer_network_failure",
       store: "amazon",
       title: "Produto Teste",
-      originalUrl: "https://www.amazon.com.br/dp/B0TEST1234"
+      originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+      publishable: true,
+      validationStatus: "ready"
     });
     db.state.drafts.push({
       id: "draft_network_failure",
