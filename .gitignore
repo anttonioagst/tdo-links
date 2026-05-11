@@ -5,3 +5,5 @@ data/*.json
 dist/
 free-react-tailwind-admin-dashboard-main/
 .worktrees/
+.claude/
+.superpowers/**/state/
