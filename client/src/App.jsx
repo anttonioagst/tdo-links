@@ -331,7 +331,7 @@ function Header({ appMenuOpen, darkMode, inputRef, query, setAppMenuOpen, setDar
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 type="text"
-                placeholder="Search or type command..."
+                placeholder="Buscar oferta, canal, status ou comando..."
                 className="h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-14 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[430px]"
               />
               <span className="absolute right-2.5 top-1/2 inline-flex -translate-y-1/2 items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 px-[7px] py-[4.5px] text-xs text-gray-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400">
@@ -405,8 +405,10 @@ function Overview({ state, data, setPeriod, period, setView }) {
 function Metrics({ state, data }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6">
+      <Metric icon={CheckCircle2} label="Pronto para publicar" value={data.autoReady} badge="verde" color={data.autoReady ? "success" : "gray"} />
+      <Metric icon={AlertTriangle} label="Bloqueado por link" value={data.missingAffiliate} badge="corrigir" color={data.missingAffiliate ? "warning" : "success"} />
+      <Metric icon={Send} label="Publicados" value={state.metrics.published} badge="Telegram" color="brand" />
       <Metric icon={MousePointerClick} label="Cliques" value={state.metrics.clicks} badge={`${data.clickRate}%`} color="success" />
-      <Metric icon={Package} label="Ofertas" value={state.metrics.offers} badge={`${data.autoReady} prontas`} color={data.autoReady ? "success" : "warning"} />
     </div>
   );
 }
@@ -433,7 +435,7 @@ function SalesChart({ data, period, setPeriod }) {
     <div className="rounded-2xl border border-gray-200 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Monthly Sales</h3>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Atividade por horario</h3>
           <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">Atividade por horario no periodo selecionado.</p>
         </div>
         <select value={period} onChange={(event) => setPeriod(event.target.value)} className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-theme-sm text-gray-700 shadow-theme-xs outline-hidden dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 sm:w-auto">
@@ -450,7 +452,7 @@ function TargetCard({ data, setView }) {
     <div className="rounded-2xl border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-white/[0.03]">
       <div className="px-5 pt-5 sm:px-6 sm:pt-6">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Monthly Target</h3>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Saude da operacao</h3>
           <button type="button" onClick={() => setView(data.rec.action.view)} className="shrink-0 rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.05] dark:hover:text-gray-300">
             <ExternalLink className="size-5" />
           </button>
@@ -481,7 +483,7 @@ function StatisticsCard({ data }) {
     <div className="rounded-2xl border border-gray-200 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Statistics</h3>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Funil de ofertas</h3>
           <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">Distribuicao por status, canal e categoria.</p>
         </div>
       </div>
@@ -497,7 +499,7 @@ function StatisticsCard({ data }) {
 function ChannelsCard({ data }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
-      <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Customers Demographic</h3>
+      <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Alertas operacionais</h3>
       <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">Leitura operacional dos canais e lojas.</p>
       <div className="mt-6 space-y-4">
         {data.alerts.length ? data.alerts.map((alert) => (
@@ -512,7 +514,7 @@ function RecentOffers({ state, data }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Recent Orders</h3>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Melhores oportunidades</h3>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
             <SlidersHorizontal className="size-5" /> Filter
@@ -553,7 +555,7 @@ function Operation({ state, data, drafts, loading, api, action }) {
 
 function ActionPanel({ data, loading, api, action }) {
   return (
-    <Panel title="Quick Actions" count={`${data.pending} pendentes`}>
+    <Panel title="Acoes operacionais" count={`${data.pending} pendentes`}>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Button className="w-full" loading={loading.scrape} onClick={() => action("scrape", () => api("/api/run/scrape", { method: "POST" }), "Ofertas coletadas")}><Search className="size-4" /> Buscar ofertas</Button>
         <Button className="w-full" loading={loading.publish} onClick={() => action("publish", () => api("/api/run/publish", { method: "POST" }), "Publicacao executada")}><Send className="size-4" /> Publicar elegiveis</Button>
@@ -578,6 +580,17 @@ function DraftCard({ draft, offer, loading, api, action }) {
           <Badge color={badgeColor(draft.status)}>{statusLabel(draft.status)}</Badge>
           <h4 className="mt-3 line-clamp-2 text-theme-sm font-medium text-gray-800 dark:text-white/90">{offer?.title || "Post de aquisicao X"}</h4>
           <p className="mt-1 text-theme-xs text-gray-500 dark:text-gray-400">{channelLabel(draft.channel)} {offer ? `- ${money(offer.currentPrice)}` : ""}</p>
+          {offer?.validationSummary ? (
+            <p className="mt-2 text-theme-xs text-gray-500 dark:text-gray-400">{offer.validationSummary}</p>
+          ) : null}
+          {offer?.scoreBreakdown ? (
+            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+              <span>Confianca {offer.scoreBreakdown.reliability}</span>
+              <span>Atratividade {offer.scoreBreakdown.attractiveness}</span>
+              <span>Potencial {offer.scoreBreakdown.potential}</span>
+              <span>Historico {offer.scoreBreakdown.performance}</span>
+            </div>
+          ) : null}
         </div>
         {draft.channel === "x" ? <Zap className="size-5 text-gray-400" /> : <Send className="size-5 text-gray-400" />}
       </div>
@@ -592,7 +605,7 @@ function DraftCard({ draft, offer, loading, api, action }) {
         <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <span className="text-theme-xs font-medium text-gray-700 dark:text-gray-300">Link afiliado oficial</span>
-            <Badge color={offer.affiliateSource === "manual" ? "success" : "warning"}>{offer.affiliateSource === "manual" ? "SiteStripe salvo" : "Pendente"}</Badge>
+            <Badge color={offer.affiliateReady ? "success" : "warning"}>{offer.affiliateReady ? "Afiliado pronto" : "Pendente"}</Badge>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
@@ -650,13 +663,27 @@ function Reports({ state, data, loading, api, action }) {
   return (
     <div className="grid grid-cols-12 gap-4 md:gap-6">
       <div className="col-span-12 xl:col-span-4">
-        <Panel title="AI Overview" count={`${data.healthScore}/100`}>
+        <Panel title="Analise operacional" count={`${data.healthScore}/100`}>
           <p className="text-theme-sm leading-6 text-gray-500 dark:text-gray-400">Relatorios analisam cliques, categorias e gargalos do funil.</p>
           <Button className="mt-4" loading={loading.report} onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}><BarChart3 className="size-4" /> Gerar relatorio</Button>
         </Panel>
       </div>
       <div className="col-span-12 xl:col-span-8">
-        <Panel title="Historico de analises" count={`${state.reports.length}`}>
+        <Panel title="Recomendacoes operacionais" count={`${(state.recommendations || data.recommendations || []).length}`}>
+          <div className="space-y-3">
+            {(state.recommendations || data.recommendations || []).map((rec) => (
+              <article key={rec.id} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+                <Badge color={rec.severity === "critical" ? "error" : rec.severity === "success" ? "success" : "brand"}>{rec.type}</Badge>
+                <h4 className="mt-2 text-theme-sm font-semibold text-gray-800 dark:text-white/90">{rec.title}</h4>
+                <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">{rec.detail}</p>
+              </article>
+            ))}
+            {!(state.recommendations || data.recommendations || []).length ? <EmptyState title="Sem recomendacoes" text="Gere uma analise para receber novas recomendacoes." /> : null}
+          </div>
+        </Panel>
+      </div>
+      <div className="col-span-12">
+        <Panel title="Historico de relatorios" count={`${state.reports.length}`}>
           <div className="space-y-4">
             {state.reports.length ? state.reports.map((report) => (
               <article key={report.id} className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -674,6 +701,10 @@ function Reports({ state, data, loading, api, action }) {
 }
 
 function Config({ state, data, loading, api, action }) {
+  const telegram = state.diagnostics?.telegram;
+  const telegramCount = telegram ? (telegram.ready ? "Pronto" : "Revisar") : "Aguardando diagnostico";
+  const telegramValue = (value, availableLabel, missingLabel) => telegram ? (value ? availableLabel : missingLabel) : "Indisponivel";
+
   return (
     <div className="grid grid-cols-12 gap-4 md:gap-6">
       <div className="col-span-12 xl:col-span-4">
@@ -693,6 +724,18 @@ function Config({ state, data, loading, api, action }) {
         </Panel>
       </div>
       <div className="col-span-12 xl:col-span-4">
+        <Panel title="Telegram" count={telegramCount}>
+          <div className="space-y-2 text-theme-sm text-gray-500 dark:text-gray-400">
+            <p>Dry-run: {telegramValue(telegram?.dryRun, "Ligado", "Desligado")}</p>
+            <p>Bot token: {telegramValue(telegram?.hasBotToken, "Configurado", "Ausente")}</p>
+            <p>Chat ID: {telegramValue(telegram?.hasChatId, "Configurado", "Ausente")}</p>
+          </div>
+          <Button className="mt-4" variant="outline" loading={loading.telegramTest} onClick={() => action("telegramTest", () => api("/api/integrations/telegram/test", { method: "POST" }), "Teste Telegram executado")}>
+            <Send className="size-4" /> Testar Telegram
+          </Button>
+        </Panel>
+      </div>
+      <div className="col-span-12 xl:col-span-4">
         <Panel title="Saude" count={`${data.healthScore}/100`}>
           <div className="space-y-3">{data.alerts.map((alert) => <AlertItem key={alert.title} alert={alert} />)}</div>
         </Panel>
@@ -707,7 +750,7 @@ function OfferTable({ offers, clicksByOffer, loading, api, action }) {
       <table className="min-w-[980px]">
         <thead className="border-y border-gray-100 dark:border-gray-800">
           <tr>
-            {["Products", "Category", "Price", "Status", "Affiliate", "Open"].map((header) => (
+            {["Oferta", "Categoria", "Preco", "Status", "Afiliado", "Abrir"].map((header) => (
               <th key={header} className="px-3 py-3 text-start text-theme-xs font-medium text-gray-500 first:pl-0 last:pr-0 dark:text-gray-400">{header}</th>
             ))}
           </tr>
@@ -901,6 +944,9 @@ function buildDashboardData(state, selectedPeriod) {
   const autoReady = state.offers.filter((offer) => offer.status === "auto_ready" && offer.affiliateReady).length;
   const reviewDrafts = state.drafts.filter((draft) => draft.status === "needs_review").length;
   const missingAffiliate = state.offers.filter((offer) => !offer.affiliateReady).length;
+  const blocked = state.offers.filter((offer) => offer.validationStatus === "blocked" || offer.status === "blocked").length;
+  const ready = state.offers.filter((offer) => offer.validationStatus === "ready" || offer.status === "auto_ready").length;
+  const needsReviewOffers = state.offers.filter((offer) => offer.validationStatus === "needs_review").length;
   const failed = state.drafts.filter((draft) => ["failed", "blocked", "rejected"].includes(draft.status)).length;
   const clickRate = Math.round((clicks.length / Math.max(publishedDrafts.length, 1)) * 100);
   const healthScore = clamp(74 + Math.min(autoReady * 3, 12) + Math.min(clicks.length, 12) - missingAffiliate * 2 - failed * 8 - reviewDrafts, 0, 100);
@@ -920,7 +966,7 @@ function buildDashboardData(state, selectedPeriod) {
   if (missingAffiliate) rec = { title: "Afiliado pendente", text: `${missingAffiliate} ofertas nao estao prontas para monetizacao.`, action: { label: "Abrir configuracao", view: "config" } };
   else if (autoReady) rec = { title: "Ofertas prontas para envio", text: `${autoReady} ofertas passaram no score e podem ir para publicacao.`, action: { label: "Abrir operacao", view: "operation" } };
   else if (reviewDrafts) rec = { title: "Revisao necessaria", text: `${reviewDrafts} drafts aguardam decisao humana.`, action: { label: "Revisar fila", view: "operation" } };
-  return { pending, autoReady, reviewDrafts, missingAffiliate, failed, clickRate, healthScore, healthTone, heatmap, statusBars, channelBars, categoryBars, topOffers, alerts, rec };
+  return { pending, autoReady, reviewDrafts, missingAffiliate, blocked, ready, needsReviewOffers, failed, clickRate, healthScore, healthTone, heatmap, statusBars, channelBars, categoryBars, topOffers, alerts, rec, recommendations: state.recommendations || [] };
 }
 
 function periodStart(period) {

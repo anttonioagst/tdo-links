@@ -1,8 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
-import { cloneDraftForRetest, createAnalyticsReport, publishApprovedX, refreshOfferAffiliateUrls, regenerateDraftCopy, runPublishPipeline, runScrapePipeline } from "./agents.js";
+import { cloneDraftForRetest, createAnalyticsReport, createDraftsForOffer, publishApprovedX, refreshOfferAffiliateUrls, refreshOfferDecision, regenerateDraftCopy, runPublishPipeline, runScrapePipeline } from "./agents.js";
+import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
+import { testTelegram } from "./publishers/telegram.js";
+import { buildRecommendations } from "./recommendations.js";
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -30,8 +33,13 @@ export function createApp({ db, config, publicDir }) {
 }
 
 async function handleApi(req, res, url, db, config) {
+  if (requiresAdminAuth(req, config) && !hasAdminAuth(req, config)) {
+    sendJson(res, 401, { error: "unauthorized" });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/state") {
-    sendJson(res, 200, publicState(db));
+    sendJson(res, 200, publicState(db, config));
     return;
   }
   if (req.method === "GET" && url.pathname === "/api/health") {
@@ -39,17 +47,82 @@ async function handleApi(req, res, url, db, config) {
     return;
   }
   if (req.method === "GET" && url.pathname === "/api/diagnostics") {
-    sendJson(res, 200, {
-      publicBaseUrl: config.publicBaseUrl,
-      telegram: {
-        dryRun: config.telegramDryRun,
-        hasBotToken: Boolean(config.telegramBotToken),
-        hasChatId: Boolean(config.telegramChatId)
-      },
-      x: {
-        dryRun: config.xDryRun
-      }
+    sendJson(res, 200, buildDiagnostics({ config, state: db.state }));
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/api/recommendations") {
+    const recommendations = buildRecommendations(db.state);
+    sendJson(res, 200, recommendations);
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/integrations/telegram/test") {
+    const result = await testTelegram(config);
+    db.state.publishLog.unshift({
+      id: db.nextId("pub"),
+      draftId: "",
+      channel: "telegram",
+      result,
+      createdAt: new Date().toISOString()
     });
+    await db.save();
+    sendJson(res, 200, result);
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/offers/manual") {
+    const body = await readJson(req);
+    const originalUrl = String(body.url || "").trim();
+    if (!/^https:\/\/(www\.)?amazon\.com\.br\//.test(originalUrl)) {
+      sendJson(res, 400, { error: "invalid_amazon_url" });
+      return;
+    }
+    const asin = extractAmazonAsin(originalUrl);
+    if (!asin) {
+      sendJson(res, 400, { error: "asin_not_found" });
+      return;
+    }
+    if (body.affiliateUrl && !isValidAffiliateUrl(body.affiliateUrl)) {
+      sendJson(res, 400, { error: "invalid_affiliate_url" });
+      return;
+    }
+    if (db.state.offers.some((offer) => isSameAmazonOffer(offer, originalUrl, asin))) {
+      sendJson(res, 409, { error: "offer_already_exists" });
+      return;
+    }
+    const id = db.nextId("offer");
+    const baseOffer = {
+      id,
+      store: "amazon",
+      source: "manual",
+      sourceConfidence: 1,
+      sourceWarnings: [],
+      asin,
+      title: String(body.title || `Amazon ${asin || "manual"}`).trim(),
+      currentPrice: Number(body.currentPrice || 0),
+      previousPrice: body.previousPrice ? Number(body.previousPrice) : null,
+      discountPercent: 0,
+      originalUrl,
+      affiliateUrl: String(body.affiliateUrl || originalUrl).trim(),
+      affiliateSource: body.affiliateUrl ? "manual" : "",
+      affiliateReady: Boolean(body.affiliateUrl),
+      imageUrl: String(body.imageUrl || ""),
+      imageUrls: body.imageUrl ? [String(body.imageUrl)] : [],
+      category: String(body.category || "tech"),
+      rating: Number(body.rating || 0),
+      reviewCount: Number(body.reviewCount || 0),
+      inStock: body.inStock !== false,
+      storeReputation: "high",
+      scrapedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    baseOffer.discountPercent = baseOffer.previousPrice && baseOffer.previousPrice > baseOffer.currentPrice
+      ? Math.round(((baseOffer.previousPrice - baseOffer.currentPrice) / baseOffer.previousPrice) * 100)
+      : 0;
+    const validated = refreshOfferDecision(baseOffer, db, config);
+    db.state.offers.unshift(validated);
+    if (validated.status !== "archived" && validated.status !== "blocked") createDraftsForOffer(db, validated, config);
+    await db.save();
+    sendJson(res, 200, validated);
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/run/scrape") {
@@ -85,21 +158,37 @@ async function handleApi(req, res, url, db, config) {
   if (req.method === "POST" && offerAffiliateMatch) {
     const [, offerId] = offerAffiliateMatch;
     const body = await readJson(req);
-    const offer = db.state.offers.find((item) => item.id === offerId);
-    if (!offer) {
+    const offerIndex = db.state.offers.findIndex((item) => item.id === offerId);
+    if (offerIndex === -1) {
       sendJson(res, 404, { error: "offer_not_found" });
       return;
     }
-    if (!/^https:\/\/(www\.)?amazon\.com\.br\/|^https:\/\/amzn\.to\//.test(body.affiliateUrl || "")) {
+    if (!isValidAffiliateUrl(body.affiliateUrl)) {
       sendJson(res, 400, { error: "invalid_affiliate_url" });
       return;
     }
-    offer.affiliateUrl = body.affiliateUrl.trim();
-    offer.affiliateReady = true;
-    offer.affiliateSource = "manual";
-    offer.updatedAt = new Date().toISOString();
+    db.state.offers[offerIndex] = refreshOfferDecision({
+      ...db.state.offers[offerIndex],
+      affiliateUrl: body.affiliateUrl.trim(),
+      affiliateReady: true,
+      affiliateSource: "manual",
+      updatedAt: new Date().toISOString()
+    }, db, config);
     await db.save();
-    sendJson(res, 200, offer);
+    sendJson(res, 200, db.state.offers[offerIndex]);
+    return;
+  }
+  const offerValidateMatch = url.pathname.match(/^\/api\/offers\/([^/]+)\/validate$/);
+  if (req.method === "POST" && offerValidateMatch) {
+    const [, offerId] = offerValidateMatch;
+    const offerIndex = db.state.offers.findIndex((item) => item.id === offerId);
+    if (offerIndex === -1) {
+      sendJson(res, 404, { error: "offer_not_found" });
+      return;
+    }
+    db.state.offers[offerIndex] = refreshOfferDecision(db.state.offers[offerIndex], db, config);
+    await db.save();
+    sendJson(res, 200, db.state.offers[offerIndex]);
     return;
   }
   const draftMatch = url.pathname.match(/^\/api\/drafts\/([^/]+)\/(approve|reject|edit|regenerate|clone)$/);
@@ -193,7 +282,8 @@ async function serveStatic(res, publicDir, pathname) {
   res.end(body);
 }
 
-function publicState(db) {
+function publicState(db, config) {
+  const recommendations = buildRecommendations(db.state);
   const clicksByOffer = Object.fromEntries(
     db.state.offers.map((offer) => [offer.id, db.state.clicks.filter((click) => click.offerId === offer.id).length])
   );
@@ -202,6 +292,8 @@ function publicState(db) {
     drafts: db.state.drafts,
     clicks: db.state.clicks,
     reports: db.state.reports,
+    diagnostics: buildDiagnostics({ config, state: db.state }),
+    recommendations,
     settings: db.state.settings,
     publishLog: db.state.publishLog.slice(0, 20),
     metrics: {
@@ -224,4 +316,36 @@ async function readJson(req) {
 function sendJson(res, status, payload) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
+}
+
+function requiresAdminAuth(req, config) {
+  return Boolean(config.adminToken) && ["POST", "PUT", "PATCH", "DELETE"].includes(req.method);
+}
+
+function hasAdminAuth(req, config) {
+  const headerToken = req.headers["x-admin-token"];
+  if (headerToken === config.adminToken) return true;
+  const authorization = String(req.headers.authorization || "");
+  return authorization === `Bearer ${config.adminToken}`;
+}
+
+function isValidAffiliateUrl(value) {
+  return /^https:\/\/(www\.)?amazon\.com\.br\/|^https:\/\/amzn\.to\//.test(String(value || ""));
+}
+
+function extractAmazonAsin(value) {
+  return String(value || "").match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i)?.[1].toUpperCase() || "";
+}
+
+function isSameAmazonOffer(offer, originalUrl, asin) {
+  return extractAmazonAsin(offer.originalUrl) === asin || canonicalUrl(offer.originalUrl) === canonicalUrl(originalUrl);
+}
+
+function canonicalUrl(value) {
+  try {
+    const url = new URL(value);
+    return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return String(value || "").trim();
+  }
 }

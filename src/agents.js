@@ -1,10 +1,12 @@
 import { validatePost, validateXAcquisitionPost } from "./compliance.js";
 import { createTelegramCopy, createXPostCopy } from "./copywriter.js";
 import { buildAffiliateUrl, createShortCode, hasAffiliateConfig } from "./links.js";
-import { dedupeOffers, scoreOffer, statusForScore } from "./scoring.js";
+import { dedupeOffers, scoreOfferDetailed, statusForScore } from "./scoring.js";
 import { getLastScrapeMeta, scrapeDeals } from "./scrapers.js";
 import { publishTelegram } from "./publishers/telegram.js";
 import { publishXAcquisition } from "./publishers/x.js";
+import { buildRecommendations } from "./recommendations.js";
+import { applyValidation } from "./validation.js";
 
 export async function runScrapePipeline(db, config) {
   const rawOffers = await scrapeDeals(config);
@@ -20,18 +22,30 @@ export async function runScrapePipeline(db, config) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    scoredOffer.score = scoreOffer(scoredOffer);
-    scoredOffer.status = statusForScore(scoredOffer.score, db.state.settings);
-    return scoredOffer;
+    return refreshOfferDecision(scoredOffer, db, config);
   });
 
   db.state.offers.unshift(...incoming);
   for (const offer of incoming) {
-    if (offer.status !== "archived") createDraftsForOffer(db, offer, config);
+    if (!["archived", "blocked"].includes(offer.status)) createDraftsForOffer(db, offer, config);
   }
   await maybeCreateXDraft(db, config);
   await db.save();
   return { found: rawOffers.length, inserted: incoming.length, scrape: getLastScrapeMeta() };
+}
+
+export function refreshOfferDecision(offer, db, config) {
+  const validatedOffer = applyValidation(offer, config);
+  const performance = { clicks: db.state.clicks.filter((click) => click.offerId === validatedOffer.id).length };
+  const score = scoreOfferDetailed(validatedOffer, performance);
+  validatedOffer.score = score.total;
+  validatedOffer.scoreBreakdown = score.components;
+  validatedOffer.status = validatedOffer.publishable
+    ? statusForScore(validatedOffer.score, db.state.settings)
+    : validatedOffer.validationStatus === "blocked"
+      ? "blocked"
+      : "needs_review";
+  return validatedOffer;
 }
 
 export function createDraftsForOffer(db, offer, config) {
@@ -104,16 +118,17 @@ export function cloneDraftForRetest(db, draftId, config) {
 }
 
 export function refreshOfferAffiliateUrls(db, config) {
-  for (const offer of db.state.offers) {
+  db.state.offers = db.state.offers.map((offer) => {
     offer.affiliateUrl = buildAffiliateUrl(offer, config);
     offer.affiliateReady = hasAffiliateConfig(offer, config);
     offer.updatedAt = new Date().toISOString();
-  }
+    return refreshOfferDecision(offer, db, config);
+  });
 }
 
 export async function maybeCreateXDraft(db, config) {
   const [topOffer] = db.state.offers
-    .filter((offer) => offer.status !== "archived")
+    .filter((offer) => !["archived", "blocked"].includes(offer.status))
     .sort((a, b) => b.score - a.score)
     .slice(0, 1);
   if (!topOffer) return null;
@@ -126,7 +141,7 @@ export async function maybeCreateXDraft(db, config) {
 export async function runPublishPipeline(db, config) {
   if (db.state.settings.mode === "paused") {
     console.log("publish_skipped", JSON.stringify({ reason: "paused" }));
-    return { published: 0, skipped: "paused" };
+    return { published: 0, failed: 0, dryRun: 0, skipped: 1, results: [{ outcome: "skipped", reason: "paused" }] };
   }
   const autoAllowed = db.state.settings.mode === "limited";
   const eligible = db.state.drafts.filter((draft) => {
@@ -145,8 +160,30 @@ export async function runPublishPipeline(db, config) {
   }));
 
   let published = 0;
+  const results = [];
   for (const draft of eligible) {
-    const offer = db.state.offers.find((item) => item.id === draft.offerId);
+    const offerIndex = db.state.offers.findIndex((item) => item.id === draft.offerId);
+    const offer = offerIndex === -1 ? null : refreshOfferDecision(db.state.offers[offerIndex], db, config);
+    if (offerIndex !== -1) db.state.offers[offerIndex] = offer;
+    if (!offer || offer.publishable !== true || offer.validationStatus !== "ready") {
+      const detail = {
+        draftId: draft.id,
+        offerId: draft.offerId,
+        channel: draft.channel,
+        ok: false,
+        dryRun: false,
+        providerMessageId: null,
+        reason: "offer_not_publishable",
+        detail: "offer_not_publishable: validate affiliate and price before publishing.",
+        outcome: "skipped"
+      };
+      results.push(detail);
+      draft.lastPublishResult = detail;
+      draft.publishAttempts = [...(draft.publishAttempts || []), detail].slice(-10);
+      draft.rejectionReason = detail.detail;
+      draft.updatedAt = new Date().toISOString();
+      continue;
+    }
     const result = await publishTelegram(draft, config, offer);
     console.log("telegram_publish_result", JSON.stringify({
       draftId: draft.id,
@@ -162,6 +199,19 @@ export async function runPublishPipeline(db, config) {
       result,
       createdAt: new Date().toISOString()
     });
+    const detail = {
+      draftId: draft.id,
+      offerId: draft.offerId,
+      channel: draft.channel,
+      ok: result.ok,
+      dryRun: result.dryRun,
+      providerMessageId: result.providerMessageId || null,
+      detail: result.detail,
+      outcome: result.ok ? "published" : "failed"
+    };
+    results.push(detail);
+    draft.lastPublishResult = detail;
+    draft.publishAttempts = [...(draft.publishAttempts || []), detail].slice(-10);
     if (result.ok) {
       draft.status = "published";
       draft.publishedAt = new Date().toISOString();
@@ -175,7 +225,13 @@ export async function runPublishPipeline(db, config) {
     }
   }
   await db.save();
-  return { published };
+  return {
+    published,
+    failed: results.filter((item) => item.outcome === "failed").length,
+    dryRun: results.filter((item) => item.dryRun).length,
+    skipped: results.filter((item) => item.outcome === "skipped").length,
+    results
+  };
 }
 
 export async function publishApprovedX(db, config) {
@@ -221,11 +277,15 @@ export function createAnalyticsReport(db) {
     topOffers.length ? "Repetir categorias e faixas de preço das ofertas com mais cliques." : "Divulgar o canal Telegram antes de aumentar volume."
   ];
 
+  const recommendations = buildRecommendations(db.state);
+  db.state.recommendations = recommendations;
+
   const report = {
     id: db.nextId("report"),
     period: new Date().toISOString().slice(0, 10),
     conclusions,
     suggestions,
+    recommendations,
     expectedImpact: "Aumentar cliques qualificados reduzindo posts fracos.",
     topOffers,
     createdAt: new Date().toISOString()
