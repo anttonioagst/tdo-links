@@ -64,9 +64,17 @@ async function handleApi(req, res, url, db, config) {
       sendJson(res, 400, { error: "invalid_amazon_url" });
       return;
     }
-    const asin = originalUrl.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i)?.[1] || "";
+    const asin = extractAmazonAsin(originalUrl);
     if (!asin) {
       sendJson(res, 400, { error: "asin_not_found" });
+      return;
+    }
+    if (body.affiliateUrl && !isValidAffiliateUrl(body.affiliateUrl)) {
+      sendJson(res, 400, { error: "invalid_affiliate_url" });
+      return;
+    }
+    if (db.state.offers.some((offer) => isSameAmazonOffer(offer, originalUrl, asin))) {
+      sendJson(res, 409, { error: "offer_already_exists" });
       return;
     }
     const id = db.nextId("offer");
@@ -144,7 +152,7 @@ async function handleApi(req, res, url, db, config) {
       sendJson(res, 404, { error: "offer_not_found" });
       return;
     }
-    if (!/^https:\/\/(www\.)?amazon\.com\.br\/|^https:\/\/amzn\.to\//.test(body.affiliateUrl || "")) {
+    if (!isValidAffiliateUrl(body.affiliateUrl)) {
       sendJson(res, 400, { error: "invalid_affiliate_url" });
       return;
     }
@@ -294,4 +302,25 @@ async function readJson(req) {
 function sendJson(res, status, payload) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
+}
+
+function isValidAffiliateUrl(value) {
+  return /^https:\/\/(www\.)?amazon\.com\.br\/|^https:\/\/amzn\.to\//.test(String(value || ""));
+}
+
+function extractAmazonAsin(value) {
+  return String(value || "").match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i)?.[1].toUpperCase() || "";
+}
+
+function isSameAmazonOffer(offer, originalUrl, asin) {
+  return extractAmazonAsin(offer.originalUrl) === asin || canonicalUrl(offer.originalUrl) === canonicalUrl(originalUrl);
+}
+
+function canonicalUrl(value) {
+  try {
+    const url = new URL(value);
+    return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return String(value || "").trim();
+  }
 }

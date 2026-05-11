@@ -210,6 +210,55 @@ test("manual offer API creates Amazon offer from pasted URL", async () => {
   }
 });
 
+test("manual offer API rejects invalid manual affiliate URL without inserting offer", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/offers/manual",
+      body: {
+        url: "https://www.amazon.com.br/dp/B0TEST1234",
+        title: "SSD NVMe Manual",
+        currentPrice: 349.9,
+        affiliateUrl: "https://example.com/not-amazon"
+      }
+    });
+    assert.equal(response.status, 400);
+    assert.deepEqual(JSON.parse(response.text), { error: "invalid_affiliate_url" });
+    assert.equal(db.state.offers.length, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("manual offer API rejects duplicate Amazon offer URL", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+    const app = createApp({ db, config, publicDir: dir });
+    const body = {
+      url: "https://www.amazon.com.br/dp/B0TEST1234",
+      title: "SSD NVMe Manual",
+      currentPrice: 349.9,
+      affiliateUrl: "https://amzn.to/42cFr9f"
+    };
+    const first = await request(app, { method: "POST", path: "/api/offers/manual", body });
+    const second = await request(app, { method: "POST", path: "/api/offers/manual", body });
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 409);
+    assert.deepEqual(JSON.parse(second.text), { error: "offer_already_exists" });
+    assert.equal(db.state.offers.length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("manual offer API rejects Amazon URL without ASIN", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   try {
