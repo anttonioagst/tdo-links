@@ -5,6 +5,7 @@ import { cloneDraftForRetest, createAnalyticsReport, createDraftsForOffer, publi
 import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
 import { testTelegram } from "./publishers/telegram.js";
+import { buildRecommendations } from "./recommendations.js";
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -42,6 +43,13 @@ async function handleApi(req, res, url, db, config) {
   }
   if (req.method === "GET" && url.pathname === "/api/diagnostics") {
     sendJson(res, 200, buildDiagnostics({ config, state: db.state }));
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/api/recommendations") {
+    const recommendations = buildRecommendations(db.state);
+    db.state.recommendations = recommendations;
+    await db.save();
+    sendJson(res, 200, recommendations);
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/integrations/telegram/test") {
@@ -280,6 +288,7 @@ function publicState(db) {
     drafts: db.state.drafts,
     clicks: db.state.clicks,
     reports: db.state.reports,
+    recommendations: db.state.recommendations || [],
     settings: db.state.settings,
     publishLog: db.state.publishLog.slice(0, 20),
     metrics: {

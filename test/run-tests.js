@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createDraftsForOffer, runPublishPipeline, runScrapePipeline } from "../src/agents.js";
+import { createDraftsForOffer, createAnalyticsReport, runPublishPipeline, runScrapePipeline } from "../src/agents.js";
 import { validatePost, validateXAcquisitionPost } from "../src/compliance.js";
 import { loadConfig } from "../src/config.js";
 import { JsonDb } from "../src/db.js";
 import { buildDiagnostics } from "../src/integrations.js";
 import { buildAffiliateUrl } from "../src/links.js";
 import { testTelegram } from "../src/publishers/telegram.js";
+import { buildRecommendations } from "../src/recommendations.js";
 import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, scoreOfferDetailed, statusForScore } from "../src/scoring.js";
 import { parseAmazonSearch } from "../src/scrapers.js";
@@ -597,6 +598,32 @@ test("refresh affiliates route refreshes validation score breakdown and status",
     assert.equal(db.state.offers[0].publishable, true);
     assert.ok(db.state.offers[0].scoreBreakdown.reliability > 0);
     assert.notEqual(db.state.offers[0].status, "blocked");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("recommendations identify missing affiliate links", () => {
+  const recommendations = buildRecommendations({
+    offers: [{ id: "offer_1", title: "SSD", affiliateReady: false, validationStatus: "blocked", score: 91 }],
+    drafts: [],
+    clicks: [],
+    publishLog: [],
+    settings: { mode: "limited" }
+  });
+  assert.equal(recommendations[0].type, "fix_affiliate");
+  assert.equal(recommendations[0].severity, "critical");
+});
+
+test("analytics report stores actionable recommendations", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({ id: "offer_1", title: "SSD", affiliateReady: false, validationStatus: "blocked", score: 91 });
+    const report = createAnalyticsReport(db);
+    assert.ok(report.recommendations.length >= 1);
+    assert.equal(db.state.recommendations.length >= 1, true);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

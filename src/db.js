@@ -7,6 +7,9 @@ const emptyDb = {
   clicks: [],
   experiments: [],
   reports: [],
+  recommendations: [],
+  integrations: {},
+  campaigns: [],
   settings: {
     mode: "limited",
     autoPublishThreshold: 85,

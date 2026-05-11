@@ -5,6 +5,7 @@ import { dedupeOffers, scoreOfferDetailed, statusForScore } from "./scoring.js";
 import { getLastScrapeMeta, scrapeDeals } from "./scrapers.js";
 import { publishTelegram } from "./publishers/telegram.js";
 import { publishXAcquisition } from "./publishers/x.js";
+import { buildRecommendations } from "./recommendations.js";
 import { applyValidation } from "./validation.js";
 
 export async function runScrapePipeline(db, config) {
@@ -274,11 +275,15 @@ export function createAnalyticsReport(db) {
     topOffers.length ? "Repetir categorias e faixas de preço das ofertas com mais cliques." : "Divulgar o canal Telegram antes de aumentar volume."
   ];
 
+  const recommendations = buildRecommendations(db.state);
+  db.state.recommendations = recommendations;
+
   const report = {
     id: db.nextId("report"),
     period: new Date().toISOString().slice(0, 10),
     conclusions,
     suggestions,
+    recommendations,
     expectedImpact: "Aumentar cliques qualificados reduzindo posts fracos.",
     topOffers,
     createdAt: new Date().toISOString()
