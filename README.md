@@ -43,6 +43,15 @@ O start command e `npm start` e o healthcheck e `/api/health`.
 Publicacao Telegram real exige `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` e `TELEGRAM_DRY_RUN=false`.
 X fica em modo aquisicao/dry-run no MVP.
 
+## Operacao premium Fase 1
+
+- Use Amazon Brasil como fonte principal inicial.
+- Candidatos podem vir de busca configurada ou entrada manual.
+- Publicacao semi-automatica exige oferta validada, afiliado pronto, compliance ok e score alto.
+- Telegram precisa de `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` e `TELEGRAM_DRY_RUN=false` para envio real.
+- A aba Configuracao mostra saude das integracoes e permite teste do Telegram.
+- Relatorios e recomendacoes usam dados locais de ofertas, drafts, logs e cliques.
+
 ## Amazon Associados
 
 - Gere links com seu ID de Associado pelo SiteStripe, Link pelo App ou tags de rastreamento validas.
