@@ -644,6 +644,23 @@ test("state endpoint returns fresh recommendations after state changes", async (
   }
 });
 
+test("state API includes diagnostics and recommendations", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318", TELEGRAM_DRY_RUN: "true" });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, { path: "/api/state" });
+    const payload = JSON.parse(response.text);
+    assert.equal(response.status, 200);
+    assert.ok(payload.diagnostics.telegram);
+    assert.ok(Array.isArray(payload.recommendations));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("analytics report stores actionable recommendations", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   try {

@@ -34,7 +34,7 @@ export function createApp({ db, config, publicDir }) {
 
 async function handleApi(req, res, url, db, config) {
   if (req.method === "GET" && url.pathname === "/api/state") {
-    sendJson(res, 200, publicState(db));
+    sendJson(res, 200, publicState(db, config));
     return;
   }
   if (req.method === "GET" && url.pathname === "/api/health") {
@@ -279,7 +279,7 @@ async function serveStatic(res, publicDir, pathname) {
   res.end(body);
 }
 
-function publicState(db) {
+function publicState(db, config) {
   const recommendations = buildRecommendations(db.state);
   const clicksByOffer = Object.fromEntries(
     db.state.offers.map((offer) => [offer.id, db.state.clicks.filter((click) => click.offerId === offer.id).length])
@@ -289,6 +289,7 @@ function publicState(db) {
     drafts: db.state.drafts,
     clicks: db.state.clicks,
     reports: db.state.reports,
+    diagnostics: buildDiagnostics({ config, state: db.state }),
     recommendations,
     settings: db.state.settings,
     publishLog: db.state.publishLog.slice(0, 20),
