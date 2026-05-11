@@ -663,7 +663,7 @@ function Reports({ state, data, loading, api, action }) {
   return (
     <div className="grid grid-cols-12 gap-4 md:gap-6">
       <div className="col-span-12 xl:col-span-4">
-        <Panel title="Recomendacoes" count={`${data.healthScore}/100`}>
+        <Panel title="Analise operacional" count={`${data.healthScore}/100`}>
           <p className="text-theme-sm leading-6 text-gray-500 dark:text-gray-400">Relatorios analisam cliques, categorias e gargalos do funil.</p>
           <Button className="mt-4" loading={loading.report} onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}><BarChart3 className="size-4" /> Gerar relatorio</Button>
         </Panel>
@@ -701,6 +701,10 @@ function Reports({ state, data, loading, api, action }) {
 }
 
 function Config({ state, data, loading, api, action }) {
+  const telegram = state.diagnostics?.telegram;
+  const telegramCount = telegram ? (telegram.ready ? "Pronto" : "Revisar") : "Aguardando diagnostico";
+  const telegramValue = (value, availableLabel, missingLabel) => telegram ? (value ? availableLabel : missingLabel) : "Indisponivel";
+
   return (
     <div className="grid grid-cols-12 gap-4 md:gap-6">
       <div className="col-span-12 xl:col-span-4">
@@ -720,11 +724,11 @@ function Config({ state, data, loading, api, action }) {
         </Panel>
       </div>
       <div className="col-span-12 xl:col-span-4">
-        <Panel title="Telegram" count={state.diagnostics?.telegram?.ready ? "Pronto" : "Revisar"}>
+        <Panel title="Telegram" count={telegramCount}>
           <div className="space-y-2 text-theme-sm text-gray-500 dark:text-gray-400">
-            <p>Dry-run: {state.diagnostics?.telegram?.dryRun ? "Ligado" : "Desligado"}</p>
-            <p>Bot token: {state.diagnostics?.telegram?.hasBotToken ? "Configurado" : "Ausente"}</p>
-            <p>Chat ID: {state.diagnostics?.telegram?.hasChatId ? "Configurado" : "Ausente"}</p>
+            <p>Dry-run: {telegramValue(telegram?.dryRun, "Ligado", "Desligado")}</p>
+            <p>Bot token: {telegramValue(telegram?.hasBotToken, "Configurado", "Ausente")}</p>
+            <p>Chat ID: {telegramValue(telegram?.hasChatId, "Configurado", "Ausente")}</p>
           </div>
           <Button className="mt-4" variant="outline" loading={loading.telegramTest} onClick={() => action("telegramTest", () => api("/api/integrations/telegram/test", { method: "POST" }), "Teste Telegram executado")}>
             <Send className="size-4" /> Testar Telegram
