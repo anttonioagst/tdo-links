@@ -1,10 +1,11 @@
 import { validatePost, validateXAcquisitionPost } from "./compliance.js";
 import { createTelegramCopy, createXPostCopy } from "./copywriter.js";
 import { buildAffiliateUrl, createShortCode, hasAffiliateConfig } from "./links.js";
-import { dedupeOffers, scoreOffer, statusForScore } from "./scoring.js";
+import { dedupeOffers, scoreOfferDetailed, statusForScore } from "./scoring.js";
 import { getLastScrapeMeta, scrapeDeals } from "./scrapers.js";
 import { publishTelegram } from "./publishers/telegram.js";
 import { publishXAcquisition } from "./publishers/x.js";
+import { applyValidation } from "./validation.js";
 
 export async function runScrapePipeline(db, config) {
   const rawOffers = await scrapeDeals(config);
@@ -20,9 +21,17 @@ export async function runScrapePipeline(db, config) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    scoredOffer.score = scoreOffer(scoredOffer);
-    scoredOffer.status = statusForScore(scoredOffer.score, db.state.settings);
-    return scoredOffer;
+    const validatedOffer = applyValidation(scoredOffer, config);
+    const performance = { clicks: db.state.clicks.filter((click) => click.offerId === validatedOffer.id).length };
+    const score = scoreOfferDetailed(validatedOffer, performance);
+    validatedOffer.score = score.total;
+    validatedOffer.scoreBreakdown = score.components;
+    validatedOffer.status = validatedOffer.publishable
+      ? statusForScore(validatedOffer.score, db.state.settings)
+      : validatedOffer.validationStatus === "blocked"
+        ? "blocked"
+        : "needs_review";
+    return validatedOffer;
   });
 
   db.state.offers.unshift(...incoming);

@@ -26,6 +26,74 @@ export function scoreOffer(offer) {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
+export function scoreOfferDetailed(offer, performance = {}) {
+  const reliability = clampScore(
+    (offer.affiliateReady ? 35 : 0) +
+    (offer.validationStatus === "ready" ? 35 : offer.validationStatus === "needs_review" ? 18 : 0) +
+    (offer.inStock ? 20 : 0) +
+    Math.round((offer.sourceConfidence ?? 0.5) * 10)
+  );
+
+  const attractiveness = clampScore(
+    discountPoints(offer.discountPercent) +
+    ratingPoints(offer.rating) +
+    reviewPoints(offer.reviewCount) +
+    (offer.currentPrice <= 150 ? 4 : offer.currentPrice <= 500 ? 7 : 3)
+  );
+
+  const potential = clampScore(
+    (offer.category === "tech" ? 70 : 45) +
+    (offer.currentPrice >= 100 ? 15 : 8) +
+    (offer.store === "amazon" ? 15 : 10)
+  );
+
+  const performanceScore = clampScore(Math.min(Number(performance.clicks || 0) * 10, 100));
+
+  const total = Math.round(
+    reliability * 0.45 +
+    attractiveness * 0.32 +
+    potential * 0.2 +
+    performanceScore * 0.03
+  );
+
+  return {
+    total: Math.max(0, Math.min(100, total)),
+    components: {
+      reliability,
+      attractiveness,
+      potential,
+      performance: performanceScore
+    }
+  };
+}
+
+function discountPoints(discountPercent = 0) {
+  if (discountPercent >= 45) return 42;
+  if (discountPercent >= 30) return 35;
+  if (discountPercent >= 20) return 30;
+  if (discountPercent >= 10) return 15;
+  return 5;
+}
+
+function ratingPoints(rating = 0) {
+  if (rating >= 4.7) return 20;
+  if (rating >= 4.4) return 15;
+  if (rating >= 4.0) return 9;
+  if (rating > 0) return 2;
+  return 5;
+}
+
+function reviewPoints(reviewCount = 0) {
+  if (reviewCount >= 1000) return 18;
+  if (reviewCount >= 300) return 15;
+  if (reviewCount >= 50) return 7;
+  return 2;
+}
+
+function clampScore(value) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
 export function statusForScore(score, settings) {
   if (score >= settings.autoPublishThreshold) return "auto_ready";
   if (score >= settings.reviewThreshold) return "needs_review";

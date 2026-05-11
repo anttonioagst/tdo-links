@@ -5,6 +5,7 @@ import { cloneDraftForRetest, createAnalyticsReport, publishApprovedX, refreshOf
 import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
 import { testTelegram } from "./publishers/telegram.js";
+import { applyValidation } from "./validation.js";
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -105,6 +106,19 @@ async function handleApi(req, res, url, db, config) {
     offer.updatedAt = new Date().toISOString();
     await db.save();
     sendJson(res, 200, offer);
+    return;
+  }
+  const offerValidateMatch = url.pathname.match(/^\/api\/offers\/([^/]+)\/validate$/);
+  if (req.method === "POST" && offerValidateMatch) {
+    const [, offerId] = offerValidateMatch;
+    const offerIndex = db.state.offers.findIndex((item) => item.id === offerId);
+    if (offerIndex === -1) {
+      sendJson(res, 404, { error: "offer_not_found" });
+      return;
+    }
+    db.state.offers[offerIndex] = applyValidation(db.state.offers[offerIndex], config);
+    await db.save();
+    sendJson(res, 200, db.state.offers[offerIndex]);
     return;
   }
   const draftMatch = url.pathname.match(/^\/api\/drafts\/([^/]+)\/(approve|reject|edit|regenerate|clone)$/);

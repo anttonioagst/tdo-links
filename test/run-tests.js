@@ -10,8 +10,9 @@ import { buildDiagnostics } from "../src/integrations.js";
 import { buildAffiliateUrl } from "../src/links.js";
 import { testTelegram } from "../src/publishers/telegram.js";
 import { createApp } from "../src/server.js";
-import { dedupeOffers, scoreOffer, statusForScore } from "../src/scoring.js";
+import { dedupeOffers, scoreOffer, scoreOfferDetailed, statusForScore } from "../src/scoring.js";
 import { parseAmazonSearch } from "../src/scrapers.js";
+import { validateOffer } from "../src/validation.js";
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -142,6 +143,8 @@ test("scrape to draft to publish dry-run pipeline", async () => {
     const config = loadConfig({
       PORT: "4318",
       PUBLIC_BASE_URL: "http://localhost:4318",
+      AMAZON_AFFILIATE_TAG: "default-20",
+      MERCADO_LIVRE_AFFILIATE_PARAM: "matt_tool=123",
       TELEGRAM_DRY_RUN: "true",
       X_DRY_RUN: "true"
     });
@@ -204,6 +207,7 @@ test("publish pipeline returns per-draft dry-run details", async () => {
       PUBLIC_BASE_URL: "http://localhost:4318",
       TELEGRAM_DRY_RUN: "true",
       AMAZON_AFFILIATE_TAG: "default-20",
+      MERCADO_LIVRE_AFFILIATE_PARAM: "matt_tool=123",
       X_DRY_RUN: "true"
     });
     await runScrapePipeline(db, config);
@@ -238,6 +242,63 @@ test("Telegram integration test normalizes provider network failures", async () 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("validation blocks Amazon offer without affiliate configuration", () => {
+  const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+  const offer = {
+    store: "amazon",
+    title: "SSD NVMe",
+    currentPrice: 349.9,
+    originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+    scrapedAt: new Date().toISOString(),
+    inStock: true
+  };
+  const result = validateOffer(offer, config);
+  assert.equal(result.validationStatus, "blocked");
+  assert.equal(result.publishable, false);
+  assert.ok(result.validationReasons.includes("affiliate_not_ready"));
+});
+
+test("validation marks official manual Amazon link as ready", () => {
+  const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+  const offer = {
+    store: "amazon",
+    title: "SSD NVMe",
+    currentPrice: 349.9,
+    originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+    affiliateUrl: "https://amzn.to/42cFr9f",
+    affiliateSource: "manual",
+    affiliateReady: true,
+    scrapedAt: new Date().toISOString(),
+    inStock: true
+  };
+  const result = validateOffer(offer, config);
+  assert.equal(result.validationStatus, "ready");
+  assert.equal(result.publishable, true);
+});
+
+test("compound score returns total and named components", () => {
+  const result = scoreOfferDetailed({
+    store: "amazon",
+    title: "SSD NVMe",
+    currentPrice: 349.9,
+    previousPrice: 529.9,
+    discountPercent: 34,
+    rating: 4.8,
+    reviewCount: 1200,
+    inStock: true,
+    storeReputation: "high",
+    category: "tech",
+    affiliateReady: true,
+    validationStatus: "ready",
+    sourceConfidence: 0.8
+  }, { clicks: 12 });
+  assert.ok(result.total >= 80);
+  assert.ok(result.components.reliability > 0);
+  assert.ok(result.components.attractiveness > 0);
+  assert.ok(result.components.potential > 0);
+  assert.ok(result.components.performance > 0);
 });
 
 test("publish pipeline records failed details when Telegram fetch throws", async () => {
