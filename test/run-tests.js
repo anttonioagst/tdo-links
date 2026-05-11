@@ -8,6 +8,7 @@ import { loadConfig } from "../src/config.js";
 import { JsonDb } from "../src/db.js";
 import { buildDiagnostics } from "../src/integrations.js";
 import { buildAffiliateUrl } from "../src/links.js";
+import { testTelegram } from "../src/publishers/telegram.js";
 import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, statusForScore } from "../src/scoring.js";
 import { parseAmazonSearch } from "../src/scrapers.js";
@@ -213,6 +214,71 @@ test("publish pipeline returns per-draft dry-run details", async () => {
     assert.equal(publish.results[0].channel, "telegram");
     assert.ok(["published", "failed", "skipped"].includes(publish.results[0].outcome));
   } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("Telegram integration test normalizes provider network failures", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new Error("network unreachable");
+  };
+  try {
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      TELEGRAM_DRY_RUN: "false",
+      TELEGRAM_BOT_TOKEN: "token",
+      TELEGRAM_CHAT_ID: "chat"
+    });
+    const result = await testTelegram(config);
+    assert.equal(result.ok, false);
+    assert.equal(result.dryRun, false);
+    assert.equal(result.providerMessageId, null);
+    assert.match(result.detail, /network unreachable/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("publish pipeline records failed details when Telegram fetch throws", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new Error("connection reset");
+  };
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      TELEGRAM_DRY_RUN: "false",
+      TELEGRAM_BOT_TOKEN: "token",
+      TELEGRAM_CHAT_ID: "chat"
+    });
+    db.state.offers.push({
+      id: "offer_network_failure",
+      store: "amazon",
+      title: "Produto Teste",
+      originalUrl: "https://www.amazon.com.br/dp/B0TEST1234"
+    });
+    db.state.drafts.push({
+      id: "draft_network_failure",
+      offerId: "offer_network_failure",
+      channel: "telegram",
+      text: "Oferta teste\nhttps://x.test/go/abc",
+      status: "approved",
+      publishedAt: null,
+      providerMessageId: null
+    });
+    const publish = await runPublishPipeline(db, config);
+    assert.equal(publish.published, 0);
+    assert.equal(publish.failed, 1);
+    assert.equal(publish.results.length, 1);
+    assert.equal(publish.results[0].outcome, "failed");
+    assert.equal(publish.results[0].dryRun, false);
+    assert.match(publish.results[0].detail, /connection reset/);
+  } finally {
+    globalThis.fetch = originalFetch;
     await rm(dir, { recursive: true, force: true });
   }
 });
