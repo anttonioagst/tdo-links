@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
-import { cloneDraftForRetest, createAnalyticsReport, publishApprovedX, refreshOfferAffiliateUrls, refreshOfferDecision, regenerateDraftCopy, runPublishPipeline, runScrapePipeline } from "./agents.js";
+import { cloneDraftForRetest, createAnalyticsReport, createDraftsForOffer, publishApprovedX, refreshOfferAffiliateUrls, refreshOfferDecision, regenerateDraftCopy, runPublishPipeline, runScrapePipeline } from "./agents.js";
 import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
 import { testTelegram } from "./publishers/telegram.js";
@@ -55,6 +55,51 @@ async function handleApi(req, res, url, db, config) {
     });
     await db.save();
     sendJson(res, 200, result);
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/offers/manual") {
+    const body = await readJson(req);
+    const originalUrl = String(body.url || "").trim();
+    if (!/^https:\/\/(www\.)?amazon\.com\.br\//.test(originalUrl)) {
+      sendJson(res, 400, { error: "invalid_amazon_url" });
+      return;
+    }
+    const asin = originalUrl.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i)?.[1] || "";
+    const id = db.nextId("offer");
+    const baseOffer = {
+      id,
+      store: "amazon",
+      source: "manual",
+      sourceConfidence: 1,
+      sourceWarnings: [],
+      asin,
+      title: String(body.title || `Amazon ${asin || "manual"}`).trim(),
+      currentPrice: Number(body.currentPrice || 0),
+      previousPrice: body.previousPrice ? Number(body.previousPrice) : null,
+      discountPercent: 0,
+      originalUrl,
+      affiliateUrl: String(body.affiliateUrl || originalUrl).trim(),
+      affiliateSource: body.affiliateUrl ? "manual" : "",
+      affiliateReady: Boolean(body.affiliateUrl),
+      imageUrl: String(body.imageUrl || ""),
+      imageUrls: body.imageUrl ? [String(body.imageUrl)] : [],
+      category: String(body.category || "tech"),
+      rating: Number(body.rating || 0),
+      reviewCount: Number(body.reviewCount || 0),
+      inStock: body.inStock !== false,
+      storeReputation: "high",
+      scrapedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    baseOffer.discountPercent = baseOffer.previousPrice && baseOffer.previousPrice > baseOffer.currentPrice
+      ? Math.round(((baseOffer.previousPrice - baseOffer.currentPrice) / baseOffer.previousPrice) * 100)
+      : 0;
+    const validated = refreshOfferDecision(baseOffer, db, config);
+    db.state.offers.unshift(validated);
+    if (validated.status !== "archived" && validated.status !== "blocked") createDraftsForOffer(db, validated, config);
+    await db.save();
+    sendJson(res, 200, validated);
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/run/scrape") {

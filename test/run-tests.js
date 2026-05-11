@@ -151,10 +151,60 @@ test("scrape to draft to publish dry-run pipeline", async () => {
     const scrape = await runScrapePipeline(db, config);
     assert.equal(scrape.inserted, 3);
     assert.ok(db.state.drafts.some((draft) => draft.channel === "telegram"));
+    const draft = db.state.drafts.find((item) => item.channel === "telegram");
+    draft.status = "approved";
+    const offer = db.state.offers.find((item) => item.id === draft.offerId);
+    offer.publishable = true;
+    offer.validationStatus = "ready";
 
     const publish = await runPublishPipeline(db, config);
     assert.ok(publish.published >= 1);
     assert.ok(db.state.drafts.some((draft) => draft.status === "published"));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("scrape pipeline reports mock fallback source explicitly", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      SCRAPER_MODE: "mock",
+      AMAZON_AFFILIATE_TAG: "default-20"
+    });
+    const result = await runScrapePipeline(db, config);
+    assert.equal(result.scrape.source, "mock");
+    assert.equal(db.state.offers[0].source, "mock");
+    assert.ok(db.state.offers[0].sourceWarnings.includes("mock_source"));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("manual offer API creates Amazon offer from pasted URL", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/offers/manual",
+      body: {
+        url: "https://www.amazon.com.br/dp/B0TEST1234",
+        title: "SSD NVMe Manual",
+        currentPrice: 349.9,
+        affiliateUrl: "https://amzn.to/42cFr9f"
+      }
+    });
+    assert.equal(response.status, 200);
+    assert.equal(db.state.offers[0].source, "manual");
+    assert.equal(db.state.offers[0].asin, "B0TEST1234");
+    assert.equal(db.state.offers[0].affiliateReady, true);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -211,6 +261,11 @@ test("publish pipeline returns per-draft dry-run details", async () => {
       X_DRY_RUN: "true"
     });
     await runScrapePipeline(db, config);
+    const draft = db.state.drafts.find((item) => item.channel === "telegram");
+    draft.status = "approved";
+    const offer = db.state.offers.find((item) => item.id === draft.offerId);
+    offer.publishable = true;
+    offer.validationStatus = "ready";
     const publish = await runPublishPipeline(db, config);
     assert.ok(Array.isArray(publish.results));
     assert.ok(publish.results.length >= 1);
