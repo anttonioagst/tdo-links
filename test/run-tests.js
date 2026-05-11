@@ -157,6 +157,9 @@ test("scrape to draft to publish dry-run pipeline", async () => {
     const offer = db.state.offers.find((item) => item.id === draft.offerId);
     offer.publishable = true;
     offer.validationStatus = "ready";
+    offer.scrapedAt = new Date().toISOString();
+    offer.source = "manual";
+    offer.sourceWarnings = [];
 
     const publish = await runPublishPipeline(db, config);
     assert.ok(publish.published >= 1);
@@ -341,12 +344,102 @@ test("publish pipeline returns per-draft dry-run details", async () => {
     const offer = db.state.offers.find((item) => item.id === draft.offerId);
     offer.publishable = true;
     offer.validationStatus = "ready";
+    offer.scrapedAt = new Date().toISOString();
+    offer.source = "manual";
+    offer.sourceWarnings = [];
     const publish = await runPublishPipeline(db, config);
     assert.ok(Array.isArray(publish.results));
     assert.ok(publish.results.length >= 1);
     assert.equal(publish.results[0].dryRun, true);
     assert.equal(publish.results[0].channel, "telegram");
     assert.ok(["published", "failed", "skipped"].includes(publish.results[0].outcome));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("publish pipeline refreshes stale offer validation before publishing", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      TELEGRAM_DRY_RUN: "true"
+    });
+    db.state.offers.push({
+      id: "offer_stale_publish",
+      store: "amazon",
+      title: "Produto com preco antigo",
+      originalUrl: "https://www.amazon.com.br/dp/B0STALE123",
+      affiliateUrl: "https://amzn.to/42cFr9f",
+      affiliateSource: "manual",
+      affiliateReady: true,
+      currentPrice: 349.9,
+      scrapedAt: new Date(Date.now() - 25 * 3_600_000).toISOString(),
+      inStock: true,
+      validationStatus: "ready",
+      publishable: true
+    });
+    db.state.drafts.push({
+      id: "draft_stale_publish",
+      offerId: "offer_stale_publish",
+      channel: "telegram",
+      text: "Oferta teste\nhttps://x.test/go/abc",
+      status: "approved",
+      publishedAt: null,
+      providerMessageId: null
+    });
+    const publish = await runPublishPipeline(db, config);
+    assert.equal(publish.published, 0);
+    assert.equal(publish.skipped, 1);
+    assert.equal(publish.results[0].outcome, "skipped");
+    assert.notEqual(db.state.drafts[0].status, "published");
+    assert.equal(db.state.offers[0].validationStatus, "needs_review");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("publish pipeline fails when Telegram credentials are missing outside dry-run", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      TELEGRAM_DRY_RUN: "false"
+    });
+    db.state.offers.push({
+      id: "offer_missing_telegram_credentials",
+      store: "amazon",
+      title: "Produto Teste",
+      originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+      affiliateUrl: "https://amzn.to/42cFr9f",
+      affiliateSource: "manual",
+      affiliateReady: true,
+      currentPrice: 349.9,
+      scrapedAt: new Date().toISOString(),
+      inStock: true,
+      publishable: true,
+      validationStatus: "ready"
+    });
+    db.state.drafts.push({
+      id: "draft_missing_telegram_credentials",
+      offerId: "offer_missing_telegram_credentials",
+      channel: "telegram",
+      text: "Oferta teste\nhttps://x.test/go/abc",
+      status: "approved",
+      publishedAt: null,
+      providerMessageId: null
+    });
+    const publish = await runPublishPipeline(db, config);
+    assert.equal(publish.published, 0);
+    assert.equal(publish.failed, 1);
+    assert.equal(publish.results[0].outcome, "failed");
+    assert.equal(publish.results[0].dryRun, false);
+    assert.match(publish.results[0].detail, /credentials missing/i);
+    assert.notEqual(db.state.drafts[0].status, "published");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -371,6 +464,50 @@ test("Telegram integration test normalizes provider network failures", async () 
     assert.match(result.detail, /network unreachable/);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("mutating API routes reject missing admin token when configured", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      ADMIN_TOKEN: "secret"
+    });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/run/scrape"
+    });
+    assert.equal(response.status, 401);
+    assert.deepEqual(JSON.parse(response.text), { error: "unauthorized" });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("mutating API routes accept x-admin-token when configured", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      ADMIN_TOKEN: "secret",
+      AMAZON_AFFILIATE_TAG: "default-20"
+    });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/run/scrape",
+      headers: { "x-admin-token": "secret" }
+    });
+    assert.equal(response.status, 200);
+    assert.equal(JSON.parse(response.text).inserted, 3);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
 
@@ -603,6 +740,47 @@ test("refresh affiliates route refreshes validation score breakdown and status",
   }
 });
 
+test("refresh affiliates preserves manual Amazon amzn.to affiliate readiness without tag config", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "offer_manual_amznto_refresh",
+      store: "amazon",
+      title: "SSD NVMe",
+      currentPrice: 349.9,
+      previousPrice: 529.9,
+      discountPercent: 34,
+      rating: 4.8,
+      reviewCount: 1200,
+      originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+      affiliateUrl: "https://amzn.to/42cFr9f",
+      affiliateSource: "manual",
+      affiliateReady: true,
+      scrapedAt: new Date().toISOString(),
+      inStock: true,
+      category: "tech",
+      validationStatus: "ready",
+      publishable: true,
+      score: 90,
+      status: "auto_ready"
+    });
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/run/refresh-affiliates"
+    });
+    assert.equal(response.status, 200);
+    assert.equal(db.state.offers[0].affiliateReady, true);
+    assert.equal(db.state.offers[0].publishable, true);
+    assert.equal(db.state.offers[0].validationStatus, "ready");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("recommendations identify missing affiliate links", () => {
   const recommendations = buildRecommendations({
     offers: [{ id: "offer_1", title: "SSD", affiliateReady: false, validationStatus: "blocked", score: 91 }],
@@ -624,6 +802,29 @@ test("recommendations ignore archived offers missing affiliate links", () => {
     settings: { mode: "limited" }
   });
   assert.equal(recommendations[0].type, "stable_pipeline");
+});
+
+test("recommendations do not mark approved Telegram drafts ready when linked offer is blocked", () => {
+  const recommendations = buildRecommendations({
+    offers: [{
+      id: "offer_blocked_recommendation",
+      title: "SSD",
+      affiliateReady: true,
+      validationStatus: "blocked",
+      publishable: false,
+      score: 91
+    }],
+    drafts: [{
+      id: "draft_blocked_recommendation",
+      offerId: "offer_blocked_recommendation",
+      channel: "telegram",
+      status: "approved"
+    }],
+    clicks: [],
+    publishLog: [],
+    settings: { mode: "limited" }
+  });
+  assert.equal(recommendations.some((item) => item.type === "publish_ready"), false);
 });
 
 test("state endpoint returns fresh recommendations after state changes", async () => {
@@ -661,6 +862,23 @@ test("state API includes diagnostics and recommendations", async () => {
   }
 });
 
+test("diagnostics reports Telegram not ready when dry-run is enabled with credentials", () => {
+  const config = loadConfig({
+    PUBLIC_BASE_URL: "http://localhost:4318",
+    TELEGRAM_DRY_RUN: "true",
+    TELEGRAM_BOT_TOKEN: "token",
+    TELEGRAM_CHAT_ID: "chat"
+  });
+  const diagnostics = buildDiagnostics({
+    config,
+    state: { publishLog: [] }
+  });
+  assert.equal(diagnostics.telegram.hasBotToken, true);
+  assert.equal(diagnostics.telegram.hasChatId, true);
+  assert.equal(diagnostics.telegram.dryRun, true);
+  assert.equal(diagnostics.telegram.ready, false);
+});
+
 test("analytics report stores actionable recommendations", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   try {
@@ -695,6 +913,12 @@ test("publish pipeline records failed details when Telegram fetch throws", async
       store: "amazon",
       title: "Produto Teste",
       originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+      affiliateUrl: "https://amzn.to/42cFr9f",
+      affiliateSource: "manual",
+      affiliateReady: true,
+      currentPrice: 349.9,
+      scrapedAt: new Date().toISOString(),
+      inStock: true,
       publishable: true,
       validationStatus: "ready"
     });
@@ -735,14 +959,14 @@ for (const { name, fn } of tests) {
 if (failed) process.exit(1);
 console.log(`${tests.length} tests passed`);
 
-function request(app, { method = "GET", path = "/", body = null }) {
+function request(app, { method = "GET", path = "/", body = null, headers = {} }) {
   return new Promise((resolve, reject) => {
     app.listen(0, "127.0.0.1", () => {
       const { port } = app.address();
       const payload = body ? JSON.stringify(body) : "";
       const req = globalThis.fetch(`http://127.0.0.1:${port}${path}`, {
         method,
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...headers },
         body: payload || undefined
       });
       req.then(async (response) => {

@@ -23,6 +23,7 @@ O projeto ja inclui `railway.json`. No Railway, configure:
 
 - `HOST=0.0.0.0`
 - `PUBLIC_BASE_URL=https://seu-dominio.up.railway.app`
+- `ADMIN_TOKEN` com um valor secreto para proteger rotas mutaveis `/api/*`
 - `DATA_FILE=/data/db.json` se usar volume persistente montado em `/data`
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
@@ -41,6 +42,7 @@ O start command e `npm start` e o healthcheck e `/api/health`.
 - Dashboard: aprovar, rejeitar, editar drafts, pausar automacao e ver metricas.
 
 Publicacao Telegram real exige `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` e `TELEGRAM_DRY_RUN=false`.
+Em deploy publico, defina `ADMIN_TOKEN` e envie `x-admin-token: <token>` ou `Authorization: Bearer <token>` nas chamadas mutaveis.
 X fica em modo aquisicao/dry-run no MVP.
 
 ## Operacao premium Fase 1

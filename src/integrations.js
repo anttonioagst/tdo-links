@@ -10,7 +10,8 @@ export function buildDiagnostics({ config, state }) {
       dryRun: config.telegramDryRun,
       hasBotToken: Boolean(config.telegramBotToken),
       hasChatId: Boolean(config.telegramChatId),
-      ready: missing.length === 0,
+      credentialsReady: missing.length === 0,
+      ready: missing.length === 0 && config.telegramDryRun === false,
       missing,
       lastAttempt: lastTelegramAttempt
     },

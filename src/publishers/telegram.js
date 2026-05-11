@@ -29,12 +29,21 @@ export async function testTelegram(config) {
 }
 
 export async function publishTelegram(draft, config, offer = null) {
-  if (config.telegramDryRun || !config.telegramBotToken || !config.telegramChatId) {
+  if (config.telegramDryRun) {
     return {
       ok: true,
       dryRun: true,
       providerMessageId: null,
-      detail: "Telegram dry-run ativo ou credenciais ausentes."
+      detail: "Telegram dry-run ativo."
+    };
+  }
+
+  if (!config.telegramBotToken || !config.telegramChatId) {
+    return {
+      ok: false,
+      dryRun: false,
+      providerMessageId: null,
+      detail: "Telegram credentials missing."
     };
   }
 

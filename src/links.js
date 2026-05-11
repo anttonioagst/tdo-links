@@ -14,7 +14,7 @@ export function buildAffiliateUrl(offer, config, channel = "") {
 }
 
 export function hasAffiliateConfig(offer, config) {
-  if (offer.store === "amazon") return Boolean(amazonTrackingTag(config));
+  if (offer.store === "amazon") return Boolean(amazonTrackingTag(config) || hasManualAmazonAffiliateUrl(offer));
   if (offer.store === "mercado_livre") return Boolean(config.mercadoLivreAffiliateParam);
   return Boolean(offer.affiliateUrl && offer.affiliateUrl !== offer.originalUrl);
 }
@@ -34,4 +34,9 @@ function amazonTrackingTag(config, channel = "") {
     admin: config.amazonAffiliateTagAdmin
   };
   return byChannel[channel] || config.amazonAffiliateTag || "";
+}
+
+function hasManualAmazonAffiliateUrl(offer) {
+  return offer.affiliateSource === "manual"
+    && /^https:\/\/((www\.)?amazon\.com\.br\/|amzn\.to\/)/.test(String(offer.affiliateUrl || ""));
 }

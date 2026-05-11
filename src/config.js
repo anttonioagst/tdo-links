@@ -27,7 +27,8 @@ export function loadConfig(env = process.env) {
     telegramChatId: env.TELEGRAM_CHAT_ID || "",
     telegramDryRun: env.TELEGRAM_DRY_RUN !== "false",
     xDryRun: env.X_DRY_RUN !== "false",
-    xProfileUrl: env.X_PROFILE_URL || ""
+    xProfileUrl: env.X_PROFILE_URL || "",
+    adminToken: env.ADMIN_TOKEN || ""
   };
 }
 

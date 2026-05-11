@@ -19,7 +19,11 @@ export function buildRecommendations(state) {
     });
   }
 
-  const readyDrafts = drafts.filter((draft) => ["auto_ready", "approved"].includes(draft.status) && draft.channel === "telegram");
+  const readyDrafts = drafts.filter((draft) => {
+    if (!["auto_ready", "approved"].includes(draft.status) || draft.channel !== "telegram") return false;
+    const offer = offers.find((item) => item.id === draft.offerId);
+    return offer?.publishable === true && offer.validationStatus === "ready";
+  });
   if (readyDrafts.length) {
     recommendations.push({
       id: "publish_ready",

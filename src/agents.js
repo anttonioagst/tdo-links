@@ -162,7 +162,9 @@ export async function runPublishPipeline(db, config) {
   let published = 0;
   const results = [];
   for (const draft of eligible) {
-    const offer = db.state.offers.find((item) => item.id === draft.offerId);
+    const offerIndex = db.state.offers.findIndex((item) => item.id === draft.offerId);
+    const offer = offerIndex === -1 ? null : refreshOfferDecision(db.state.offers[offerIndex], db, config);
+    if (offerIndex !== -1) db.state.offers[offerIndex] = offer;
     if (!offer || offer.publishable !== true || offer.validationStatus !== "ready") {
       const detail = {
         draftId: draft.id,

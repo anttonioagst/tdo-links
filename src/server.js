@@ -33,6 +33,11 @@ export function createApp({ db, config, publicDir }) {
 }
 
 async function handleApi(req, res, url, db, config) {
+  if (requiresAdminAuth(req, config) && !hasAdminAuth(req, config)) {
+    sendJson(res, 401, { error: "unauthorized" });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/state") {
     sendJson(res, 200, publicState(db, config));
     return;
@@ -47,8 +52,6 @@ async function handleApi(req, res, url, db, config) {
   }
   if (req.method === "GET" && url.pathname === "/api/recommendations") {
     const recommendations = buildRecommendations(db.state);
-    db.state.recommendations = recommendations;
-    await db.save();
     sendJson(res, 200, recommendations);
     return;
   }
@@ -313,6 +316,17 @@ async function readJson(req) {
 function sendJson(res, status, payload) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
+}
+
+function requiresAdminAuth(req, config) {
+  return Boolean(config.adminToken) && ["POST", "PUT", "PATCH", "DELETE"].includes(req.method);
+}
+
+function hasAdminAuth(req, config) {
+  const headerToken = req.headers["x-admin-token"];
+  if (headerToken === config.adminToken) return true;
+  const authorization = String(req.headers.authorization || "");
+  return authorization === `Bearer ${config.adminToken}`;
 }
 
 function isValidAffiliateUrl(value) {

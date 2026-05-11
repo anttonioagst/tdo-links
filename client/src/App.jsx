@@ -605,7 +605,7 @@ function DraftCard({ draft, offer, loading, api, action }) {
         <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <span className="text-theme-xs font-medium text-gray-700 dark:text-gray-300">Link afiliado oficial</span>
-            <Badge color={offer.affiliateSource === "manual" ? "success" : "warning"}>{offer.affiliateSource === "manual" ? "SiteStripe salvo" : "Pendente"}</Badge>
+            <Badge color={offer.affiliateReady ? "success" : "warning"}>{offer.affiliateReady ? "Afiliado pronto" : "Pendente"}</Badge>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
