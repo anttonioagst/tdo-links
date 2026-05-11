@@ -280,6 +280,7 @@ async function serveStatic(res, publicDir, pathname) {
 }
 
 function publicState(db) {
+  const recommendations = buildRecommendations(db.state);
   const clicksByOffer = Object.fromEntries(
     db.state.offers.map((offer) => [offer.id, db.state.clicks.filter((click) => click.offerId === offer.id).length])
   );
@@ -288,7 +289,7 @@ function publicState(db) {
     drafts: db.state.drafts,
     clicks: db.state.clicks,
     reports: db.state.reports,
-    recommendations: db.state.recommendations || [],
+    recommendations,
     settings: db.state.settings,
     publishLog: db.state.publishLog.slice(0, 20),
     metrics: {

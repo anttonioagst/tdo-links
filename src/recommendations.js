@@ -5,7 +5,7 @@ export function buildRecommendations(state) {
   const clicks = state.clicks || [];
   const publishLog = state.publishLog || [];
 
-  const missingAffiliate = offers.filter((offer) => !offer.affiliateReady);
+  const missingAffiliate = offers.filter((offer) => !offer.affiliateReady && offer.status !== "archived");
   if (missingAffiliate.length) {
     recommendations.push({
       id: "fix_affiliate",

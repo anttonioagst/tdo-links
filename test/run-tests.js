@@ -615,6 +615,35 @@ test("recommendations identify missing affiliate links", () => {
   assert.equal(recommendations[0].severity, "critical");
 });
 
+test("recommendations ignore archived offers missing affiliate links", () => {
+  const recommendations = buildRecommendations({
+    offers: [{ id: "offer_1", title: "SSD", affiliateReady: false, status: "archived", validationStatus: "blocked", score: 91 }],
+    drafts: [],
+    clicks: [],
+    publishLog: [],
+    settings: { mode: "limited" }
+  });
+  assert.equal(recommendations[0].type, "stable_pipeline");
+});
+
+test("state endpoint returns fresh recommendations after state changes", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.recommendations = [{ id: "stable_pipeline", type: "stable_pipeline", severity: "info" }];
+    db.state.offers.push({ id: "offer_1", title: "SSD", affiliateReady: false, validationStatus: "blocked", score: 91 });
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, { path: "/api/state" });
+    const payload = JSON.parse(response.text);
+    assert.equal(response.status, 200);
+    assert.equal(payload.recommendations[0].type, "fix_affiliate");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("analytics report stores actionable recommendations", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   try {
