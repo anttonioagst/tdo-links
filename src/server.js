@@ -65,6 +65,10 @@ async function handleApi(req, res, url, db, config) {
       return;
     }
     const asin = originalUrl.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i)?.[1] || "";
+    if (!asin) {
+      sendJson(res, 400, { error: "asin_not_found" });
+      return;
+    }
     const id = db.nextId("offer");
     const baseOffer = {
       id,

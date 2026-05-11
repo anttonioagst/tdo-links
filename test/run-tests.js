@@ -210,6 +210,31 @@ test("manual offer API creates Amazon offer from pasted URL", async () => {
   }
 });
 
+test("manual offer API rejects Amazon URL without ASIN", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/offers/manual",
+      body: {
+        url: "https://www.amazon.com.br/s?k=ssd",
+        title: "SSD NVMe Manual",
+        currentPrice: 349.9,
+        affiliateUrl: "https://amzn.to/42cFr9f"
+      }
+    });
+    assert.equal(response.status, 400);
+    assert.deepEqual(JSON.parse(response.text), { error: "asin_not_found" });
+    assert.equal(db.state.offers.length, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("parses Amazon search HTML into normalized offer candidates", () => {
   const html = `
     <div data-asin="B0TEST1234">
