@@ -1,3 +1,29 @@
+export async function testTelegram(config) {
+  if (config.telegramDryRun || !config.telegramBotToken || !config.telegramChatId) {
+    return {
+      ok: false,
+      dryRun: config.telegramDryRun,
+      providerMessageId: null,
+      detail: "Teste nao enviado: dry-run ativo ou credenciais ausentes."
+    };
+  }
+  const response = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: config.telegramChatId,
+      text: "TDO Links: teste de integracao Telegram concluido."
+    })
+  });
+  const payload = await response.json().catch(() => ({}));
+  return {
+    ok: response.ok && payload.ok === true,
+    dryRun: false,
+    providerMessageId: payload.result?.message_id || null,
+    detail: payload.description || (response.ok ? "ok" : `HTTP ${response.status}`)
+  };
+}
+
 export async function publishTelegram(draft, config, offer = null) {
   if (config.telegramDryRun || !config.telegramBotToken || !config.telegramChatId) {
     return {
@@ -22,7 +48,7 @@ export async function publishTelegram(draft, config, offer = null) {
         }))
       })
     });
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({}));
     return {
       ok: response.ok && payload.ok,
       dryRun: false,
@@ -49,7 +75,7 @@ export async function publishTelegram(draft, config, offer = null) {
     body: JSON.stringify(body)
   });
 
-  const payload = await response.json();
+  const payload = await response.json().catch(() => ({}));
   return {
     ok: response.ok && payload.ok,
     dryRun: false,

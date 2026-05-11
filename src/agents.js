@@ -126,7 +126,7 @@ export async function maybeCreateXDraft(db, config) {
 export async function runPublishPipeline(db, config) {
   if (db.state.settings.mode === "paused") {
     console.log("publish_skipped", JSON.stringify({ reason: "paused" }));
-    return { published: 0, skipped: "paused" };
+    return { published: 0, failed: 0, dryRun: 0, skipped: 1, results: [{ outcome: "skipped", reason: "paused" }] };
   }
   const autoAllowed = db.state.settings.mode === "limited";
   const eligible = db.state.drafts.filter((draft) => {
@@ -145,6 +145,7 @@ export async function runPublishPipeline(db, config) {
   }));
 
   let published = 0;
+  const results = [];
   for (const draft of eligible) {
     const offer = db.state.offers.find((item) => item.id === draft.offerId);
     const result = await publishTelegram(draft, config, offer);
@@ -162,6 +163,19 @@ export async function runPublishPipeline(db, config) {
       result,
       createdAt: new Date().toISOString()
     });
+    const detail = {
+      draftId: draft.id,
+      offerId: draft.offerId,
+      channel: draft.channel,
+      ok: result.ok,
+      dryRun: result.dryRun,
+      providerMessageId: result.providerMessageId || null,
+      detail: result.detail,
+      outcome: result.ok ? "published" : "failed"
+    };
+    results.push(detail);
+    draft.lastPublishResult = detail;
+    draft.publishAttempts = [...(draft.publishAttempts || []), detail].slice(-10);
     if (result.ok) {
       draft.status = "published";
       draft.publishedAt = new Date().toISOString();
@@ -175,7 +189,13 @@ export async function runPublishPipeline(db, config) {
     }
   }
   await db.save();
-  return { published };
+  return {
+    published,
+    failed: results.filter((item) => item.outcome === "failed").length,
+    dryRun: results.filter((item) => item.dryRun).length,
+    skipped: 0,
+    results
+  };
 }
 
 export async function publishApprovedX(db, config) {

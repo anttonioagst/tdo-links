@@ -6,6 +6,7 @@ import { createDraftsForOffer, runPublishPipeline, runScrapePipeline } from "../
 import { validatePost, validateXAcquisitionPost } from "../src/compliance.js";
 import { loadConfig } from "../src/config.js";
 import { JsonDb } from "../src/db.js";
+import { buildDiagnostics } from "../src/integrations.js";
 import { buildAffiliateUrl } from "../src/links.js";
 import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, statusForScore } from "../src/scoring.js";
@@ -174,6 +175,46 @@ test("parses Amazon search HTML into normalized offer candidates", () => {
   assert.equal(offer.imageUrl, "https://m.media-amazon.com/images/I/test.jpg");
   assert.deepEqual(offer.imageUrls, ["https://m.media-amazon.com/images/I/test.jpg"]);
   assert.equal(offer.originalUrl, "https://www.amazon.com.br/dp/B0TEST1234");
+});
+
+test("diagnostics exposes Telegram dry-run and credential health", () => {
+  const config = loadConfig({
+    PUBLIC_BASE_URL: "http://localhost:4318",
+    TELEGRAM_DRY_RUN: "true",
+    TELEGRAM_BOT_TOKEN: "",
+    TELEGRAM_CHAT_ID: ""
+  });
+  const diagnostics = buildDiagnostics({
+    config,
+    state: { publishLog: [] }
+  });
+  assert.equal(diagnostics.telegram.dryRun, true);
+  assert.equal(diagnostics.telegram.ready, false);
+  assert.deepEqual(diagnostics.telegram.missing, ["bot_token", "chat_id"]);
+});
+
+test("publish pipeline returns per-draft dry-run details", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({
+      PORT: "4318",
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      TELEGRAM_DRY_RUN: "true",
+      AMAZON_AFFILIATE_TAG: "default-20",
+      X_DRY_RUN: "true"
+    });
+    await runScrapePipeline(db, config);
+    const publish = await runPublishPipeline(db, config);
+    assert.ok(Array.isArray(publish.results));
+    assert.ok(publish.results.length >= 1);
+    assert.equal(publish.results[0].dryRun, true);
+    assert.equal(publish.results[0].channel, "telegram");
+    assert.ok(["published", "failed", "skipped"].includes(publish.results[0].outcome));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 let failed = 0;

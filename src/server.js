@@ -2,7 +2,9 @@ import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { cloneDraftForRetest, createAnalyticsReport, publishApprovedX, refreshOfferAffiliateUrls, regenerateDraftCopy, runPublishPipeline, runScrapePipeline } from "./agents.js";
+import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
+import { testTelegram } from "./publishers/telegram.js";
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -39,17 +41,20 @@ async function handleApi(req, res, url, db, config) {
     return;
   }
   if (req.method === "GET" && url.pathname === "/api/diagnostics") {
-    sendJson(res, 200, {
-      publicBaseUrl: config.publicBaseUrl,
-      telegram: {
-        dryRun: config.telegramDryRun,
-        hasBotToken: Boolean(config.telegramBotToken),
-        hasChatId: Boolean(config.telegramChatId)
-      },
-      x: {
-        dryRun: config.xDryRun
-      }
+    sendJson(res, 200, buildDiagnostics({ config, state: db.state }));
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/integrations/telegram/test") {
+    const result = await testTelegram(config);
+    db.state.publishLog.unshift({
+      id: db.nextId("pub"),
+      draftId: "",
+      channel: "telegram",
+      result,
+      createdAt: new Date().toISOString()
     });
+    await db.save();
+    sendJson(res, 200, result);
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/run/scrape") {
