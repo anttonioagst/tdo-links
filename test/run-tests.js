@@ -315,6 +315,73 @@ test("Amazon discovery records healthy no-op when no sources are configured", as
   }
 });
 
+test("discovery settings API persists dashboard configuration", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "PUT",
+      path: "/api/discovery/amazon/settings",
+      body: {
+        enabled: false,
+        intervalHours: 3,
+        minScore: 72,
+        maxCandidatesPerRun: 7,
+        sourceUrls: ["https://www.amazon.com.br/s?k=ssd"],
+        searchTerms: ["monitor gamer"]
+      }
+    });
+    assert.equal(response.status, 200);
+    const payload = JSON.parse(response.text);
+    assert.equal(payload.enabled, false);
+    assert.equal(db.state.discovery.amazon.intervalHours, 3);
+    assert.deepEqual(db.state.discovery.amazon.searchTerms, ["monitor gamer"]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("discovery run API returns summary and updates state", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/discovery/amazon/run"
+    });
+    assert.equal(response.status, 200);
+    const payload = JSON.parse(response.text);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.reason, "no_sources_configured");
+    assert.equal(db.state.discovery.amazon.lastRun.reason, "no_sources_configured");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("state API includes discovery settings and run status", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.discovery.amazon.lastRun = { id: "disc_1", ok: true, acceptedCount: 0 };
+    const app = createApp({ db, config: loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" }), publicDir: dir });
+    const response = await request(app, { method: "GET", path: "/api/state" });
+    assert.equal(response.status, 200);
+    const payload = JSON.parse(response.text);
+    assert.equal(payload.discovery.amazon.intervalHours, 2);
+    assert.equal(payload.discovery.amazon.lastRun.id, "disc_1");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("scrape to draft to publish dry-run pipeline", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   try {

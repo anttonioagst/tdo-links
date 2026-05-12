@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { cloneDraftForRetest, createAnalyticsReport, createDraftsForOffer, publishApprovedX, refreshOfferAffiliateUrls, refreshOfferDecision, regenerateDraftCopy, runPublishPipeline, runScrapePipeline } from "./agents.js";
+import { runAmazonDiscovery, updateAmazonDiscoverySettings } from "./discovery.js";
 import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
 import { testTelegram } from "./publishers/telegram.js";
@@ -53,6 +54,18 @@ async function handleApi(req, res, url, db, config) {
   if (req.method === "GET" && url.pathname === "/api/recommendations") {
     const recommendations = buildRecommendations(db.state);
     sendJson(res, 200, recommendations);
+    return;
+  }
+  if (req.method === "PUT" && url.pathname === "/api/discovery/amazon/settings") {
+    const body = await readJson(req);
+    db.state.discovery.amazon = updateAmazonDiscoverySettings(db.state.discovery?.amazon || {}, body);
+    await db.save();
+    sendJson(res, 200, db.state.discovery.amazon);
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/discovery/amazon/run") {
+    const result = await runAmazonDiscovery(db, config, { trigger: "manual" });
+    sendJson(res, 200, result);
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/integrations/telegram/test") {
@@ -295,6 +308,7 @@ function publicState(db, config) {
     diagnostics: buildDiagnostics({ config, state: db.state }),
     recommendations,
     settings: db.state.settings,
+    discovery: db.state.discovery,
     publishLog: db.state.publishLog.slice(0, 20),
     metrics: {
       offers: db.state.offers.length,
