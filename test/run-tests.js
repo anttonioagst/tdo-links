@@ -14,6 +14,7 @@ import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, scoreOfferDetailed, statusForScore } from "../src/scoring.js";
 import { parseAmazonSearch } from "../src/scrapers.js";
 import { validateOffer } from "../src/validation.js";
+import { normalizeDiscoverySettings } from "../src/discovery.js";
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -134,6 +135,43 @@ test("saves manual Amazon affiliate links and prioritizes them", async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("db load includes default Amazon discovery settings", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    assert.equal(db.state.discovery.amazon.enabled, true);
+    assert.equal(db.state.discovery.amazon.intervalHours, 2);
+    assert.equal(db.state.discovery.amazon.minScore, 70);
+    assert.equal(db.state.discovery.amazon.maxCandidatesPerRun, 10);
+    assert.deepEqual(db.state.discovery.amazon.sourceUrls, []);
+    assert.deepEqual(db.state.discovery.amazon.searchTerms, []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("normalizes Amazon discovery settings conservatively", () => {
+  const settings = normalizeDiscoverySettings({
+    enabled: false,
+    intervalHours: "0",
+    minScore: "101",
+    maxCandidatesPerRun: "0",
+    sourceUrls: [
+      "https://www.amazon.com.br/s?k=ssd",
+      "https://example.com/not-amazon",
+      "https://www.amazon.com.br/s?k=ssd"
+    ],
+    searchTerms: ["SSD NVMe", "", " monitor 144hz ", "SSD NVMe"]
+  });
+  assert.equal(settings.enabled, false);
+  assert.equal(settings.intervalHours, 1);
+  assert.equal(settings.minScore, 100);
+  assert.equal(settings.maxCandidatesPerRun, 1);
+  assert.deepEqual(settings.sourceUrls, ["https://www.amazon.com.br/s?k=ssd"]);
+  assert.deepEqual(settings.searchTerms, ["SSD NVMe", "monitor 144hz"]);
 });
 
 test("scrape to draft to publish dry-run pipeline", async () => {

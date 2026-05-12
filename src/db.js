@@ -1,6 +1,19 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+const defaultDiscovery = {
+  amazon: {
+    enabled: true,
+    intervalHours: 2,
+    minScore: 70,
+    maxCandidatesPerRun: 10,
+    sourceUrls: [],
+    searchTerms: [],
+    lastRun: null,
+    nextRunAt: null
+  }
+};
+
 const emptyDb = {
   offers: [],
   drafts: [],
@@ -10,6 +23,7 @@ const emptyDb = {
   recommendations: [],
   integrations: {},
   campaigns: [],
+  discovery: structuredClone(defaultDiscovery),
   settings: {
     mode: "limited",
     autoPublishThreshold: 85,
@@ -17,6 +31,21 @@ const emptyDb = {
   },
   publishLog: []
 };
+
+function normalizeState(state) {
+  const base = structuredClone(emptyDb);
+  const merged = { ...base, ...state };
+  merged.settings = { ...base.settings, ...(state.settings || {}) };
+  merged.discovery = {
+    ...base.discovery,
+    ...(state.discovery || {}),
+    amazon: {
+      ...base.discovery.amazon,
+      ...(state.discovery?.amazon || {})
+    }
+  };
+  return merged;
+}
 
 export class JsonDb {
   constructor(filePath) {
@@ -28,7 +57,7 @@ export class JsonDb {
     await mkdir(dirname(this.filePath), { recursive: true });
     try {
       this.state = JSON.parse(await readFile(this.filePath, "utf8"));
-      this.state = { ...structuredClone(emptyDb), ...this.state };
+      this.state = normalizeState(this.state);
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       await this.save();
