@@ -14,7 +14,7 @@ import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, scoreOfferDetailed, statusForScore } from "../src/scoring.js";
 import { parseAmazonSearch } from "../src/scrapers.js";
 import { validateOffer } from "../src/validation.js";
-import { normalizeDiscoverySettings } from "../src/discovery.js";
+import { buildAmazonSearchUrl, normalizeDiscoverySettings, runAmazonDiscovery } from "../src/discovery.js";
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -172,6 +172,147 @@ test("normalizes Amazon discovery settings conservatively", () => {
   assert.equal(settings.maxCandidatesPerRun, 1);
   assert.deepEqual(settings.sourceUrls, ["https://www.amazon.com.br/s?k=ssd"]);
   assert.deepEqual(settings.searchTerms, ["SSD NVMe", "monitor 144hz"]);
+});
+
+test("builds Amazon search URLs for configured terms", () => {
+  assert.equal(
+    buildAmazonSearchUrl("SSD NVMe 1TB"),
+    "https://www.amazon.com.br/s?k=SSD+NVMe+1TB"
+  );
+});
+
+test("manual Amazon discovery inserts blocked high-score candidates only", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.discovery.amazon = normalizeDiscoverySettings({
+      sourceUrls: ["https://www.amazon.com.br/s?k=ssd"],
+      searchTerms: ["monitor gamer"],
+      minScore: 70,
+      maxCandidatesPerRun: 10
+    });
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+    const result = await runAmazonDiscovery(db, config, {
+      trigger: "manual",
+      fetchCandidates: async (source) => [{
+        store: "amazon",
+        title: source.type === "term" ? "Monitor Gamer 144hz" : "SSD NVMe 1TB Gen4",
+        currentPrice: 349.9,
+        previousPrice: 529.9,
+        originalUrl: source.type === "term"
+          ? "https://www.amazon.com.br/dp/B0MONITOR1X"
+          : "https://www.amazon.com.br/dp/B0SSD1TBX1",
+        asin: source.type === "term" ? "B0MONITOR1X" : "B0SSD1TBX1",
+        sourceConfidence: 0.9,
+        sourceWarnings: [],
+        category: "tech",
+        rating: 4.8,
+        reviewCount: 1200,
+        inStock: true,
+        storeReputation: "high"
+      }]
+    });
+    assert.equal(result.trigger, "manual");
+    assert.equal(result.acceptedCount, 2);
+    assert.equal(db.state.offers.length, 2);
+    assert.equal(db.state.offers[0].source, "amazon_discovery");
+    assert.equal(db.state.offers[0].affiliateReady, false);
+    assert.equal(db.state.offers[0].publishable, false);
+    assert.equal(db.state.offers[0].validationStatus, "blocked");
+    assert.ok(db.state.offers[0].validationReasons.includes("amazon_manual_link_required"));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("Amazon discovery deduplicates existing ASINs and applies score and limit", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "existing_offer",
+      store: "amazon",
+      asin: "B0DUPLICAT",
+      originalUrl: "https://www.amazon.com.br/dp/B0DUPLICAT"
+    });
+    db.state.discovery.amazon = normalizeDiscoverySettings({
+      searchTerms: ["tech"],
+      minScore: 70,
+      maxCandidatesPerRun: 1
+    });
+    const candidates = [
+      {
+        store: "amazon",
+        title: "Produto Duplicado",
+        currentPrice: 349.9,
+        previousPrice: 529.9,
+        originalUrl: "https://www.amazon.com.br/dp/B0DUPLICAT",
+        asin: "B0DUPLICAT",
+        sourceConfidence: 0.9,
+        category: "tech",
+        rating: 4.8,
+        reviewCount: 1200,
+        inStock: true,
+        storeReputation: "high"
+      },
+      {
+        store: "amazon",
+        title: "Produto Forte",
+        currentPrice: 349.9,
+        previousPrice: 529.9,
+        originalUrl: "https://www.amazon.com.br/dp/B0STRONG01",
+        asin: "B0STRONG01",
+        sourceConfidence: 0.9,
+        category: "tech",
+        rating: 4.8,
+        reviewCount: 1200,
+        inStock: true,
+        storeReputation: "high"
+      },
+      {
+        store: "amazon",
+        title: "Produto Fraco",
+        currentPrice: 999.9,
+        previousPrice: null,
+        originalUrl: "https://www.amazon.com.br/dp/B0WEAK001X",
+        asin: "B0WEAK001X",
+        sourceConfidence: 0.2,
+        category: "other",
+        rating: 3.8,
+        reviewCount: 3,
+        inStock: true,
+        storeReputation: "high"
+      }
+    ];
+    const result = await runAmazonDiscovery(db, loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" }), {
+      trigger: "manual",
+      fetchCandidates: async () => candidates
+    });
+    assert.equal(result.duplicateCount, 1);
+    assert.equal(result.rejectedLowScoreCount, 1);
+    assert.equal(result.acceptedCount, 1);
+    assert.equal(db.state.offers.length, 2);
+    assert.equal(db.state.offers[0].asin, "B0STRONG01");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("Amazon discovery records healthy no-op when no sources are configured", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const result = await runAmazonDiscovery(db, loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" }), { trigger: "manual" });
+    assert.equal(result.ok, true);
+    assert.equal(result.reason, "no_sources_configured");
+    assert.equal(result.acceptedCount, 0);
+    assert.equal(db.state.discovery.amazon.lastRun.reason, "no_sources_configured");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("scrape to draft to publish dry-run pipeline", async () => {

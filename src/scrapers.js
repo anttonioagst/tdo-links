@@ -86,6 +86,12 @@ export async function scrapeAmazonDeals(config) {
   return normalizeOffers(limitByUrl(all, 20));
 }
 
+export async function scrapeAmazonSource(source, config = {}) {
+  const url = source.type === "term" ? source.url : source.value;
+  const html = await fetchText(url, config);
+  return normalizeOffers(parseAmazonSearch(html, url));
+}
+
 export function getLastScrapeMeta() {
   return lastScrapeMeta;
 }
