@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { createAnalyticsReport, runPublishPipeline, runScrapePipeline } from "./agents.js";
 import { loadConfig } from "./config.js";
 import { JsonDb } from "./db.js";
+import { startDiscoveryScheduler } from "./discovery-scheduler.js";
 import { createApp } from "./server.js";
 
 await loadEnvFile(resolve(".env"));
@@ -18,6 +19,8 @@ const app = createApp({ db, config, publicDir: existsSync(resolve("dist")) ? res
 app.listen(config.port, config.host, () => {
   console.log(`Affiliate Deal Agents MVP running at ${config.publicBaseUrl}`);
 });
+
+startDiscoveryScheduler(db, config);
 
 setInterval(() => {
   runScrapePipeline(db, config).catch((error) => console.error("scrape_failed", error));

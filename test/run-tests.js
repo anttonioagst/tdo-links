@@ -15,6 +15,7 @@ import { dedupeOffers, scoreOffer, scoreOfferDetailed, statusForScore } from "..
 import { parseAmazonSearch } from "../src/scrapers.js";
 import { validateOffer } from "../src/validation.js";
 import { buildAmazonSearchUrl, normalizeDiscoverySettings, runAmazonDiscovery } from "../src/discovery.js";
+import { shouldRunAmazonDiscovery, runDiscoverySchedulerTick } from "../src/discovery-scheduler.js";
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -377,6 +378,35 @@ test("state API includes discovery settings and run status", async () => {
     const payload = JSON.parse(response.text);
     assert.equal(payload.discovery.amazon.intervalHours, 2);
     assert.equal(payload.discovery.amazon.lastRun.id, "disc_1");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("discovery scheduler skips disabled or future runs", () => {
+  const now = new Date("2026-05-12T10:00:00.000Z");
+  assert.equal(shouldRunAmazonDiscovery({ enabled: false }, now), false);
+  assert.equal(shouldRunAmazonDiscovery({ enabled: true, nextRunAt: "2026-05-12T11:00:00.000Z" }, now), false);
+  assert.equal(shouldRunAmazonDiscovery({ enabled: true, nextRunAt: "2026-05-12T09:00:00.000Z" }, now), true);
+  assert.equal(shouldRunAmazonDiscovery({ enabled: true, nextRunAt: null }, now), true);
+});
+
+test("discovery scheduler tick runs when due", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.discovery.amazon.nextRunAt = "2026-05-12T09:00:00.000Z";
+    let called = 0;
+    const result = await runDiscoverySchedulerTick(db, loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" }), {
+      now: new Date("2026-05-12T10:00:00.000Z"),
+      runDiscovery: async () => {
+        called += 1;
+        return { ok: true, trigger: "scheduled", acceptedCount: 0 };
+      }
+    });
+    assert.equal(called, 1);
+    assert.equal(result.ran, true);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
