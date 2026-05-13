@@ -577,9 +577,18 @@ function DraftCard({ draft, offer, loading, api, action }) {
     <article className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <Badge color={badgeColor(draft.status)}>{statusLabel(draft.status)}</Badge>
+          <div className="flex flex-wrap gap-2">
+            <Badge color={badgeColor(draft.status)}>{statusLabel(draft.status)}</Badge>
+            {offer?.source === "amazon_discovery" ? <Badge color="warning">Descoberta Amazon</Badge> : null}
+            {offer?.source === "amazon_discovery" && !offer.affiliateReady ? <Badge color="error">Link oficial pendente</Badge> : null}
+          </div>
           <h4 className="mt-3 line-clamp-2 text-theme-sm font-medium text-gray-800 dark:text-white/90">{offer?.title || "Post de aquisicao X"}</h4>
           <p className="mt-1 text-theme-xs text-gray-500 dark:text-gray-400">{channelLabel(draft.channel)} {offer ? `- ${money(offer.currentPrice)}` : ""}</p>
+          {offer?.discoverySource ? (
+            <p className="mt-1 text-theme-xs text-gray-500 dark:text-gray-400">
+              {offer.discoverySourceType === "term" ? "Termo" : "URL"}: {offer.discoverySource}
+            </p>
+          ) : null}
           {offer?.validationSummary ? (
             <p className="mt-2 text-theme-xs text-gray-500 dark:text-gray-400">{offer.validationSummary}</p>
           ) : null}
@@ -704,6 +713,55 @@ function Config({ state, data, loading, api, action }) {
   const telegram = state.diagnostics?.telegram;
   const telegramCount = telegram ? (telegram.ready ? "Pronto" : "Revisar") : "Aguardando diagnostico";
   const telegramValue = (value, availableLabel, missingLabel) => telegram ? (value ? availableLabel : missingLabel) : "Indisponivel";
+  const discovery = state.discovery?.amazon || {
+    enabled: true,
+    intervalHours: 2,
+    minScore: 70,
+    maxCandidatesPerRun: 10,
+    sourceUrls: [],
+    searchTerms: [],
+    lastRun: null,
+    nextRunAt: null
+  };
+  const [discoveryForm, setDiscoveryForm] = useState({
+    enabled: discovery.enabled,
+    intervalHours: discovery.intervalHours,
+    minScore: discovery.minScore,
+    maxCandidatesPerRun: discovery.maxCandidatesPerRun,
+    sourceUrls: (discovery.sourceUrls || []).join("\n"),
+    searchTerms: (discovery.searchTerms || []).join("\n")
+  });
+
+  useEffect(() => {
+    setDiscoveryForm({
+      enabled: discovery.enabled,
+      intervalHours: discovery.intervalHours,
+      minScore: discovery.minScore,
+      maxCandidatesPerRun: discovery.maxCandidatesPerRun,
+      sourceUrls: (discovery.sourceUrls || []).join("\n"),
+      searchTerms: (discovery.searchTerms || []).join("\n")
+    });
+  }, [
+    discovery.enabled,
+    discovery.intervalHours,
+    discovery.minScore,
+    discovery.maxCandidatesPerRun,
+    JSON.stringify(discovery.sourceUrls || []),
+    JSON.stringify(discovery.searchTerms || [])
+  ]);
+
+  const saveDiscovery = () => action("discoverySave", () => api("/api/discovery/amazon/settings", {
+    method: "PUT",
+    body: {
+      enabled: discoveryForm.enabled,
+      intervalHours: discoveryForm.intervalHours,
+      minScore: discoveryForm.minScore,
+      maxCandidatesPerRun: discoveryForm.maxCandidatesPerRun,
+      sourceUrls: lines(discoveryForm.sourceUrls),
+      searchTerms: lines(discoveryForm.searchTerms)
+    }
+  }), "Descoberta Amazon atualizada");
+  const runDiscovery = () => action("discoveryRun", () => api("/api/discovery/amazon/run", { method: "POST" }), "Descoberta Amazon executada");
 
   return (
     <div className="grid grid-cols-12 gap-4 md:gap-6">
@@ -740,6 +798,52 @@ function Config({ state, data, loading, api, action }) {
           <div className="space-y-3">{data.alerts.map((alert) => <AlertItem key={alert.title} alert={alert} />)}</div>
         </Panel>
       </div>
+      <div className="col-span-12">
+        <Panel title="Descoberta Amazon" count={discovery.enabled ? "Ativa" : "Pausada"}>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <label className="text-theme-sm text-gray-700 dark:text-gray-300">
+              URLs Amazon
+              <textarea
+                className="mt-2 min-h-28 w-full rounded-lg border border-gray-200 bg-white p-3 text-theme-sm text-gray-800 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                value={discoveryForm.sourceUrls}
+                onChange={(event) => setDiscoveryForm({ ...discoveryForm, sourceUrls: event.target.value })}
+                placeholder="https://www.amazon.com.br/s?k=ssd"
+              />
+            </label>
+            <label className="text-theme-sm text-gray-700 dark:text-gray-300">
+              Termos de busca
+              <textarea
+                className="mt-2 min-h-28 w-full rounded-lg border border-gray-200 bg-white p-3 text-theme-sm text-gray-800 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                value={discoveryForm.searchTerms}
+                onChange={(event) => setDiscoveryForm({ ...discoveryForm, searchTerms: event.target.value })}
+                placeholder={"SSD NVMe 1TB\nmonitor 144hz"}
+              />
+            </label>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <NumberField label="Intervalo (h)" value={discoveryForm.intervalHours} onChange={(value) => setDiscoveryForm({ ...discoveryForm, intervalHours: value })} />
+            <NumberField label="Score minimo" value={discoveryForm.minScore} onChange={(value) => setDiscoveryForm({ ...discoveryForm, minScore: value })} />
+            <NumberField label="Max. por ciclo" value={discoveryForm.maxCandidatesPerRun} onChange={(value) => setDiscoveryForm({ ...discoveryForm, maxCandidatesPerRun: value })} />
+            <label className="flex h-full min-h-17 items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-theme-sm text-gray-700 dark:border-gray-800 dark:text-gray-300">
+              <input type="checkbox" checked={discoveryForm.enabled} onChange={(event) => setDiscoveryForm({ ...discoveryForm, enabled: event.target.checked })} />
+              Automatica
+            </label>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <StatusLine label="Ultima execucao" value={discovery.lastRun?.finishedAt ? formatDate(discovery.lastRun.finishedAt) : "Nunca"} />
+            <StatusLine label="Aceitos" value={String(discovery.lastRun?.acceptedCount ?? 0)} />
+            <StatusLine label="Erros" value={String(discovery.lastRun?.errorCount ?? 0)} />
+            <StatusLine label="Proxima execucao" value={discovery.nextRunAt ? formatDate(discovery.nextRunAt) : "Aguardando fontes"} />
+          </div>
+          {discovery.lastRun?.reason ? (
+            <p className="mt-3 text-theme-xs text-gray-500 dark:text-gray-400">{discovery.lastRun.reason}</p>
+          ) : null}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button loading={loading.discoverySave} onClick={saveDiscovery}>Salvar descoberta</Button>
+            <Button variant="outline" loading={loading.discoveryRun} onClick={runDiscovery}><Search className="size-4" /> Buscar agora</Button>
+          </div>
+        </Panel>
+      </div>
     </div>
   );
 }
@@ -762,8 +866,17 @@ function OfferTable({ offers, clicksByOffer, loading, api, action }) {
                 <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="flex items-center gap-3">
                   <ProductThumb offer={offer} />
                   <div>
+                    <div className="mb-1 flex flex-wrap gap-2">
+                      {offer.source === "amazon_discovery" ? <Badge color="warning">Descoberta Amazon</Badge> : null}
+                      {offer.source === "amazon_discovery" && !offer.affiliateReady ? <Badge color="error">Link oficial pendente</Badge> : null}
+                    </div>
                     <p className="line-clamp-2 max-w-[360px] text-theme-sm font-medium text-gray-800 dark:text-white/90">{offer.title}</p>
                     <span className="text-theme-xs text-gray-500 dark:text-gray-400">{storeLabel(offer.store)} - {clicksByOffer[offer.id] || 0} cliques</span>
+                    {offer.discoverySource ? (
+                      <span className="mt-1 block max-w-[360px] truncate text-theme-xs text-gray-500 dark:text-gray-400">
+                        {offer.discoverySourceType === "term" ? "Termo" : "URL"}: {offer.discoverySource}
+                      </span>
+                    ) : null}
                   </div>
                 </a>
               </td>
@@ -809,6 +922,37 @@ function InlineAffiliateForm({ offer, loading, api, action }) {
       </Button>
     </div>
   );
+}
+
+function NumberField({ label, value, onChange }) {
+  return (
+    <label className="text-theme-sm text-gray-700 dark:text-gray-300">
+      {label}
+      <input
+        className="mt-2 h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-theme-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+        type="number"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
+function StatusLine({ label, value }) {
+  return (
+    <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+      <p className="text-theme-xs text-gray-500 dark:text-gray-400">{label}</p>
+      <p className="mt-1 text-theme-sm font-medium text-gray-800 dark:text-white">{value}</p>
+    </div>
+  );
+}
+
+function lines(value) {
+  return String(value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+}
+
+function formatDate(value) {
+  return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
 function Panel({ title, count, children }) {
