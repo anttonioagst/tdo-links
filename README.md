@@ -54,6 +54,15 @@ X fica em modo aquisicao/dry-run no MVP.
 - A aba Configuracao mostra saude das integracoes e permite teste do Telegram.
 - Relatorios e recomendacoes usam dados locais de ofertas, drafts, logs e cliques.
 
+## Descoberta Amazon
+
+- Configure URLs e termos na aba Configuracao > Descoberta Amazon.
+- O scheduler interno roda a cada 2 horas por padrao.
+- Use "Buscar agora" para alimentar a fila manualmente.
+- Cada ciclo aceita por padrao ate 10 candidatos com score minimo 70.
+- Candidatos descobertos entram bloqueados ate receberem um link oficial manual, como SiteStripe ou amzn.to.
+- O painel mostra ultima execucao, proxima execucao, aceitos, duplicados, rejeitados e erros por fonte.
+
 ## Amazon Associados
 
 - Gere links com seu ID de Associado pelo SiteStripe, Link pelo App ou tags de rastreamento validas.
