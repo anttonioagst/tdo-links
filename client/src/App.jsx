@@ -16,7 +16,7 @@ import {
   X,
   Zap
 } from "lucide-react";
-import { AppShell, ActionButton, DataTable, EmptyState as DesignEmptyState, InsightPanel, MetricTile, Panel, QueueColumn, StatusBadge } from "./ui/components.jsx";
+import { AppShell, ActionButton, DataTable, EmptyState as DesignEmptyState, FormField, InsightPanel, MetricTile, Panel, QueueColumn, StatusBadge } from "./ui/components.jsx";
 import { viewMeta } from "./ui/tokens.js";
 
 const periods = [
@@ -570,87 +570,152 @@ function Config({ state, data, loading, api, action }) {
     }
   }), "Descoberta Amazon atualizada");
   const runDiscovery = () => action("discoveryRun", () => api("/api/discovery/amazon/run", { method: "POST" }), "Descoberta Amazon executada");
+  const configInputClass = "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none tdo-focus dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
+  const configTextareaClass = "min-h-32 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 outline-none tdo-focus dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
+  const healthTone = data.healthTone === "critical" ? "danger" : data.healthTone === "warning" ? "warning" : "brand";
 
   return (
-    <div className="grid grid-cols-12 gap-4 md:gap-6">
-      <div className="col-span-12 xl:col-span-4">
-        <LegacyPanel title="Automacao" count={modeLabel(state.settings.mode)}>
-          <label className="text-theme-sm font-medium text-gray-700 dark:text-gray-300">Modo de publicacao</label>
-          <select value={state.settings.mode} onChange={(event) => action("mode", () => api("/api/settings", { method: "POST", body: { mode: event.target.value } }), "Modo atualizado")} className="mt-3 h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-theme-sm text-gray-700 shadow-theme-xs outline-hidden dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-            <option value="limited">Automatico limitado</option>
-            <option value="manual">Manual</option>
-            <option value="paused">Pausado</option>
-          </select>
-        </LegacyPanel>
-      </div>
-      <div className="col-span-12 xl:col-span-4">
-        <LegacyPanel title="Links afiliados" count={`${data.missingAffiliate} pendentes`}>
-          <p className="text-theme-sm leading-6 text-gray-500 dark:text-gray-400">Recalcula URLs afiliadas usando as variaveis atuais do ambiente.</p>
-          <Button className="mt-4" loading={loading.refreshAffiliates} onClick={() => action("refreshAffiliates", () => api("/api/run/refresh-affiliates", { method: "POST" }), "Links recalculados")}><RefreshCcw className="size-4" /> Recalcular</Button>
-        </LegacyPanel>
-      </div>
-      <div className="col-span-12 xl:col-span-4">
-        <LegacyPanel title="Telegram" count={telegramCount}>
-          <div className="space-y-2 text-theme-sm text-gray-500 dark:text-gray-400">
-            <p>Dry-run: {telegramValue(telegram?.dryRun, "Ligado", "Desligado")}</p>
-            <p>Bot token: {telegramValue(telegram?.hasBotToken, "Configurado", "Ausente")}</p>
-            <p>Chat ID: {telegramValue(telegram?.hasChatId, "Configurado", "Ausente")}</p>
-          </div>
-          <Button className="mt-4" variant="outline" loading={loading.telegramTest} onClick={() => action("telegramTest", () => api("/api/integrations/telegram/test", { method: "POST" }), "Teste Telegram executado")}>
-            <Send className="size-4" /> Testar Telegram
-          </Button>
-        </LegacyPanel>
-      </div>
-      <div className="col-span-12 xl:col-span-4">
-        <LegacyPanel title="Saude" count={`${data.healthScore}/100`}>
-          <div className="space-y-3">{data.alerts.map((alert) => <AlertItem key={alert.title} alert={alert} />)}</div>
-        </LegacyPanel>
-      </div>
-      <div className="col-span-12">
-        <LegacyPanel title="Descoberta Amazon" count={discovery.enabled ? "Ativa" : "Pausada"}>
-          <div className="grid gap-4 xl:grid-cols-2">
-            <label className="text-theme-sm text-gray-700 dark:text-gray-300">
-              URLs Amazon
-              <textarea
-                className="mt-2 min-h-28 w-full rounded-lg border border-gray-200 bg-white p-3 text-theme-sm text-gray-800 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
-                value={discoveryForm.sourceUrls}
-                onChange={(event) => setDiscoveryForm({ ...discoveryForm, sourceUrls: event.target.value })}
-                placeholder="https://www.amazon.com.br/s?k=ssd"
-              />
-            </label>
-            <label className="text-theme-sm text-gray-700 dark:text-gray-300">
-              Termos de busca
-              <textarea
-                className="mt-2 min-h-28 w-full rounded-lg border border-gray-200 bg-white p-3 text-theme-sm text-gray-800 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
-                value={discoveryForm.searchTerms}
-                onChange={(event) => setDiscoveryForm({ ...discoveryForm, searchTerms: event.target.value })}
-                placeholder={"SSD NVMe 1TB\nmonitor 144hz"}
-              />
-            </label>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-4">
-            <NumberField label="Intervalo (h)" value={discoveryForm.intervalHours} onChange={(value) => setDiscoveryForm({ ...discoveryForm, intervalHours: value })} />
-            <NumberField label="Score minimo" value={discoveryForm.minScore} onChange={(value) => setDiscoveryForm({ ...discoveryForm, minScore: value })} />
-            <NumberField label="Max. por ciclo" value={discoveryForm.maxCandidatesPerRun} onChange={(value) => setDiscoveryForm({ ...discoveryForm, maxCandidatesPerRun: value })} />
-            <label className="flex h-full min-h-17 items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-theme-sm text-gray-700 dark:border-gray-800 dark:text-gray-300">
-              <input type="checkbox" checked={discoveryForm.enabled} onChange={(event) => setDiscoveryForm({ ...discoveryForm, enabled: event.target.checked })} />
-              Automatica
-            </label>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-4">
-            <StatusLine label="Ultima execucao" value={discovery.lastRun?.finishedAt ? formatDate(discovery.lastRun.finishedAt) : "Nunca"} />
-            <StatusLine label="Aceitos" value={String(discovery.lastRun?.acceptedCount ?? 0)} />
-            <StatusLine label="Erros" value={String(discovery.lastRun?.errorCount ?? 0)} />
-            <StatusLine label="Proxima execucao" value={discovery.nextRunAt ? formatDate(discovery.nextRunAt) : "Aguardando fontes"} />
-          </div>
-          {discovery.lastRun?.reason ? (
-            <p className="mt-3 text-theme-xs text-gray-500 dark:text-gray-400">{discovery.lastRun.reason}</p>
-          ) : null}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button loading={loading.discoverySave} onClick={saveDiscovery}>Salvar descoberta</Button>
-            <Button variant="outline" loading={loading.discoveryRun} onClick={runDiscovery}><Search className="size-4" /> Buscar agora</Button>
-          </div>
-        </LegacyPanel>
+    <div className="space-y-5 md:space-y-6">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <MetricTile
+          icon={Send}
+          label="Telegram"
+          value={telegramCount}
+          tone={telegram?.ready ? "success" : "warning"}
+          detail={telegramValue(telegram?.dryRun, "Dry-run ligado", "Envio real")}
+        />
+        <MetricTile
+          icon={Search}
+          label="Discovery"
+          value={discovery.enabled ? "Ativa" : "Pausada"}
+          tone={discovery.enabled ? "success" : "warning"}
+          detail={discovery.nextRunAt ? `Proxima: ${formatDate(discovery.nextRunAt)}` : "Aguardando fontes"}
+        />
+        <MetricTile
+          icon={CheckCircle2}
+          label="Saude"
+          value={`${data.healthScore}/100`}
+          tone={healthTone}
+          detail={`${data.alerts.length} sinais operacionais`}
+        />
+      </section>
+
+      <div className="grid grid-cols-12 gap-5">
+        <div className="col-span-12 space-y-5 xl:col-span-4">
+          <Panel title="Automation" count={modeLabel(state.settings.mode)}>
+            <FormField label="Modo de publicacao" help="Controla como a automacao publica oportunidades elegiveis.">
+              <select
+                value={state.settings.mode}
+                onChange={(event) => action("mode", () => api("/api/settings", { method: "POST", body: { mode: event.target.value } }), "Modo atualizado")}
+                className={configInputClass}
+              >
+                <option value="limited">Automatico limitado</option>
+                <option value="manual">Manual</option>
+                <option value="paused">Pausado</option>
+              </select>
+            </FormField>
+          </Panel>
+
+          <Panel title="Telegram" count={telegramCount}>
+            <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+              <p>Dry-run: {telegramValue(telegram?.dryRun, "Ligado", "Desligado")}</p>
+              <p>Bot token: {telegramValue(telegram?.hasBotToken, "Configurado", "Ausente")}</p>
+              <p>Chat ID: {telegramValue(telegram?.hasChatId, "Configurado", "Ausente")}</p>
+            </div>
+            <ActionButton className="mt-4" variant="outline" loading={loading.telegramTest} onClick={() => action("telegramTest", () => api("/api/integrations/telegram/test", { method: "POST" }), "Teste Telegram executado")}>
+              <Send className="size-4" /> Testar Telegram
+            </ActionButton>
+          </Panel>
+
+          <Panel title="Affiliate Links" count={`${data.missingAffiliate} pendentes`}>
+            <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">Recalcula URLs afiliadas usando as variaveis atuais do ambiente.</p>
+            <ActionButton className="mt-4" loading={loading.refreshAffiliates} onClick={() => action("refreshAffiliates", () => api("/api/run/refresh-affiliates", { method: "POST" }), "Links recalculados")}>
+              <RefreshCcw className="size-4" /> Recalcular
+            </ActionButton>
+          </Panel>
+
+          <Panel title="Health" count={`${data.healthScore}/100`}>
+            <div className="space-y-3">{data.alerts.map((alert) => <AlertItem key={alert.title} alert={alert} />)}</div>
+          </Panel>
+        </div>
+
+        <div className="col-span-12 xl:col-span-8">
+          <Panel title="Discovery Amazon" count={discovery.enabled ? "Ativa" : "Pausada"}>
+            <div className="grid gap-4 xl:grid-cols-2">
+              <FormField label="URLs Amazon" help="Uma URL por linha para fontes de descoberta monitoradas.">
+                <textarea
+                  className={configTextareaClass}
+                  value={discoveryForm.sourceUrls}
+                  onChange={(event) => setDiscoveryForm({ ...discoveryForm, sourceUrls: event.target.value })}
+                  placeholder="https://www.amazon.com.br/s?k=ssd"
+                />
+              </FormField>
+              <FormField label="Termos de busca" help="Um termo por linha para pesquisas automaticas.">
+                <textarea
+                  className={configTextareaClass}
+                  value={discoveryForm.searchTerms}
+                  onChange={(event) => setDiscoveryForm({ ...discoveryForm, searchTerms: event.target.value })}
+                  placeholder={"SSD NVMe 1TB\nmonitor 144hz"}
+                />
+              </FormField>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              <FormField label="Intervalo" help="Horas entre ciclos.">
+                <input
+                  className={configInputClass}
+                  type="number"
+                  value={discoveryForm.intervalHours}
+                  onChange={(event) => setDiscoveryForm({ ...discoveryForm, intervalHours: event.target.value })}
+                />
+              </FormField>
+              <FormField label="Score minimo" help="Corte para aceitar candidatos.">
+                <input
+                  className={configInputClass}
+                  type="number"
+                  value={discoveryForm.minScore}
+                  onChange={(event) => setDiscoveryForm({ ...discoveryForm, minScore: event.target.value })}
+                />
+              </FormField>
+              <FormField label="Maximo por ciclo" help="Limite por execucao.">
+                <input
+                  className={configInputClass}
+                  type="number"
+                  value={discoveryForm.maxCandidatesPerRun}
+                  onChange={(event) => setDiscoveryForm({ ...discoveryForm, maxCandidatesPerRun: event.target.value })}
+                />
+              </FormField>
+              <FormField label="Automatica" help="Permite execucao agendada.">
+                <span className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={discoveryForm.enabled}
+                    onChange={(event) => setDiscoveryForm({ ...discoveryForm, enabled: event.target.checked })}
+                    className="size-4 rounded border-slate-300 text-tdo-blue tdo-focus dark:border-slate-600 dark:bg-slate-900"
+                  />
+                  Discovery habilitada
+                </span>
+              </FormField>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-5">
+              <StatusLine label="Ultima execucao" value={discovery.lastRun?.finishedAt ? formatDate(discovery.lastRun.finishedAt) : "Nunca"} />
+              <StatusLine label="Status" value={discovery.lastRun?.status ? statusLabel(discovery.lastRun.status) : "Sem execucao"} tone={discovery.lastRun?.status === "failed" ? "danger" : "neutral"} />
+              <StatusLine label="Aceitos" value={String(discovery.lastRun?.acceptedCount ?? 0)} tone="success" />
+              <StatusLine label="Erros" value={String(discovery.lastRun?.errorCount ?? 0)} tone={discovery.lastRun?.errorCount ? "danger" : "neutral"} />
+              <StatusLine label="Proxima execucao" value={discovery.nextRunAt ? formatDate(discovery.nextRunAt) : "Aguardando fontes"} />
+            </div>
+            {discovery.lastRun?.reason ? (
+              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{discovery.lastRun.reason}</p>
+            ) : null}
+            <div className="mt-5 flex flex-wrap gap-2">
+              <ActionButton loading={loading.discoverySave} onClick={saveDiscovery}>Salvar descoberta</ActionButton>
+              <ActionButton variant="outline" loading={loading.discoveryRun} onClick={runDiscovery}>
+                <Search className="size-4" /> Buscar agora
+              </ActionButton>
+            </div>
+          </Panel>
+        </div>
       </div>
     </div>
   );

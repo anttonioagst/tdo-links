@@ -281,11 +281,22 @@ export function InsightPanel({ title, detail, action, tone = "brand", toneLabel 
 
 export function EmptyState({ title, text, action }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-      <p className="mt-1 text-sm text-slate-500">{text}</p>
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-900/60">
+      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{text}</p>
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
+  );
+}
+
+export function FormField({ label, help, error, children }) {
+  return (
+    <label className="block text-sm text-slate-700 dark:text-slate-300">
+      <span className="font-medium text-slate-800 dark:text-slate-100">{label}</span>
+      {help ? <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">{help}</span> : null}
+      <div className="mt-2">{children}</div>
+      {error ? <span className="mt-1 block text-xs text-rose-600 dark:text-rose-400">{error}</span> : null}
+    </label>
   );
 }
 
