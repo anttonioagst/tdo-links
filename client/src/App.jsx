@@ -572,7 +572,8 @@ function Config({ state, data, loading, api, action }) {
   const runDiscovery = () => action("discoveryRun", () => api("/api/discovery/amazon/run", { method: "POST" }), "Descoberta Amazon executada");
   const configInputClass = "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none tdo-focus dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
   const configTextareaClass = "min-h-32 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 outline-none tdo-focus dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
-  const healthTone = data.healthTone === "critical" ? "danger" : data.healthTone === "warning" ? "warning" : "brand";
+  const healthTone = data.healthTone === "critical" ? "danger" : data.healthTone === "warning" ? "warning" : "success";
+  const discoveryStatus = discoveryRunStatus(discovery.lastRun);
 
   return (
     <div className="space-y-5 md:space-y-6">
@@ -700,14 +701,11 @@ function Config({ state, data, loading, api, action }) {
 
             <div className="mt-5 grid gap-3 md:grid-cols-5">
               <StatusLine label="Ultima execucao" value={discovery.lastRun?.finishedAt ? formatDate(discovery.lastRun.finishedAt) : "Nunca"} />
-              <StatusLine label="Status" value={discovery.lastRun?.status ? statusLabel(discovery.lastRun.status) : "Sem execucao"} tone={discovery.lastRun?.status === "failed" ? "danger" : "neutral"} />
+              <StatusLine label="Status" value={discoveryStatus.label} tone={discoveryStatus.tone} />
               <StatusLine label="Aceitos" value={String(discovery.lastRun?.acceptedCount ?? 0)} tone="success" />
               <StatusLine label="Erros" value={String(discovery.lastRun?.errorCount ?? 0)} tone={discovery.lastRun?.errorCount ? "danger" : "neutral"} />
               <StatusLine label="Proxima execucao" value={discovery.nextRunAt ? formatDate(discovery.nextRunAt) : "Aguardando fontes"} />
             </div>
-            {discovery.lastRun?.reason ? (
-              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{discovery.lastRun.reason}</p>
-            ) : null}
             <div className="mt-5 flex flex-wrap gap-2">
               <ActionButton loading={loading.discoverySave} onClick={saveDiscovery}>Salvar descoberta</ActionButton>
               <ActionButton variant="outline" loading={loading.discoveryRun} onClick={runDiscovery}>
@@ -719,6 +717,22 @@ function Config({ state, data, loading, api, action }) {
       </div>
     </div>
   );
+}
+
+function discoveryRunStatus(lastRun) {
+  if (!lastRun) return { label: "Sem execucao", tone: "neutral" };
+  if (lastRun.reason) return { label: discoveryReasonLabel(lastRun.reason), tone: lastRun.ok === false ? "danger" : "warning" };
+  if (lastRun.ok === true) return { label: "Concluida", tone: "success" };
+  if (lastRun.ok === false) return { label: "Falhou", tone: "danger" };
+  return { label: "Sem execucao", tone: "neutral" };
+}
+
+function discoveryReasonLabel(reason) {
+  return {
+    no_sources_configured: "Sem fontes configuradas",
+    not_due: "Ainda nao agendada",
+    already_running: "Execucao em andamento"
+  }[reason] || String(reason || "Sem execucao").replace(/_/g, " ");
 }
 
 function OfferTable({ offers, clicksByOffer, loading, api, action }) {
@@ -871,20 +885,6 @@ function InlineAffiliateForm({ offer, loading, api, action }) {
   );
 }
 
-function NumberField({ label, value, onChange }) {
-  return (
-    <label className="text-theme-sm text-gray-700 dark:text-gray-300">
-      {label}
-      <input
-        className="mt-2 h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-theme-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
-        type="number"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}
-
 function StatusLine({ label, value, tone = "neutral" }) {
   const toneClass = {
     brand: "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-300",
@@ -910,18 +910,6 @@ function lines(value) {
 
 function formatDate(value) {
   return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
-}
-
-function LegacyPanel({ title, count, children }) {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <h3 className="min-w-0 text-lg font-semibold text-gray-800 dark:text-white/90">{title}</h3>
-        {count ? <span className="shrink-0 text-theme-sm text-gray-500 dark:text-gray-400">{count}</span> : null}
-      </div>
-      {children}
-    </div>
-  );
 }
 
 function Heatmap({ heatmap }) {
