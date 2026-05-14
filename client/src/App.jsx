@@ -28,6 +28,8 @@ import {
   X,
   Zap
 } from "lucide-react";
+import { AppShell, ActionButton } from "./ui/components.jsx";
+import { viewMeta } from "./ui/tokens.js";
 
 const navItems = [
   {
@@ -156,45 +158,39 @@ export default function App() {
     );
   }
 
-  const sidebarWide = isExpanded || isHovered || isMobileOpen;
+  const activeViewMeta = viewMeta[view] || viewMeta.overview;
+  const topBarActions = (
+    <ActionButton
+      aria-label={`Atualizar ${activeViewMeta.title}`}
+      onClick={() => refresh().catch((error) => toast("Erro ao atualizar", error.message, "error"))}
+    >
+      <RefreshCcw className="size-4" />
+      Atualizar
+    </ActionButton>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-white/90">
-      <Sidebar
-        isExpanded={isExpanded}
-        isHovered={isHovered}
-        isMobileOpen={isMobileOpen}
-        setIsHovered={setIsHovered}
-        setIsMobileOpen={setIsMobileOpen}
+    <>
+      <AppShell
+        darkMode={darkMode}
+        inputRef={inputRef}
+        mobileOpen={isMobileOpen}
+        query={query}
+        setDarkMode={setDarkMode}
+        setMobileOpen={setIsMobileOpen}
+        setQuery={setQuery}
         setView={setView}
-        sidebarWide={sidebarWide}
+        topBar={{ actions: topBarActions }}
         view={view}
-      />
-      {isMobileOpen ? <button className="fixed inset-0 z-40 bg-gray-900/50 lg:hidden" onClick={() => setIsMobileOpen(false)} aria-label="Fechar menu" /> : null}
-      <div className={`flex-1 transition-all duration-300 ease-in-out ${sidebarWide ? "lg:ml-[290px]" : "lg:ml-[90px]"}`}>
-        <Header
-          appMenuOpen={appMenuOpen}
-          darkMode={darkMode}
-          inputRef={inputRef}
-          query={query}
-          setAppMenuOpen={setAppMenuOpen}
-          setDarkMode={setDarkMode}
-          setIsExpanded={setIsExpanded}
-          setIsMobileOpen={setIsMobileOpen}
-          setQuery={setQuery}
-          state={state}
-        />
-        <main className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
-          <PageTitle view={view} />
+      >
           {view === "overview" && <Overview state={state} data={data} setPeriod={setPeriod} period={period} setView={setView} />}
-            {view === "operation" && <Operation state={state} data={data} drafts={drafts} loading={loading} api={api} action={action} />}
-            {view === "offers" && <Offers state={state} data={data} offers={offers} loading={loading} api={api} action={action} />}
+          {view === "operation" && <Operation state={state} data={data} drafts={drafts} loading={loading} api={api} action={action} />}
+          {view === "offers" && <Offers state={state} data={data} offers={offers} loading={loading} api={api} action={action} />}
           {view === "ai" && <Reports state={state} data={data} loading={loading} api={api} action={action} />}
           {view === "config" && <Config state={state} data={data} loading={loading} api={api} action={action} />}
-        </main>
-      </div>
+      </AppShell>
       <ToastStack toasts={toasts} setToasts={setToasts} />
-    </div>
+    </>
   );
 }
 

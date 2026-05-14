@@ -1248,6 +1248,12 @@ test("ui status tones and labels stay consistent", () => {
   assert.match(uiMoney(349.9).replace(/\s+/g, " "), /^R\$ ?349,90$/);
 });
 
+test("view metadata provides contextual primary actions", () => {
+  assert.equal(viewMeta.overview.primaryAction, "Buscar oportunidades");
+  assert.equal(viewMeta.operation.primaryAction, "Publicar elegiveis");
+  assert.equal(viewMeta.config.primaryAction, "Testar Telegram");
+});
+
 let failed = 0;
 for (const { name, fn } of tests) {
   try {
