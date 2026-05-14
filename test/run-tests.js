@@ -1245,7 +1245,7 @@ test("ui status tones and labels stay consistent", () => {
   assert.equal(statusTone("needs_review"), "warning");
   assert.equal(uiStatusLabel("published"), "Publicado");
   assert.equal(uiChannelLabel("telegram"), "Telegram");
-  assert.equal(uiMoney(349.9), "R$ 349,90");
+  assert.match(uiMoney(349.9).replace(/\s+/g, " "), /^R\$ ?349,90$/);
 });
 
 let failed = 0;

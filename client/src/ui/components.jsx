@@ -119,6 +119,7 @@ export function TopContextBar({
           <label className="relative min-w-0 sm:w-[280px]">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
+              aria-label="Buscar ofertas, canais e status"
               ref={inputRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -142,13 +143,14 @@ export function TopContextBar({
 
 export function Panel({ title, count, children, density = "comfortable", action }) {
   const densityClass = density === "compact" ? "p-4" : "p-5 md:p-6";
+  const hasCount = count !== undefined && count !== null;
 
   return (
     <section className={`rounded-2xl border border-slate-200 bg-white shadow-tdo-card ${densityClass}`}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-950 md:text-base">{title}</h2>
-          {count ? <p className="mt-1 text-xs text-slate-500">{count}</p> : null}
+          {hasCount ? <p className="mt-1 text-xs text-slate-500">{count}</p> : null}
         </div>
         {action}
       </div>
@@ -176,6 +178,7 @@ export function StatusBadge({ children, tone = "brand" }) {
 
 export function ActionButton({
   children,
+  disabled,
   loading,
   variant = "primary",
   size = "md",
@@ -197,7 +200,7 @@ export function ActionButton({
   return (
     <button
       className={`inline-flex items-center justify-center gap-2 rounded-xl font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${sizes[size]} ${className}`}
-      disabled={loading || props.disabled}
+      disabled={loading || disabled}
       type="button"
       {...props}
     >
@@ -234,10 +237,10 @@ export function MetricTile({ icon: Icon, label, value, tone = "brand", detail })
   );
 }
 
-export function InsightPanel({ title, detail, action, tone = "brand" }) {
+export function InsightPanel({ title, detail, action, tone = "brand", toneLabel = "Insight" }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-tdo-card">
-      <StatusBadge tone={tone}>{tone}</StatusBadge>
+      <StatusBadge tone={tone}>{toneLabel}</StatusBadge>
       <h3 className="mt-3 text-sm font-semibold text-slate-950">{title}</h3>
       <p className="mt-1 text-sm leading-6 text-slate-500">{detail}</p>
       {action}
