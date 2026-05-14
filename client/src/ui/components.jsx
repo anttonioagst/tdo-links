@@ -230,7 +230,7 @@ export function ActionButton({
 
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-medium transition disabled:cursor-not-allowed disabled:opacity-60 [&>svg]:shrink-0 ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`inline-flex max-w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl font-medium transition disabled:cursor-not-allowed disabled:opacity-60 [&>svg]:shrink-0 ${variants[variant]} ${sizes[size]} ${className}`}
       disabled={loading || disabled}
       type="button"
       {...props}
@@ -290,13 +290,29 @@ export function EmptyState({ title, text, action }) {
 }
 
 export function FormField({ label, help, error, children }) {
+  const fieldId = React.useId();
+  const helpId = help ? `${fieldId}-help` : undefined;
+  const errorId = error ? `${fieldId}-error` : undefined;
+  const describedBy = [helpId, errorId].filter(Boolean).join(" ") || undefined;
+  const canBindControl = React.isValidElement(children) && ["input", "select", "textarea"].includes(children.type);
+  const control = canBindControl
+    ? React.cloneElement(children, {
+      id: children.props.id || fieldId,
+      "aria-describedby": [children.props["aria-describedby"], describedBy].filter(Boolean).join(" ") || undefined
+    })
+    : children;
+
   return (
-    <label className="block text-sm text-slate-700 dark:text-slate-300">
-      <span className="font-medium text-slate-800 dark:text-slate-100">{label}</span>
-      {help ? <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">{help}</span> : null}
-      <div className="mt-2">{children}</div>
-      {error ? <span className="mt-1 block text-xs text-rose-600 dark:text-rose-400">{error}</span> : null}
-    </label>
+    <div className="block text-sm text-slate-700 dark:text-slate-300">
+      {canBindControl ? (
+        <label className="font-medium text-slate-800 dark:text-slate-100" htmlFor={children.props.id || fieldId}>{label}</label>
+      ) : (
+        <span className="font-medium text-slate-800 dark:text-slate-100">{label}</span>
+      )}
+      {help ? <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400" id={helpId}>{help}</span> : null}
+      <div className="mt-2">{control}</div>
+      {error ? <span className="mt-1 block text-xs text-rose-600 dark:text-rose-400" id={errorId}>{error}</span> : null}
+    </div>
   );
 }
 

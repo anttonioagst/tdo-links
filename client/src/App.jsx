@@ -308,7 +308,9 @@ function ActionPanel({ data, loading, api, action }) {
           </ActionButton>
         </div>
         <p className="text-xs leading-5 text-slate-500 dark:text-slate-400 xl:max-w-md">
-          Sem envio no Telegram? Revise Configuracao/Railway: `TELEGRAM_DRY_RUN=false`, token e chat id preenchidos.
+          Sem envio no Telegram? Revise Configuracao/Railway:{" "}
+          <code className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">TELEGRAM_DRY_RUN=false</code>
+          {", token e chat id preenchidos."}
         </p>
       </div>
     </Panel>
@@ -425,7 +427,7 @@ function Offers({ state, data, offers, loading, api, action }) {
 
 function Reports({ state, data, loading, api, action }) {
   const recommendations = state.recommendations || data.recommendations || [];
-  const reports = state.reports;
+  const reports = state.reports || [];
   const reportTone = data.healthTone === "critical" ? "danger" : data.healthTone === "warning" ? "warning" : "success";
 
   return (
@@ -470,7 +472,7 @@ function Reports({ state, data, loading, api, action }) {
               <InsightPanel
                 key={rec.id}
                 tone={recommendationTone(rec.severity)}
-                toneLabel={rec.type}
+                toneLabel="Recomendacao"
                 title={rec.title}
                 detail={rec.detail}
               />
@@ -491,11 +493,11 @@ function Reports({ state, data, loading, api, action }) {
               <article key={report.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/35">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <span className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">{report.period}</span>
-                  <StatusBadge tone="cyan">AI report</StatusBadge>
+                  <StatusBadge tone="cyan">Relatorio IA</StatusBadge>
                 </div>
                 <h4 className="mt-3 break-words text-sm font-semibold leading-6 text-slate-950 dark:text-slate-100">{report.expectedImpact}</h4>
-                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600 dark:text-slate-300">{report.conclusions.join(" ")}</p>
-                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600 dark:text-slate-300">{report.suggestions.join(" ")}</p>
+                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600 dark:text-slate-300">{Array.isArray(report.conclusions) ? report.conclusions.join(" ") : ""}</p>
+                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600 dark:text-slate-300">{Array.isArray(report.suggestions) ? report.suggestions.join(" ") : ""}</p>
               </article>
             )) : (
               <DesignEmptyState
@@ -864,7 +866,7 @@ function InlineAffiliateForm({ offer, loading, api, action }) {
   const [affiliateUrl, setAffiliateUrl] = useState(offer.affiliateSource === "manual" ? offer.affiliateUrl || "" : "");
   useEffect(() => setAffiliateUrl(offer.affiliateSource === "manual" ? offer.affiliateUrl || "" : ""), [offer.affiliateUrl, offer.affiliateSource]);
   return (
-    <div className="flex min-w-[260px] items-center gap-2">
+    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
       <input
         aria-label={`Link afiliado oficial para ${offer.title}`}
         value={affiliateUrl}
@@ -872,7 +874,8 @@ function InlineAffiliateForm({ offer, loading, api, action }) {
         placeholder="SiteStripe/amzn.to"
         className="h-9 min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-theme-xs text-gray-700 outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300"
       />
-      <Button
+      <ActionButton
+        className="w-full sm:w-auto"
         size="sm"
         variant={offer.affiliateSource === "manual" ? "outline" : "primary"}
         loading={loading?.[`affiliate-${offer.id}`]}
@@ -880,7 +883,7 @@ function InlineAffiliateForm({ offer, loading, api, action }) {
         onClick={() => action(`affiliate-${offer.id}`, () => api(`/api/offers/${offer.id}/affiliate`, { method: "POST", body: { affiliateUrl } }), "Link afiliado salvo")}
       >
         Salvar
-      </Button>
+      </ActionButton>
     </div>
   );
 }
@@ -970,32 +973,6 @@ function AlertItem({ alert }) {
       </div>
     </div>
   );
-}
-
-function Button({ children, loading, variant = "primary", size = "md", className = "", ...props }) {
-  const variantClass = {
-    primary: "bg-brand-500 text-white hover:bg-brand-600 disabled:bg-brand-400",
-    outline: "border border-gray-300 bg-white text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03]",
-    danger: "border border-error-200 bg-error-50 text-error-600 hover:bg-error-100 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400"
-  }[variant];
-  const sizeClass = size === "sm" ? "h-9 px-3 text-theme-xs" : "h-11 px-4 text-theme-sm";
-  return (
-    <button type="button" disabled={loading || props.disabled} className={`inline-flex min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition disabled:cursor-not-allowed disabled:opacity-70 [&>svg]:shrink-0 ${variantClass} ${sizeClass} ${className}`} {...props}>
-      {loading ? <Loader2 className="size-4 animate-spin" /> : null}
-      {children}
-    </button>
-  );
-}
-
-function Badge({ color = "brand", children }) {
-  const classes = {
-    success: "bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500",
-    error: "bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500",
-    warning: "bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-orange-400",
-    brand: "bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400",
-    gray: "bg-gray-100 text-gray-700 dark:bg-white/[0.03] dark:text-gray-400"
-  }[color] || "bg-brand-50 text-brand-500";
-  return <span className={`inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-0.5 text-theme-xs font-medium ${classes}`}>{children}</span>;
 }
 
 function EmptyState({ title, text }) {

@@ -247,15 +247,21 @@
 
 @utility custom-scrollbar {
   &::-webkit-scrollbar {
-    @apply size-1.5;
+    height: 0.375rem;
+    width: 0.375rem;
   }
 
   &::-webkit-scrollbar-track {
-    @apply rounded-full;
+    border-radius: 9999px;
   }
 
   &::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-gray-200 dark:bg-gray-700;
+    background-color: var(--color-gray-200);
+    border-radius: 9999px;
+  }
+
+  .dark &::-webkit-scrollbar-thumb {
+    background-color: var(--color-gray-700);
   }
 }
 
