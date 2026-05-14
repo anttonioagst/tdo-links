@@ -162,6 +162,34 @@ export function Panel({ title, count, children, density = "comfortable", action 
   );
 }
 
+export function QueueColumn({ title, count, children, tone = "brand" }) {
+  const accentClass = {
+    brand: "bg-blue-500",
+    success: "bg-emerald-500",
+    warning: "bg-amber-500",
+    danger: "bg-rose-500",
+    cyan: "bg-cyan-500",
+    muted: "bg-slate-400"
+  }[tone] || "bg-blue-500";
+
+  return (
+    <Panel
+      title={(
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <span className={`size-2 rounded-full ${accentClass}`} />
+          <span className="truncate">{title}</span>
+        </span>
+      )}
+      density="compact"
+      action={<StatusBadge tone={tone}>{count}</StatusBadge>}
+    >
+      <div className="max-h-[760px] space-y-3 overflow-y-auto pr-1 custom-scrollbar">
+        {children}
+      </div>
+    </Panel>
+  );
+}
+
 export function StatusBadge({ children, tone = "brand" }) {
   const classes = {
     brand: "bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-400/20",

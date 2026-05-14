@@ -16,7 +16,7 @@ import {
   X,
   Zap
 } from "lucide-react";
-import { AppShell, ActionButton, InsightPanel, MetricTile, Panel } from "./ui/components.jsx";
+import { AppShell, ActionButton, InsightPanel, MetricTile, Panel, QueueColumn, StatusBadge } from "./ui/components.jsx";
 import { viewMeta } from "./ui/tokens.js";
 
 const periods = [
@@ -28,11 +28,11 @@ const periods = [
 ];
 
 const draftColumns = [
-  ["auto_ready", "Pronto"],
-  ["needs_review", "Revisao"],
-  ["approved", "Aprovado"],
-  ["published", "Publicado"],
-  ["problem", "Problema"]
+  ["auto_ready", "Pronto", "success"],
+  ["needs_review", "Revisao", "warning"],
+  ["approved", "Aprovado", "brand"],
+  ["published", "Publicado", "cyan"],
+  ["problem", "Problema", "danger"]
 ];
 
 const dayLabels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"];
@@ -285,18 +285,16 @@ function Operation({ state, data, drafts, loading, api, action }) {
     <div className="space-y-4 md:space-y-6">
       <ActionPanel data={data} loading={loading} api={api} action={action} />
       <div className="grid gap-4 xl:grid-cols-3">
-        {draftColumns.map(([column, title]) => {
+        {draftColumns.map(([column, title, tone]) => {
           const columnDrafts = drafts.filter((draft) => draftColumn(draft) === column);
           return (
-            <LegacyPanel key={column} title={title} count={`${columnDrafts.length}`}>
-              <div className="max-h-[760px] space-y-4 overflow-y-auto pr-1 custom-scrollbar">
-                {columnDrafts.map((draft) => {
-                  const offer = state.offers.find((item) => item.id === draft.offerId);
-                  return <DraftCard key={draft.id} draft={draft} offer={offer} loading={loading} api={api} action={action} />;
-                })}
-                {!columnDrafts.length ? <EmptyState title="Fila vazia" text="Nenhum draft neste status." /> : null}
-              </div>
-            </LegacyPanel>
+            <QueueColumn key={column} title={title} count={`${columnDrafts.length}`} tone={tone}>
+              {columnDrafts.map((draft) => {
+                const offer = state.offers.find((item) => item.id === draft.offerId);
+                return <DraftCard key={draft.id} draft={draft} offer={offer} loading={loading} api={api} action={action} />;
+              })}
+              {!columnDrafts.length ? <EmptyState title="Fila vazia" text="Nenhum draft neste status." /> : null}
+            </QueueColumn>
           );
         })}
       </div>
@@ -306,15 +304,32 @@ function Operation({ state, data, drafts, loading, api, action }) {
 
 function ActionPanel({ data, loading, api, action }) {
   return (
-    <LegacyPanel title="Acoes operacionais" count={`${data.pending} pendentes`}>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Button className="w-full" loading={loading.scrape} onClick={() => action("scrape", () => api("/api/run/scrape", { method: "POST" }), "Ofertas coletadas")}><Search className="size-4" /> Buscar ofertas</Button>
-        <Button className="w-full" loading={loading.publish} onClick={() => action("publish", () => api("/api/run/publish", { method: "POST" }), "Publicacao executada")}><Send className="size-4" /> Publicar elegiveis</Button>
-        <Button className="w-full" variant="outline" loading={loading.report} onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}><BarChart3 className="size-4" /> Gerar relatorio</Button>
-        <Button className="w-full" variant="outline" loading={loading.refreshAffiliates} onClick={() => action("refreshAffiliates", () => api("/api/run/refresh-affiliates", { method: "POST" }), "Links recalculados")}><RefreshCcw className="size-4" /> Recalcular afiliados</Button>
+    <Panel
+      title="Comandos"
+      count={`${data.pending} drafts pendentes`}
+      density="compact"
+      action={<StatusBadge tone={data.pending ? "warning" : "success"}>{data.pending ? "Acao pendente" : "Fila estavel"}</StatusBadge>}
+    >
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:flex xl:flex-wrap">
+          <ActionButton size="sm" loading={loading.scrape} onClick={() => action("scrape", () => api("/api/run/scrape", { method: "POST" }), "Ofertas coletadas")}>
+            <Search className="size-4" /> Buscar ofertas
+          </ActionButton>
+          <ActionButton size="sm" loading={loading.publish} onClick={() => action("publish", () => api("/api/run/publish", { method: "POST" }), "Publicacao executada")}>
+            <Send className="size-4" /> Publicar elegiveis
+          </ActionButton>
+          <ActionButton size="sm" variant="outline" loading={loading.report} onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}>
+            <BarChart3 className="size-4" /> Gerar relatorio
+          </ActionButton>
+          <ActionButton size="sm" variant="outline" loading={loading.refreshAffiliates} onClick={() => action("refreshAffiliates", () => api("/api/run/refresh-affiliates", { method: "POST" }), "Links recalculados")}>
+            <RefreshCcw className="size-4" /> Recalcular afiliados
+          </ActionButton>
+        </div>
+        <p className="text-xs leading-5 text-slate-500 dark:text-slate-400 xl:max-w-md">
+          Sem envio no Telegram? Revise Configuracao/Railway: `TELEGRAM_DRY_RUN=false`, token e chat id preenchidos.
+        </p>
       </div>
-      <p className="mt-3 text-theme-xs leading-5 text-gray-500 dark:text-gray-400">Se nada sair no Telegram, consulte Configuracao no Railway: `TELEGRAM_DRY_RUN=false`, token e chat id precisam estar preenchidos.</p>
-    </LegacyPanel>
+    </Panel>
   );
 }
 
@@ -325,26 +340,26 @@ function DraftCard({ draft, offer, loading, api, action }) {
   useEffect(() => setAffiliateUrl(offer?.affiliateSource === "manual" ? offer.affiliateUrl || "" : ""), [offer?.affiliateUrl, offer?.affiliateSource]);
   const actions = draftActionsForStatus(draft.status);
   return (
-    <article className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950/55 dark:shadow-none dark:hover:border-slate-700">
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap gap-2">
-            <Badge color={badgeColor(draft.status)}>{statusLabel(draft.status)}</Badge>
-            {offer?.source === "amazon_discovery" ? <Badge color="warning">Descoberta Amazon</Badge> : null}
-            {offer?.source === "amazon_discovery" && !offer.affiliateReady ? <Badge color="error">Link oficial pendente</Badge> : null}
+        <div className="min-w-0">
+          <div className="flex flex-wrap gap-1.5">
+            <StatusBadge tone={statusBadgeTone(draft.status)}>{statusLabel(draft.status)}</StatusBadge>
+            {offer?.source === "amazon_discovery" ? <StatusBadge tone="cyan">Descoberta Amazon</StatusBadge> : null}
+            {offer?.source === "amazon_discovery" && !offer.affiliateReady ? <StatusBadge tone="warning">Link oficial pendente</StatusBadge> : null}
           </div>
-          <h4 className="mt-3 line-clamp-2 text-theme-sm font-medium text-gray-800 dark:text-white/90">{offer?.title || "Post de aquisicao X"}</h4>
-          <p className="mt-1 text-theme-xs text-gray-500 dark:text-gray-400">{channelLabel(draft.channel)} {offer ? `- ${money(offer.currentPrice)}` : ""}</p>
+          <h4 className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950 dark:text-slate-100">{offer?.title || "Post de aquisicao X"}</h4>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{channelLabel(draft.channel)} {offer ? `- ${money(offer.currentPrice)}` : ""}</p>
           {offer?.discoverySource ? (
-            <p className="mt-1 text-theme-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {offer.discoverySourceType === "term" ? "Termo" : "URL"}: {offer.discoverySource}
             </p>
           ) : null}
           {offer?.validationSummary ? (
-            <p className="mt-2 text-theme-xs text-gray-500 dark:text-gray-400">{offer.validationSummary}</p>
+            <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{offer.validationSummary}</p>
           ) : null}
           {offer?.scoreBreakdown ? (
-            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+            <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
               <span>Confianca {offer.scoreBreakdown.reliability}</span>
               <span>Atratividade {offer.scoreBreakdown.attractiveness}</span>
               <span>Potencial {offer.scoreBreakdown.potential}</span>
@@ -352,29 +367,36 @@ function DraftCard({ draft, offer, loading, api, action }) {
             </div>
           ) : null}
         </div>
-        {draft.channel === "x" ? <Zap className="size-5 text-gray-400" /> : <Send className="size-5 text-gray-400" />}
+        <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+          {draft.channel === "x" ? <Zap className="size-4" /> : <Send className="size-4" />}
+        </div>
       </div>
-      <textarea value={text} onChange={(event) => setText(event.target.value)} rows={7} className="w-full resize-y rounded-lg border border-gray-200 bg-gray-50 p-3 text-theme-sm leading-5 text-gray-700 outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300" />
+      <textarea
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        rows={6}
+        className="w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-5 text-slate-700 outline-none tdo-focus dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+      />
       {draft.warnings?.length ? (
-        <div className="mt-3 rounded-lg border border-warning-200 bg-warning-50 px-3 py-2 text-theme-xs leading-5 text-warning-700 dark:border-warning-500/20 dark:bg-warning-500/10 dark:text-warning-300">
+        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-300">
           {draft.warnings.map(warningLabel).join(" ")}
         </div>
       ) : null}
-      {draft.rejectionReason ? <p className="mt-2 text-theme-xs text-error-500">{draft.rejectionReason}</p> : null}
+      {draft.rejectionReason ? <p className="mt-2 text-xs font-medium text-rose-600 dark:text-rose-300">{draft.rejectionReason}</p> : null}
       {offer ? (
-        <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
+        <div className={`mt-3 rounded-xl border p-3 ${offer.affiliateReady ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-400/20 dark:bg-emerald-500/10" : "border-amber-300 bg-amber-50 shadow-[inset_3px_0_0_rgb(245_158_11)] dark:border-amber-400/30 dark:bg-amber-500/10"}`}>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-theme-xs font-medium text-gray-700 dark:text-gray-300">Link afiliado oficial</span>
-            <Badge color={offer.affiliateReady ? "success" : "warning"}>{offer.affiliateReady ? "Afiliado pronto" : "Pendente"}</Badge>
+            <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">Link afiliado oficial</span>
+            <StatusBadge tone={offer.affiliateReady ? "success" : "warning"}>{offer.affiliateReady ? "Afiliado pronto" : "Pendente"}</StatusBadge>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
               value={affiliateUrl}
               onChange={(event) => setAffiliateUrl(event.target.value)}
               placeholder="Cole o link do SiteStripe ou amzn.to"
-              className="h-10 min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-theme-sm text-gray-700 outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300"
+              className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none tdo-focus dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
             />
-            <Button
+            <ActionButton
               size="sm"
               className="h-10 sm:w-auto"
               variant="outline"
@@ -383,16 +405,16 @@ function DraftCard({ draft, offer, loading, api, action }) {
               onClick={() => action(`affiliate-${offer.id}`, () => api(`/api/offers/${offer.id}/affiliate`, { method: "POST", body: { affiliateUrl } }), "Link afiliado salvo")}
             >
               Salvar link
-            </Button>
+            </ActionButton>
           </div>
         </div>
       ) : null}
-      <div className="mt-4 flex flex-wrap gap-2">
-        {actions.includes("approve") ? <Button size="sm" loading={loading[`approve-${draft.id}`]} onClick={() => action(`approve-${draft.id}`, () => api(`/api/drafts/${draft.id}/approve`, { method: "POST" }), "Draft aprovado")}><CheckCircle2 className="size-4" /> Aprovar</Button> : null}
-        {actions.includes("edit") ? <Button size="sm" variant="outline" loading={loading[`edit-${draft.id}`]} onClick={() => action(`edit-${draft.id}`, () => api(`/api/drafts/${draft.id}/edit`, { method: "POST", body: { text } }), "Draft salvo")}><FileText className="size-4" /> Salvar</Button> : null}
-        {actions.includes("regenerate") ? <Button size="sm" variant="outline" loading={loading[`regen-${draft.id}`]} onClick={() => action(`regen-${draft.id}`, () => api(`/api/drafts/${draft.id}/regenerate`, { method: "POST" }), "Texto regenerado")}><RefreshCcw className="size-4" /> Regenerar</Button> : null}
-        {actions.includes("clone") ? <Button size="sm" variant="outline" loading={loading[`clone-${draft.id}`]} onClick={() => action(`clone-${draft.id}`, () => api(`/api/drafts/${draft.id}/clone`, { method: "POST" }), "Draft duplicado")}><Copy className="size-4" /> Clonar</Button> : null}
-        {actions.includes("reject") ? <Button size="sm" variant="danger" loading={loading[`reject-${draft.id}`]} onClick={() => action(`reject-${draft.id}`, () => api(`/api/drafts/${draft.id}/reject`, { method: "POST", body: { reason: "Rejeitado no dashboard." } }), "Draft rejeitado")}><X className="size-4" /> Rejeitar</Button> : null}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {actions.includes("approve") ? <ActionButton size="sm" loading={loading[`approve-${draft.id}`]} onClick={() => action(`approve-${draft.id}`, () => api(`/api/drafts/${draft.id}/approve`, { method: "POST" }), "Draft aprovado")}><CheckCircle2 className="size-4" /> Aprovar</ActionButton> : null}
+        {actions.includes("edit") ? <ActionButton size="sm" variant="outline" loading={loading[`edit-${draft.id}`]} onClick={() => action(`edit-${draft.id}`, () => api(`/api/drafts/${draft.id}/edit`, { method: "POST", body: { text } }), "Draft salvo")}><FileText className="size-4" /> Salvar</ActionButton> : null}
+        {actions.includes("regenerate") ? <ActionButton size="sm" variant="outline" loading={loading[`regen-${draft.id}`]} onClick={() => action(`regen-${draft.id}`, () => api(`/api/drafts/${draft.id}/regenerate`, { method: "POST" }), "Texto regenerado")}><RefreshCcw className="size-4" /> Regenerar</ActionButton> : null}
+        {actions.includes("clone") ? <ActionButton size="sm" variant="outline" loading={loading[`clone-${draft.id}`]} onClick={() => action(`clone-${draft.id}`, () => api(`/api/drafts/${draft.id}/clone`, { method: "POST" }), "Draft duplicado")}><Copy className="size-4" /> Clonar</ActionButton> : null}
+        {actions.includes("reject") ? <ActionButton size="sm" variant="danger" loading={loading[`reject-${draft.id}`]} onClick={() => action(`reject-${draft.id}`, () => api(`/api/drafts/${draft.id}/reject`, { method: "POST", body: { reason: "Rejeitado no dashboard." } }), "Draft rejeitado")}><X className="size-4" /> Rejeitar</ActionButton> : null}
       </div>
     </article>
   );
@@ -940,6 +962,18 @@ function badgeColor(status) {
     failed: "error",
     blocked: "error"
   }[status] || "gray";
+}
+function statusBadgeTone(status) {
+  return {
+    auto_ready: "success",
+    needs_review: "warning",
+    approved: "brand",
+    published: "success",
+    archived: "muted",
+    rejected: "danger",
+    failed: "danger",
+    blocked: "danger"
+  }[status] || "muted";
 }
 function warningLabel(warning) {
   return {
