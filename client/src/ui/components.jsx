@@ -323,13 +323,15 @@ export function DataTable({ columns, rows, getKey, renderMobileCard }) {
           </tbody>
         </table>
       </div>
-      <div className="space-y-3 lg:hidden">
-        {rows.map((row) => (
-          <React.Fragment key={getKey(row)}>
-            {renderMobileCard(row)}
-          </React.Fragment>
-        ))}
-      </div>
+      {renderMobileCard ? (
+        <div className="space-y-3 lg:hidden">
+          {rows.map((row) => (
+            <React.Fragment key={getKey(row)}>
+              {renderMobileCard(row)}
+            </React.Fragment>
+          ))}
+        </div>
+      ) : null}
     </>
   );
 }

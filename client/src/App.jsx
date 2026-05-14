@@ -262,24 +262,6 @@ function Overview({ state, data, setPeriod, period, setView }) {
   );
 }
 
-function StatisticsCard({ data }) {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
-      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Funil de ofertas</h3>
-          <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">Distribuicao por status, canal e categoria.</p>
-        </div>
-      </div>
-      <div className="grid gap-5 xl:grid-cols-3">
-        <Bars title="Status" items={data.statusBars} />
-        <Bars title="Canais" items={data.channelBars} />
-        <Bars title="Categorias" items={data.categoryBars} />
-      </div>
-    </div>
-  );
-}
-
 function Operation({ state, data, drafts, loading, api, action }) {
   return (
     <div className="space-y-4 md:space-y-6">
@@ -752,6 +734,7 @@ function InlineAffiliateForm({ offer, loading, api, action }) {
   return (
     <div className="flex min-w-[260px] items-center gap-2">
       <input
+        aria-label={`Link afiliado oficial para ${offer.title}`}
         value={affiliateUrl}
         onChange={(event) => setAffiliateUrl(event.target.value)}
         placeholder="SiteStripe/amzn.to"
@@ -786,6 +769,9 @@ function NumberField({ label, value, onChange }) {
 
 function StatusLine({ label, value, tone = "neutral" }) {
   const toneClass = {
+    brand: "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-300",
+    cyan: "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-300",
+    muted: "border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-800/40 dark:text-gray-300",
     success: "border-success-200 bg-success-50 text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-300",
     warning: "border-warning-200 bg-warning-50 text-warning-700 dark:border-warning-500/20 dark:bg-warning-500/10 dark:text-warning-300",
     danger: "border-error-200 bg-error-50 text-error-700 dark:border-error-500/20 dark:bg-error-500/10 dark:text-error-300",
@@ -1024,18 +1010,6 @@ function matches(value, query) { return !query || normalize(value).includes(norm
 function normalize(value) { return String(value || "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, ""); }
 function money(value) { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0)); }
 function clamp(value, min, max) { return Math.min(max, Math.max(min, Math.round(value))); }
-function badgeColor(status) {
-  return {
-    auto_ready: "success",
-    needs_review: "warning",
-    approved: "brand",
-    published: "success",
-    archived: "gray",
-    rejected: "error",
-    failed: "error",
-    blocked: "error"
-  }[status] || "gray";
-}
 function statusBadgeTone(status) {
   return {
     auto_ready: "success",
