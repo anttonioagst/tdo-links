@@ -16,7 +16,7 @@ import {
   X,
   Zap
 } from "lucide-react";
-import { AppShell, ActionButton, InsightPanel, MetricTile, Panel, QueueColumn, StatusBadge } from "./ui/components.jsx";
+import { AppShell, ActionButton, DataTable, InsightPanel, MetricTile, Panel, QueueColumn, StatusBadge } from "./ui/components.jsx";
 import { viewMeta } from "./ui/tokens.js";
 
 const periods = [
@@ -422,21 +422,21 @@ function DraftCard({ draft, offer, loading, api, action }) {
 
 function Offers({ state, data, offers, loading, api, action }) {
   return (
-    <div className="grid grid-cols-12 gap-4 md:gap-6">
-      <div className="col-span-12">
-        <StatisticsCard data={data} />
+    <div className="space-y-5">
+      <div className="grid gap-4 md:grid-cols-4">
+        <MetricTile label="Prontas" value={data.autoReady} tone="success" detail="Elegiveis para publicar" />
+        <MetricTile label="Afiliado pendente" value={data.missingAffiliate} tone={data.missingAffiliate ? "warning" : "success"} detail="Links oficiais faltando" />
+        <MetricTile label="Total" value={offers.length} tone="brand" detail="Inventario filtrado" />
+        <MetricTile label="Publicadas" value={state.metrics.published} tone="cyan" detail="Historico de envios" />
       </div>
-      <div className="col-span-12">
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Ofertas</h3>
-            <div className="sm:shrink-0">
-              <Badge color={data.missingAffiliate ? "warning" : "success"}>{data.missingAffiliate} afiliado pendente</Badge>
-            </div>
-          </div>
-          <OfferTable offers={offers} clicksByOffer={state.metrics.clicksByOffer} loading={loading} api={api} action={action} />
-        </div>
-      </div>
+      <Panel
+        title="Inventario de ofertas"
+        count={`${offers.length} ofertas`}
+        density="compact"
+        action={<StatusBadge tone={data.missingAffiliate ? "warning" : "success"}>{data.missingAffiliate} afiliado pendente</StatusBadge>}
+      >
+        <OfferTable offers={offers} clicksByOffer={state.metrics.clicksByOffer} loading={loading} api={api} action={action} />
+      </Panel>
     </div>
   );
 }
@@ -622,54 +622,127 @@ function Config({ state, data, loading, api, action }) {
 }
 
 function OfferTable({ offers, clicksByOffer, loading, api, action }) {
+  const columns = [
+    {
+      key: "offer",
+      label: "Oferta",
+      cellClassName: "min-w-[360px]",
+      render: (offer) => (
+        <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="flex items-start gap-3">
+          <ProductThumb offer={offer} />
+          <OfferIdentity offer={offer} clicks={clicksByOffer[offer.id] || 0} />
+        </a>
+      )
+    },
+    {
+      key: "score",
+      label: "Score",
+      render: (offer) => <ScoreCell offer={offer} />
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (offer) => <StatusBadge tone={statusBadgeTone(offer.status)}>{statusLabel(offer.status)}</StatusBadge>
+    },
+    {
+      key: "affiliate",
+      label: "Afiliado",
+      cellClassName: "min-w-[300px]",
+      render: (offer) => api && action
+        ? <InlineAffiliateForm offer={offer} loading={loading} api={api} action={action} />
+        : <StatusBadge tone={offer.affiliateReady ? "success" : "warning"}>{offer.affiliateReady ? "Pronto" : "Pendente"}</StatusBadge>
+    },
+    {
+      key: "clicks",
+      label: "Cliques",
+      render: (offer) => (
+        <div>
+          <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">{clicksByOffer[offer.id] || 0}</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">rastreados</p>
+        </div>
+      )
+    },
+    {
+      key: "actions",
+      label: "Acoes",
+      render: (offer) => (
+        <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+          <ExternalLink className="size-4 shrink-0" /> Abrir
+        </a>
+      )
+    }
+  ];
+
   return (
-    <div className="max-w-full overflow-x-auto">
-      <table className="min-w-[980px]">
-        <thead className="border-y border-gray-100 dark:border-gray-800">
-          <tr>
-            {["Oferta", "Categoria", "Preco", "Status", "Afiliado", "Abrir"].map((header) => (
-              <th key={header} className="px-3 py-3 text-start text-theme-xs font-medium text-gray-500 first:pl-0 last:pr-0 dark:text-gray-400">{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-          {offers.map((offer) => (
-            <tr key={offer.id}>
-              <td className="py-3 pr-3">
-                <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="flex items-center gap-3">
-                  <ProductThumb offer={offer} />
-                  <div>
-                    <div className="mb-1 flex flex-wrap gap-2">
-                      {offer.source === "amazon_discovery" ? <Badge color="warning">Descoberta Amazon</Badge> : null}
-                      {offer.source === "amazon_discovery" && !offer.affiliateReady ? <Badge color="error">Link oficial pendente</Badge> : null}
-                    </div>
-                    <p className="line-clamp-2 max-w-[360px] text-theme-sm font-medium text-gray-800 dark:text-white/90">{offer.title}</p>
-                    <span className="text-theme-xs text-gray-500 dark:text-gray-400">{storeLabel(offer.store)} - {clicksByOffer[offer.id] || 0} cliques</span>
-                    {offer.discoverySource ? (
-                      <span className="mt-1 block max-w-[360px] truncate text-theme-xs text-gray-500 dark:text-gray-400">
-                        {offer.discoverySourceType === "term" ? "Termo" : "URL"}: {offer.discoverySource}
-                      </span>
-                    ) : null}
-                  </div>
-                </a>
-              </td>
-              <td className="px-3 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{offer.category || "Tech"}</td>
-              <td className="px-3 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{money(offer.currentPrice)}</td>
-              <td className="px-3 py-3 text-theme-sm text-gray-500 dark:text-gray-400"><Badge color={badgeColor(offer.status)}>{statusLabel(offer.status)}</Badge></td>
-              <td className="py-3 pl-3 text-theme-sm text-gray-500 dark:text-gray-400">
-                {api && action ? <InlineAffiliateForm offer={offer} loading={loading} api={api} action={action} /> : <Badge color={offer.affiliateReady ? "success" : "warning"}>{offer.affiliateReady ? "Pronto" : "Pendente"}</Badge>}
-              </td>
-              <td className="py-3 pl-3 text-theme-sm text-gray-500 dark:text-gray-400">
-                <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 text-theme-xs font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03]">
-                  <ExternalLink className="size-4" /> Abrir
-                </a>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-3">
+      <DataTable
+        columns={columns}
+        rows={offers}
+        getKey={(offer) => offer.id}
+        renderMobileCard={(offer) => (
+          <OfferMobileCard offer={offer} clicks={clicksByOffer[offer.id] || 0} loading={loading} api={api} action={action} />
+        )}
+      />
       {!offers.length ? <EmptyState title="Nenhuma oferta" text="Execute a coleta para popular a tabela." /> : null}
     </div>
+  );
+}
+
+function OfferIdentity({ offer, clicks }) {
+  return (
+    <div className="min-w-0">
+      <div className="mb-2 flex flex-wrap gap-2">
+        {offer.source === "amazon_discovery" ? <StatusBadge tone="cyan">Descoberta Amazon</StatusBadge> : null}
+        {offer.source === "amazon_discovery" && !offer.affiliateReady ? <StatusBadge tone="warning">Link oficial pendente</StatusBadge> : null}
+      </div>
+      <p className="line-clamp-2 max-w-[420px] text-sm font-medium text-slate-950 dark:text-slate-100">{offer.title}</p>
+      <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+        {storeLabel(offer.store)} - {offer.category || "Tech"} - {money(offer.currentPrice)} - {clicks} cliques
+      </span>
+      {offer.discoverySource ? (
+        <span className="mt-1 block max-w-[420px] truncate text-xs text-slate-500 dark:text-slate-400">
+          {offer.discoverySourceType === "term" ? "Termo" : "URL"}: {offer.discoverySource}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function ScoreCell({ offer }) {
+  const score = Math.round(Number(offer.score || 0));
+  const tone = score >= 85 ? "success" : score >= 70 ? "warning" : "muted";
+
+  return (
+    <div className="min-w-[86px]">
+      <StatusBadge tone={tone}>{score}</StatusBadge>
+      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{money(offer.currentPrice)}</p>
+    </div>
+  );
+}
+
+function OfferMobileCard({ offer, clicks, loading, api, action }) {
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="flex items-start gap-3">
+        <ProductThumb offer={offer} />
+        <OfferIdentity offer={offer} clicks={clicks} />
+      </a>
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <StatusLine label="Score" value={String(Math.round(Number(offer.score || 0)))} tone={offer.score >= 85 ? "success" : offer.score >= 70 ? "warning" : "neutral"} />
+        <StatusLine label="Status" value={statusLabel(offer.status)} tone={statusBadgeTone(offer.status)} />
+        <StatusLine label="Cliques" value={String(clicks)} />
+      </div>
+      <div className="mt-4">
+        {api && action ? (
+          <InlineAffiliateForm offer={offer} loading={loading} api={api} action={action} />
+        ) : (
+          <StatusBadge tone={offer.affiliateReady ? "success" : "warning"}>{offer.affiliateReady ? "Afiliado pronto" : "Afiliado pendente"}</StatusBadge>
+        )}
+      </div>
+      <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="mt-4 inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800">
+        <ExternalLink className="size-4 shrink-0" /> Abrir oferta
+      </a>
+    </article>
   );
 }
 

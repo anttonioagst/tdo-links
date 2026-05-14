@@ -230,7 +230,7 @@ export function ActionButton({
 
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-xl font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-medium transition disabled:cursor-not-allowed disabled:opacity-60 [&>svg]:shrink-0 ${variants[variant]} ${sizes[size]} ${className}`}
       disabled={loading || disabled}
       type="button"
       {...props}
@@ -286,6 +286,51 @@ export function EmptyState({ title, text, action }) {
       <p className="mt-1 text-sm text-slate-500">{text}</p>
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
+  );
+}
+
+export function DataTable({ columns, rows, getKey, renderMobileCard }) {
+  return (
+    <>
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 lg:block">
+        <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+          <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900">
+            <tr>
+              {columns.map((column) => (
+                <th
+                  key={column.key}
+                  className={`px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 ${column.className || ""}`}
+                  scope="col"
+                >
+                  {column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-950/30">
+            {rows.map((row) => (
+              <tr key={getKey(row)} className="transition hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className={`px-4 py-3 align-top text-slate-700 dark:text-slate-300 ${column.cellClassName || ""}`}
+                  >
+                    {column.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="space-y-3 lg:hidden">
+        {rows.map((row) => (
+          <React.Fragment key={getKey(row)}>
+            {renderMobileCard(row)}
+          </React.Fragment>
+        ))}
+      </div>
+    </>
   );
 }
 
