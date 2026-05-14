@@ -1,0 +1,260 @@
+import React from "react";
+import { Loader2, Menu, Search } from "lucide-react";
+import { commandItems, statusTone, viewMeta } from "./tokens.js";
+
+export function AppShell({
+  children,
+  darkMode,
+  inputRef,
+  query,
+  setDarkMode,
+  setMobileOpen,
+  setQuery,
+  mobileOpen,
+  view,
+  setView,
+  topBar
+}) {
+  return (
+    <div className="min-h-screen bg-tdo-surface text-tdo-ink">
+      <CommandRail view={view} setView={setView} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      {mobileOpen ? (
+        <button
+          className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-label="Fechar menu"
+          type="button"
+        />
+      ) : null}
+      <div className="min-h-screen transition lg:pl-[92px]">
+        <TopContextBar
+          darkMode={darkMode}
+          inputRef={inputRef}
+          query={query}
+          setDarkMode={setDarkMode}
+          setMobileOpen={setMobileOpen}
+          setQuery={setQuery}
+          view={view}
+          {...topBar}
+        />
+        <main className="mx-auto max-w-[1540px] px-4 py-5 md:px-6 lg:px-8">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
+  const railState = mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0";
+
+  return (
+    <aside className={`fixed inset-y-0 left-0 z-50 w-[86px] border-r border-white/10 bg-tdo-rail px-3 py-4 text-white transition ${railState}`}>
+      <button
+        className="mb-6 grid size-12 place-items-center rounded-xl bg-tdo-blue text-sm font-bold shadow-tdo-glow"
+        onClick={() => setView("overview")}
+        type="button"
+        aria-label="Ir para Performance"
+      >
+        T
+      </button>
+      <nav className="space-y-2">
+        {commandItems.map(({ icon: Icon, label, view: itemView }) => {
+          const activeClass = view === itemView
+            ? "bg-white text-tdo-rail"
+            : "text-slate-300 hover:bg-white/10 hover:text-white";
+
+          return (
+            <button
+              aria-label={label}
+              className={`group relative grid size-12 place-items-center rounded-xl transition ${activeClass}`}
+              key={itemView}
+              onClick={() => {
+                setView(itemView);
+                setMobileOpen(false);
+              }}
+              title={label}
+              type="button"
+            >
+              <Icon className="size-5" />
+              <span className="pointer-events-none absolute left-14 top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-950 px-2 py-1 text-xs text-white shadow-lg group-hover:block">
+                {label}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+export function TopContextBar({
+  actions,
+  darkMode,
+  inputRef,
+  query,
+  setDarkMode,
+  setMobileOpen,
+  setQuery,
+  view
+}) {
+  const meta = viewMeta[view] || viewMeta.overview;
+
+  return (
+    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-tdo-surface/95 backdrop-blur">
+      <div className="mx-auto flex min-h-[76px] max-w-[1540px] flex-col gap-3 px-4 py-3 md:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            className="grid size-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 lg:hidden"
+            onClick={() => setMobileOpen(true)}
+            type="button"
+            aria-label="Abrir menu"
+          >
+            <Menu className="size-5" />
+          </button>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold text-slate-950">{meta.title}</h1>
+            <p className="truncate text-sm text-slate-500">{meta.subtitle}</p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label className="relative min-w-0 sm:w-[280px]">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm tdo-focus"
+              placeholder="Buscar ofertas, canais, status..."
+            />
+          </label>
+          <button
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700"
+            onClick={() => setDarkMode(!darkMode)}
+            type="button"
+          >
+            {darkMode ? "Claro" : "Escuro"}
+          </button>
+          {actions}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+export function Panel({ title, count, children, density = "comfortable", action }) {
+  const densityClass = density === "compact" ? "p-4" : "p-5 md:p-6";
+
+  return (
+    <section className={`rounded-2xl border border-slate-200 bg-white shadow-tdo-card ${densityClass}`}>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-950 md:text-base">{title}</h2>
+          {count ? <p className="mt-1 text-xs text-slate-500">{count}</p> : null}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+export function StatusBadge({ children, tone = "brand" }) {
+  const classes = {
+    brand: "bg-blue-50 text-blue-700 ring-blue-200",
+    success: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    warning: "bg-amber-50 text-amber-800 ring-amber-200",
+    danger: "bg-rose-50 text-rose-700 ring-rose-200",
+    cyan: "bg-cyan-50 text-cyan-700 ring-cyan-200",
+    muted: "bg-slate-100 text-slate-600 ring-slate-200"
+  };
+
+  return (
+    <span className={`inline-flex min-h-6 items-center rounded-full px-2.5 text-xs font-medium ring-1 ${classes[tone] || classes.brand}`}>
+      {children}
+    </span>
+  );
+}
+
+export function ActionButton({
+  children,
+  loading,
+  variant = "primary",
+  size = "md",
+  className = "",
+  ...props
+}) {
+  const variants = {
+    primary: "bg-tdo-blue text-white hover:bg-blue-700",
+    secondary: "bg-slate-950 text-white hover:bg-slate-800",
+    outline: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+    danger: "bg-rose-600 text-white hover:bg-rose-700",
+    ghost: "text-slate-600 hover:bg-slate-100"
+  };
+  const sizes = {
+    sm: "h-9 px-3 text-xs",
+    md: "h-10 px-4 text-sm"
+  };
+
+  return (
+    <button
+      className={`inline-flex items-center justify-center gap-2 rounded-xl font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${sizes[size]} ${className}`}
+      disabled={loading || props.disabled}
+      type="button"
+      {...props}
+    >
+      {loading ? <Loader2 className="size-4 animate-spin" /> : null}
+      {children}
+    </button>
+  );
+}
+
+export function MetricTile({ icon: Icon, label, value, tone = "brand", detail }) {
+  const iconTone = {
+    brand: "bg-blue-50 text-blue-700",
+    success: "bg-emerald-50 text-emerald-700",
+    warning: "bg-amber-50 text-amber-700",
+    danger: "bg-rose-50 text-rose-700",
+    cyan: "bg-cyan-50 text-cyan-700"
+  }[tone] || "bg-blue-50 text-blue-700";
+
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-tdo-card">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
+          {detail ? <p className="mt-1 truncate text-xs text-slate-500">{detail}</p> : null}
+        </div>
+        {Icon ? (
+          <div className={`grid size-11 place-items-center rounded-xl ${iconTone}`}>
+            <Icon className="size-5" />
+          </div>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+export function InsightPanel({ title, detail, action, tone = "brand" }) {
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-tdo-card">
+      <StatusBadge tone={tone}>{tone}</StatusBadge>
+      <h3 className="mt-3 text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="mt-1 text-sm leading-6 text-slate-500">{detail}</p>
+      {action}
+    </article>
+  );
+}
+
+export function EmptyState({ title, text, action }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+      <p className="mt-1 text-sm text-slate-500">{text}</p>
+      {action ? <div className="mt-4">{action}</div> : null}
+    </div>
+  );
+}
+
+export function toneForStatus(status) {
+  return statusTone(status);
+}

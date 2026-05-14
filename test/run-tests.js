@@ -16,6 +16,17 @@ import { parseAmazonSearch } from "../src/scrapers.js";
 import { validateOffer } from "../src/validation.js";
 import { buildAmazonSearchUrl, normalizeDiscoverySettings, runAmazonDiscovery } from "../src/discovery.js";
 import { shouldRunAmazonDiscovery, runDiscoverySchedulerTick } from "../src/discovery-scheduler.js";
+import {
+  commandItems,
+  densityForView,
+  statusTone,
+  viewMeta
+} from "../client/src/ui/tokens.js";
+import {
+  channelLabel as uiChannelLabel,
+  money as uiMoney,
+  statusLabel as uiStatusLabel
+} from "../client/src/ui/format.js";
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -1218,6 +1229,23 @@ test("publish pipeline records failed details when Telegram fetch throws", async
     globalThis.fetch = originalFetch;
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("ui tokens define the command-center navigation", () => {
+  assert.deepEqual(commandItems.map((item) => item.view), ["overview", "operation", "offers", "ai", "config"]);
+  assert.equal(viewMeta.overview.title, "Performance");
+  assert.equal(viewMeta.operation.title, "Operacao");
+  assert.equal(densityForView("operation"), "compact");
+  assert.equal(densityForView("overview"), "comfortable");
+});
+
+test("ui status tones and labels stay consistent", () => {
+  assert.equal(statusTone("auto_ready"), "success");
+  assert.equal(statusTone("blocked"), "danger");
+  assert.equal(statusTone("needs_review"), "warning");
+  assert.equal(uiStatusLabel("published"), "Publicado");
+  assert.equal(uiChannelLabel("telegram"), "Telegram");
+  assert.equal(uiMoney(349.9), "R$ 349,90");
 });
 
 let failed = 0;

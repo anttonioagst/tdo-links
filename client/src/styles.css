@@ -150,6 +150,20 @@
   --z-index-999999: 999999;
 }
 
+@theme {
+  --color-tdo-rail: #171717;
+  --color-tdo-ink: #111827;
+  --color-tdo-surface: #f6f7f9;
+  --color-tdo-panel: #ffffff;
+  --color-tdo-blue: #2563eb;
+  --color-tdo-cyan: #06b6d4;
+  --color-tdo-green: #10b981;
+  --color-tdo-amber: #f59e0b;
+  --color-tdo-red: #e11d48;
+  --shadow-tdo-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 28px rgba(15, 23, 42, 0.04);
+  --shadow-tdo-glow: 0 14px 30px rgba(37, 99, 235, 0.35);
+}
+
 @layer base {
   *,
   ::after,
@@ -243,6 +257,10 @@
   &::-webkit-scrollbar-thumb {
     @apply rounded-full bg-gray-200 dark:bg-gray-700;
   }
+}
+
+@utility tdo-focus {
+  @apply outline-none ring-tdo-blue/20 focus:border-tdo-blue focus:ring-4;
 }
 
 .line-clamp-2 {
