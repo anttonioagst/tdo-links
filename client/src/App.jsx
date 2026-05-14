@@ -2,60 +2,23 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   BarChart3,
-  Bell,
-  Bot,
   Box,
-  ChevronDown,
   CheckCircle2,
   Copy,
   ExternalLink,
   FileText,
-  Gauge,
-  Grid3X3,
-  LayoutDashboard,
   Loader2,
-  Menu,
-  Moon,
   MousePointerClick,
   Package,
   RefreshCcw,
   Search,
   Send,
-  Settings,
-  ShoppingBag,
   SlidersHorizontal,
-  Sun,
   X,
   Zap
 } from "lucide-react";
 import { AppShell, ActionButton } from "./ui/components.jsx";
 import { viewMeta } from "./ui/tokens.js";
-
-const navItems = [
-  {
-    name: "Dashboard",
-    icon: LayoutDashboard,
-    subItems: [{ name: "Ecommerce", view: "overview" }]
-  },
-  { name: "Operacao", icon: Send, view: "operation" },
-  { name: "Ofertas", icon: ShoppingBag, view: "offers" },
-  { name: "IA / Relatorios", icon: Bot, view: "ai" },
-  { name: "Configuracao", icon: Settings, view: "config" }
-];
-
-const othersItems = [
-  { name: "Cliques", icon: MousePointerClick, view: "overview" },
-  { name: "Score", icon: Gauge, view: "offers" },
-  { name: "Publicacao", icon: Zap, view: "operation" }
-];
-
-const viewTitles = {
-  overview: "eCommerce",
-  operation: "Operacao",
-  offers: "Ofertas",
-  ai: "IA / Relatorios",
-  config: "Configuracao"
-};
 
 const periods = [
   { id: "7", label: "7 dias", days: 7 },
@@ -83,10 +46,7 @@ export default function App() {
   const [loading, setLoading] = useState({});
   const [toasts, setToasts] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [isHovered, setIsHovered] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [appMenuOpen, setAppMenuOpen] = useState(false);
   const inputRef = useRef(null);
 
   async function api(path, options = {}) {
@@ -183,195 +143,14 @@ export default function App() {
         topBar={{ actions: topBarActions }}
         view={view}
       >
-          {view === "overview" && <Overview state={state} data={data} setPeriod={setPeriod} period={period} setView={setView} />}
-          {view === "operation" && <Operation state={state} data={data} drafts={drafts} loading={loading} api={api} action={action} />}
-          {view === "offers" && <Offers state={state} data={data} offers={offers} loading={loading} api={api} action={action} />}
-          {view === "ai" && <Reports state={state} data={data} loading={loading} api={api} action={action} />}
-          {view === "config" && <Config state={state} data={data} loading={loading} api={api} action={action} />}
+        {view === "overview" && <Overview state={state} data={data} setPeriod={setPeriod} period={period} setView={setView} />}
+        {view === "operation" && <Operation state={state} data={data} drafts={drafts} loading={loading} api={api} action={action} />}
+        {view === "offers" && <Offers state={state} data={data} offers={offers} loading={loading} api={api} action={action} />}
+        {view === "ai" && <Reports state={state} data={data} loading={loading} api={api} action={action} />}
+        {view === "config" && <Config state={state} data={data} loading={loading} api={api} action={action} />}
       </AppShell>
       <ToastStack toasts={toasts} setToasts={setToasts} />
     </>
-  );
-}
-
-function Sidebar({ isExpanded, isHovered, isMobileOpen, setIsHovered, setIsMobileOpen, setView, sidebarWide, view }) {
-  const [openSubmenu, setOpenSubmenu] = useState("Dashboard");
-
-  function go(nextView) {
-    setView(nextView);
-    setIsMobileOpen(false);
-  }
-
-  return (
-    <aside
-      className={`fixed left-0 top-0 z-50 mt-16 flex h-screen flex-col border-r border-gray-200 bg-white px-5 text-gray-900 transition-all duration-300 ease-in-out dark:border-gray-800 dark:bg-gray-900 lg:mt-0 ${sidebarWide ? "w-[290px]" : "w-[90px]"} ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
-      onMouseEnter={() => !isExpanded && setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div className={`flex py-8 ${!sidebarWide ? "lg:justify-center" : "justify-start"}`}>
-        <button type="button" onClick={() => go("overview")} className="flex items-center gap-3">
-          <span className="grid size-8 place-items-center rounded-lg bg-brand-500 text-xs font-bold text-white shadow-theme-sm">T</span>
-          {sidebarWide ? (
-            <span className="text-left">
-              <span className="block text-xl font-semibold tracking-tight text-gray-900 dark:text-white">TDO Links</span>
-              <span className="block text-xs text-gray-500 dark:text-gray-400">Affiliate Admin</span>
-            </span>
-          ) : null}
-        </button>
-      </div>
-      <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
-        <nav className="mb-6">
-          <MenuGroup title="Menu" sidebarWide={sidebarWide}>
-            {navItems.map((item) => (
-              <NavButton
-                key={item.name}
-                item={item}
-                open={openSubmenu === item.name}
-                setOpen={() => setOpenSubmenu(openSubmenu === item.name ? "" : item.name)}
-                sidebarWide={sidebarWide}
-                view={view}
-                go={go}
-              />
-            ))}
-          </MenuGroup>
-          <MenuGroup title="Others" sidebarWide={sidebarWide}>
-            {othersItems.map((item) => <NavButton key={item.name} item={item} sidebarWide={sidebarWide} view={view} go={go} />)}
-          </MenuGroup>
-        </nav>
-        {sidebarWide ? (
-          <div className="mb-6 rounded-2xl bg-gray-50 px-4 py-5 text-center dark:bg-white/[0.03]">
-            <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">TDO Links Admin</h3>
-            <p className="mb-4 text-xs leading-5 text-gray-500 dark:text-gray-400">Pipeline de ofertas, aprovacao e cliques rastreaveis.</p>
-            <button type="button" onClick={() => go("operation")} className="inline-flex h-9 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-xs font-medium text-white transition hover:bg-brand-600">Abrir operacao</button>
-          </div>
-        ) : null}
-      </div>
-    </aside>
-  );
-}
-
-function MenuGroup({ title, sidebarWide, children }) {
-  return (
-    <div className="mb-6">
-      <h2 className={`mb-4 flex text-xs uppercase leading-[20px] text-gray-400 ${!sidebarWide ? "lg:justify-center" : "justify-start"}`}>
-        {sidebarWide ? title : <Grid3X3 className="size-5" />}
-      </h2>
-      <ul className="flex flex-col gap-4">{children}</ul>
-    </div>
-  );
-}
-
-function NavButton({ item, open, setOpen, sidebarWide, view, go }) {
-  const Icon = item.icon;
-  const active = item.view === view || item.subItems?.some((sub) => sub.view === view);
-  if (item.subItems) {
-    return (
-      <li>
-        <button type="button" onClick={setOpen} className={`menu-item group cursor-pointer ${active || open ? "menu-item-active" : "menu-item-inactive"} ${!sidebarWide ? "lg:justify-center" : "lg:justify-start"}`}>
-          <span className={`menu-item-icon-size ${active || open ? "menu-item-icon-active" : "menu-item-icon-inactive"}`}><Icon /></span>
-          {sidebarWide ? <span className="menu-item-text">{item.name}</span> : null}
-          {sidebarWide ? <ChevronDown className={`ml-auto size-5 transition-transform duration-200 ${open ? "rotate-180 text-brand-500" : "text-gray-500"}`} /> : null}
-        </button>
-        {sidebarWide ? (
-          <div className="overflow-hidden transition-all duration-300" style={{ height: open ? `${item.subItems.length * 42}px` : "0px" }}>
-            <ul className="ml-9 mt-2 space-y-1">
-              {item.subItems.map((sub) => (
-                <li key={sub.name}>
-                  <button type="button" onClick={() => go(sub.view)} className={`menu-dropdown-item w-full ${sub.view === view ? "menu-dropdown-item-active" : "menu-dropdown-item-inactive"}`}>
-                    {sub.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </li>
-    );
-  }
-  return (
-    <li>
-      <button type="button" onClick={() => go(item.view)} className={`menu-item group ${active ? "menu-item-active" : "menu-item-inactive"} ${!sidebarWide ? "lg:justify-center" : "lg:justify-start"}`}>
-        <span className={`menu-item-icon-size ${active ? "menu-item-icon-active" : "menu-item-icon-inactive"}`}><Icon /></span>
-        {sidebarWide ? <span className="menu-item-text">{item.name}</span> : null}
-      </button>
-    </li>
-  );
-}
-
-function Header({ appMenuOpen, darkMode, inputRef, query, setAppMenuOpen, setDarkMode, setIsExpanded, setIsMobileOpen, setQuery, state }) {
-  function toggleSidebar() {
-    if (window.innerWidth >= 1024) setIsExpanded((value) => !value);
-    else setIsMobileOpen((value) => !value);
-  }
-  return (
-    <header className="sticky top-0 z-99999 flex w-full border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 lg:border-b">
-      <div className="flex grow flex-col items-center justify-between lg:flex-row lg:px-6">
-        <div className="flex w-full items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 dark:border-gray-800 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
-          <button type="button" onClick={toggleSidebar} className="z-99999 flex size-10 items-center justify-center rounded-lg border-gray-200 text-gray-500 dark:border-gray-800 dark:text-gray-400 lg:size-11 lg:border" aria-label="Toggle Sidebar">
-            <Menu className="size-5" />
-          </button>
-          <button type="button" className="flex items-center gap-2 lg:hidden">
-            <span className="grid size-8 place-items-center rounded-lg bg-brand-500 text-xs font-bold text-white">T</span>
-            <span className="text-sm font-semibold text-gray-900 dark:text-white">TDO Links</span>
-          </button>
-          <button type="button" onClick={() => setAppMenuOpen((value) => !value)} className="z-99999 flex size-10 items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:hidden">
-            <Grid3X3 className="size-5" />
-          </button>
-          <div className="hidden lg:block">
-            <div className="relative">
-              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2">
-                <Search className="size-5 text-gray-500 dark:text-gray-400" />
-              </span>
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                type="text"
-                placeholder="Buscar oferta, canal, status ou comando..."
-                className="h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-14 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[430px]"
-              />
-              <span className="absolute right-2.5 top-1/2 inline-flex -translate-y-1/2 items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 px-[7px] py-[4.5px] text-xs text-gray-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400">
-                <span>Ctrl</span><span>K</span>
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className={`${appMenuOpen ? "flex" : "hidden"} w-full flex-wrap items-center justify-between gap-3 px-4 py-4 shadow-theme-md lg:flex lg:flex-nowrap lg:justify-end lg:px-0 lg:shadow-none`}>
-          <div className="flex items-center gap-2 2xsm:gap-3">
-            <button type="button" onClick={() => setDarkMode((value) => !value)} className="flex size-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white">
-              {darkMode ? <Sun className="size-5" /> : <Moon className="size-5" />}
-            </button>
-            <button type="button" className="relative flex size-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white">
-              <span className="absolute right-2 top-2 size-2 rounded-full bg-orange-400" />
-              <Bell className="size-5" />
-            </button>
-          </div>
-          <button type="button" className="flex min-w-0 items-center text-gray-700 dark:text-gray-400">
-            <span className="mr-3 grid size-11 place-items-center rounded-full bg-brand-500 text-sm font-semibold text-white">A</span>
-            <span className="mr-1 block min-w-0 text-left">
-              <span className="block truncate text-sm font-medium text-gray-700 dark:text-gray-400">Antonio</span>
-              <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{state.settings.mode}</span>
-            </span>
-            <ChevronDown className="size-5 shrink-0 text-gray-400" />
-          </button>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-function PageTitle({ view }) {
-  return (
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">{viewTitles[view]}</h2>
-      <nav>
-        <ol className="flex items-center gap-1.5">
-          <li className="text-sm text-gray-500 dark:text-gray-400">Home</li>
-          <li className="text-sm text-gray-500 dark:text-gray-400">/</li>
-          <li className="text-sm text-gray-800 dark:text-white/90">{viewTitles[view]}</li>
-        </ol>
-      </nav>
-    </div>
   );
 }
 

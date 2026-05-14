@@ -16,7 +16,7 @@ export function AppShell({
   topBar
 }) {
   return (
-    <div className="min-h-screen bg-tdo-surface text-tdo-ink">
+    <div className="min-h-screen bg-tdo-surface text-tdo-ink dark:bg-slate-950 dark:text-slate-100">
       <CommandRail view={view} setView={setView} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       {mobileOpen ? (
         <button
@@ -50,7 +50,10 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
     <aside className={`fixed inset-y-0 left-0 z-50 w-[86px] border-r border-white/10 bg-tdo-rail px-3 py-4 text-white transition ${railState}`}>
       <button
         className="mb-6 grid size-12 place-items-center rounded-xl bg-tdo-blue text-sm font-bold shadow-tdo-glow"
-        onClick={() => setView("overview")}
+        onClick={() => {
+          setView("overview");
+          setMobileOpen(false);
+        }}
         type="button"
         aria-label="Ir para Performance"
       >
@@ -99,11 +102,11 @@ export function TopContextBar({
   const meta = viewMeta[view] || viewMeta.overview;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-tdo-surface/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-tdo-surface/95 backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/95">
       <div className="mx-auto flex min-h-[76px] max-w-[1540px] flex-col gap-3 px-4 py-3 md:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <button
-            className="grid size-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 lg:hidden"
+            className="grid size-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 lg:hidden"
             onClick={() => setMobileOpen(true)}
             type="button"
             aria-label="Abrir menu"
@@ -111,24 +114,24 @@ export function TopContextBar({
             <Menu className="size-5" />
           </button>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold text-slate-950">{meta.title}</h1>
-            <p className="truncate text-sm text-slate-500">{meta.subtitle}</p>
+            <h1 className="truncate text-xl font-semibold text-slate-950 dark:text-white">{meta.title}</h1>
+            <p className="truncate text-sm text-slate-500 dark:text-slate-400">{meta.subtitle}</p>
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <label className="relative min-w-0 sm:w-[280px]">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
             <input
               aria-label="Buscar ofertas, canais e status"
               ref={inputRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm tdo-focus"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 tdo-focus dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
               placeholder="Buscar ofertas, canais, status..."
             />
           </label>
           <button
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700"
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             onClick={() => setDarkMode(!darkMode)}
             type="button"
           >
@@ -187,10 +190,10 @@ export function ActionButton({
 }) {
   const variants = {
     primary: "bg-tdo-blue text-white hover:bg-blue-700",
-    secondary: "bg-slate-950 text-white hover:bg-slate-800",
-    outline: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+    secondary: "bg-slate-950 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white",
+    outline: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
     danger: "bg-rose-600 text-white hover:bg-rose-700",
-    ghost: "text-slate-600 hover:bg-slate-100"
+    ghost: "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
   };
   const sizes = {
     sm: "h-9 px-3 text-xs",
