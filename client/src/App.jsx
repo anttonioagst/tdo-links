@@ -16,7 +16,7 @@ import {
   X,
   Zap
 } from "lucide-react";
-import { AppShell, ActionButton, DataTable, InsightPanel, MetricTile, Panel, QueueColumn, StatusBadge } from "./ui/components.jsx";
+import { AppShell, ActionButton, DataTable, EmptyState as DesignEmptyState, InsightPanel, MetricTile, Panel, QueueColumn, StatusBadge } from "./ui/components.jsx";
 import { viewMeta } from "./ui/tokens.js";
 
 const periods = [
@@ -424,44 +424,97 @@ function Offers({ state, data, offers, loading, api, action }) {
 }
 
 function Reports({ state, data, loading, api, action }) {
+  const recommendations = state.recommendations || data.recommendations || [];
+  const reports = state.reports;
+  const reportTone = data.healthTone === "critical" ? "danger" : data.healthTone === "warning" ? "warning" : "success";
+
   return (
     <div className="grid grid-cols-12 gap-4 md:gap-6">
       <div className="col-span-12 xl:col-span-4">
-        <LegacyPanel title="Analise operacional" count={`${data.healthScore}/100`}>
-          <p className="text-theme-sm leading-6 text-gray-500 dark:text-gray-400">Relatorios analisam cliques, categorias e gargalos do funil.</p>
-          <Button className="mt-4" loading={loading.report} onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}><BarChart3 className="size-4" /> Gerar relatorio</Button>
-        </LegacyPanel>
+        <Panel
+          title="Analise operacional"
+          count={`${data.healthScore}/100 saude do funil`}
+          action={<StatusBadge tone={reportTone}>{data.healthTone === "critical" ? "Critico" : data.healthTone === "warning" ? "Atencao" : "Estavel"}</StatusBadge>}
+        >
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+              <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Relatorios analisam cliques, categorias, gargalos do funil e proximas acoes para gerar trafego afiliado seguro.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">Recomendacoes</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{recommendations.length}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">Historico</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{reports.length}</p>
+              </div>
+            </div>
+            <ActionButton
+              className="w-full"
+              loading={loading.report}
+              onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}
+            >
+              <BarChart3 className="size-4" />
+              Gerar analise
+            </ActionButton>
+          </div>
+        </Panel>
       </div>
       <div className="col-span-12 xl:col-span-8">
-        <LegacyPanel title="Recomendacoes operacionais" count={`${(state.recommendations || data.recommendations || []).length}`}>
-          <div className="space-y-3">
-            {(state.recommendations || data.recommendations || []).map((rec) => (
-              <article key={rec.id} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
-                <Badge color={rec.severity === "critical" ? "error" : rec.severity === "success" ? "success" : "brand"}>{rec.type}</Badge>
-                <h4 className="mt-2 text-theme-sm font-semibold text-gray-800 dark:text-white/90">{rec.title}</h4>
-                <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">{rec.detail}</p>
-              </article>
+        <Panel title="Recomendacoes operacionais" count={`${recommendations.length} proximas acoes`}>
+          <div className="grid gap-3 md:grid-cols-2">
+            {recommendations.map((rec) => (
+              <InsightPanel
+                key={rec.id}
+                tone={recommendationTone(rec.severity)}
+                toneLabel={rec.type}
+                title={rec.title}
+                detail={rec.detail}
+              />
             ))}
-            {!(state.recommendations || data.recommendations || []).length ? <EmptyState title="Sem recomendacoes" text="Gere uma analise para receber novas recomendacoes." /> : null}
           </div>
-        </LegacyPanel>
+          {!recommendations.length ? (
+            <DesignEmptyState
+              title="Sem recomendacoes"
+              text="Gere uma analise para receber novas recomendacoes."
+            />
+          ) : null}
+        </Panel>
       </div>
       <div className="col-span-12">
-        <LegacyPanel title="Historico de relatorios" count={`${state.reports.length}`}>
+        <Panel title="Historico de relatorios" count={`${reports.length} analises geradas`}>
           <div className="space-y-4">
-            {state.reports.length ? state.reports.map((report) => (
-              <article key={report.id} className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
-                <span className="text-theme-xs text-gray-500 dark:text-gray-400">{report.period}</span>
-                <h4 className="mt-2 text-theme-sm font-semibold text-gray-800 dark:text-white/90">{report.expectedImpact}</h4>
-                <p className="mt-2 text-theme-sm leading-6 text-gray-500 dark:text-gray-400">{report.conclusions.join(" ")}</p>
-                <p className="mt-2 text-theme-sm leading-6 text-gray-500 dark:text-gray-400">{report.suggestions.join(" ")}</p>
+            {reports.length ? reports.map((report) => (
+              <article key={report.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/35">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <span className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">{report.period}</span>
+                  <StatusBadge tone="cyan">AI report</StatusBadge>
+                </div>
+                <h4 className="mt-3 break-words text-sm font-semibold leading-6 text-slate-950 dark:text-slate-100">{report.expectedImpact}</h4>
+                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600 dark:text-slate-300">{report.conclusions.join(" ")}</p>
+                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600 dark:text-slate-300">{report.suggestions.join(" ")}</p>
               </article>
-            )) : <EmptyState title="Nenhum relatorio" text="Gere uma analise para popular este painel." />}
+            )) : (
+              <DesignEmptyState
+                title="Nenhum relatorio"
+                text="Gere uma analise para popular este painel."
+              />
+            )}
           </div>
-        </LegacyPanel>
+        </Panel>
       </div>
     </div>
   );
+}
+
+function recommendationTone(severity) {
+  if (severity === "critical") return "danger";
+  if (severity === "success") return "success";
+  if (severity === "warning") return "warning";
+  return "brand";
 }
 
 function Config({ state, data, loading, api, action }) {
