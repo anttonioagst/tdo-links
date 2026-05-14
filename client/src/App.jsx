@@ -356,6 +356,7 @@ function DraftCard({ draft, offer, loading, api, action }) {
         </div>
       </div>
       <textarea
+        aria-label={`Texto do draft para ${offer?.title || channelLabel(draft.channel)}`}
         value={text}
         onChange={(event) => setText(event.target.value)}
         rows={6}
@@ -375,6 +376,7 @@ function DraftCard({ draft, offer, loading, api, action }) {
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
+              aria-label={`Link afiliado oficial para ${offer.title}`}
               value={affiliateUrl}
               onChange={(event) => setAffiliateUrl(event.target.value)}
               placeholder="Cole o link do SiteStripe ou amzn.to"
@@ -994,7 +996,7 @@ function ToastStack({ toasts, setToasts }) {
             <p className="text-theme-sm font-semibold">{item.title}</p>
             {item.detail ? <p className="mt-1 text-theme-sm opacity-80">{item.detail}</p> : null}
           </div>
-          <button type="button" onClick={() => setToasts((items) => items.filter((toast) => toast.id !== item.id))}><X className="size-4" /></button>
+          <button type="button" aria-label={`Fechar aviso: ${item.title}`} onClick={() => setToasts((items) => items.filter((toast) => toast.id !== item.id))}><X className="size-4" /></button>
         </div>
       ))}
     </div>
