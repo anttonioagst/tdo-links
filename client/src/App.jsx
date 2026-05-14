@@ -13,11 +13,10 @@ import {
   RefreshCcw,
   Search,
   Send,
-  SlidersHorizontal,
   X,
   Zap
 } from "lucide-react";
-import { AppShell, ActionButton } from "./ui/components.jsx";
+import { AppShell, ActionButton, InsightPanel, MetricTile, Panel } from "./ui/components.jsx";
 import { viewMeta } from "./ui/tokens.js";
 
 const periods = [
@@ -155,100 +154,110 @@ export default function App() {
 }
 
 function Overview({ state, data, setPeriod, period, setView }) {
-  return (
-    <div className="grid grid-cols-12 gap-4 md:gap-6">
-      <div className="col-span-12 space-y-6 xl:col-span-7">
-        <Metrics state={state} data={data} />
-        <SalesChart data={data} period={period} setPeriod={setPeriod} />
-      </div>
-      <div className="col-span-12 xl:col-span-5">
-        <TargetCard data={data} setView={setView} />
-      </div>
-      <div className="col-span-12">
-        <StatisticsCard data={data} />
-      </div>
-      <div className="col-span-12 xl:col-span-5">
-        <ChannelsCard data={data} />
-      </div>
-      <div className="col-span-12 xl:col-span-7">
-        <RecentOffers state={state} data={data} />
-      </div>
-    </div>
-  );
-}
+  const telegram = state.diagnostics?.telegram;
+  const discovery = state.discovery?.amazon;
+  const healthTone = data.healthTone === "critical" ? "danger" : data.healthTone === "warning" ? "warning" : "success";
+  const insightTone = data.rec.title.includes("pendente") ? "danger" : data.rec.title.includes("prontas") ? "success" : data.rec.title.includes("Revisao") ? "warning" : "brand";
 
-function Metrics({ state, data }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6">
-      <Metric icon={CheckCircle2} label="Pronto para publicar" value={data.autoReady} badge="verde" color={data.autoReady ? "success" : "gray"} />
-      <Metric icon={AlertTriangle} label="Bloqueado por link" value={data.missingAffiliate} badge="corrigir" color={data.missingAffiliate ? "warning" : "success"} />
-      <Metric icon={Send} label="Publicados" value={state.metrics.published} badge="Telegram" color="brand" />
-      <Metric icon={MousePointerClick} label="Cliques" value={state.metrics.clicks} badge={`${data.clickRate}%`} color="success" />
-    </div>
-  );
-}
+    <div className="space-y-5 md:space-y-6">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricTile
+          icon={MousePointerClick}
+          label="Cliques no periodo"
+          value={data.clicksInPeriod}
+          tone="brand"
+          detail={`${data.clickRate}% por publicacao`}
+        />
+        <MetricTile
+          icon={Send}
+          label="Publicados"
+          value={data.publishedInPeriod}
+          tone="success"
+          detail={`${state.metrics.published} no total`}
+        />
+        <MetricTile
+          icon={CheckCircle2}
+          label="Ofertas prontas"
+          value={data.ready}
+          tone="cyan"
+          detail={`${data.autoReady} prontas para publicar`}
+        />
+        <MetricTile
+          icon={AlertTriangle}
+          label="Ofertas bloqueadas"
+          value={data.blocked}
+          tone={data.blocked ? "danger" : "success"}
+          detail={`${data.missingAffiliate} links pendentes`}
+        />
+      </section>
 
-function Metric({ icon: Icon, label, value, badge, color }) {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-      <div className="flex size-12 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800">
-        <Icon className="size-6 text-gray-800 dark:text-white/90" />
-      </div>
-      <div className="mt-5 flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
-          <h4 className="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90">{value}</h4>
+      <div className="grid grid-cols-12 gap-4 md:gap-6">
+        <div className="col-span-12 xl:col-span-8">
+          <Panel
+            title="Atividade por horario"
+            count="Cliques e publicacoes no periodo selecionado"
+            action={(
+              <select
+                value={period}
+                onChange={(event) => setPeriod(event.target.value)}
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none tdo-focus dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              >
+                {periods.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+            )}
+          >
+            <Heatmap heatmap={data.heatmap} />
+          </Panel>
         </div>
-        <Badge color={color}>{badge}</Badge>
-      </div>
-    </div>
-  );
-}
 
-function SalesChart({ data, period, setPeriod }) {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Atividade por horario</h3>
-          <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">Atividade por horario no periodo selecionado.</p>
+        <div className="col-span-12 xl:col-span-4">
+          <InsightPanel
+            tone={insightTone}
+            toneLabel={`${data.healthScore}/100 saude`}
+            title={data.rec.title}
+            detail={data.rec.text}
+            action={(
+              <ActionButton className="mt-4" onClick={() => setView(data.rec.action.view)}>
+                <ExternalLink className="size-4" />
+                {data.rec.action.label}
+              </ActionButton>
+            )}
+          />
         </div>
-        <select value={period} onChange={(event) => setPeriod(event.target.value)} className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-theme-sm text-gray-700 shadow-theme-xs outline-hidden dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 sm:w-auto">
-          {periods.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-        </select>
-      </div>
-      <Heatmap heatmap={data.heatmap} />
-    </div>
-  );
-}
 
-function TargetCard({ data, setView }) {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="px-5 pt-5 sm:px-6 sm:pt-6">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Saude da operacao</h3>
-          <button type="button" onClick={() => setView(data.rec.action.view)} className="shrink-0 rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.05] dark:hover:text-gray-300">
-            <ExternalLink className="size-5" />
-          </button>
+        <div className="col-span-12 xl:col-span-5">
+          <Panel title="Categorias e canais" count="Onde a oportunidade esta concentrada">
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-1">
+              <Bars title="Categorias" items={data.categoryBars} />
+              <Bars title="Canais" items={data.channelBars} />
+            </div>
+          </Panel>
         </div>
-        <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">{data.rec.text}</p>
-      </div>
-      <div className="mx-auto flex min-h-[260px] max-w-[330px] items-center justify-center px-5 py-8">
-        <div className="relative grid size-48 place-items-center rounded-full border-[18px] border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-          <div className={`absolute inset-[-18px] rounded-full border-[18px] ${data.healthTone === "critical" ? "border-error-500" : data.healthTone === "warning" ? "border-warning-500" : "border-brand-500"}`} style={{ clipPath: `inset(${100 - data.healthScore}% 0 0 0)` }} />
-          <div className="relative text-center">
-            <span className="text-title-sm font-bold text-gray-800 dark:text-white/90">{data.healthScore}%</span>
-            <p className="text-theme-xs text-gray-500 dark:text-gray-400">Saude</p>
-          </div>
+
+        <div className="col-span-12 xl:col-span-7">
+          <Panel
+            title="Melhores oportunidades"
+            count={`${data.topOffers.length} ofertas por score`}
+            action={(
+              <ActionButton variant="outline" onClick={() => setView("offers")}>
+                Ver ofertas
+              </ActionButton>
+            )}
+          >
+            <OfferTable offers={data.topOffers} clicksByOffer={state.metrics.clicksByOffer} />
+          </Panel>
         </div>
       </div>
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-        <p className="text-theme-sm font-medium text-gray-800 dark:text-white/90">{data.rec.title}</p>
-        <button type="button" onClick={() => setView(data.rec.action.view)} className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-theme-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
-          {data.rec.action.label}
-        </button>
-      </div>
+
+      <Panel title="Saude operacional" count="Estado rapido do sistema">
+        <div className="grid gap-3 md:grid-cols-4">
+          <StatusLine label="Health score" value={`${data.healthScore}/100`} tone={healthTone} />
+          <StatusLine label="Telegram" value={telegram ? (telegram.ready ? "Pronto" : "Revisar") : "Indisponivel"} tone={telegram?.ready ? "success" : "warning"} />
+          <StatusLine label="Descoberta" value={discovery?.enabled ? "Ativa" : "Pausada"} tone={discovery?.enabled ? "success" : "warning"} />
+          <StatusLine label="Backlog afiliado" value={`${data.missingAffiliate} pendentes`} tone={data.missingAffiliate ? "danger" : "success"} />
+        </div>
+      </Panel>
     </div>
   );
 }
@@ -271,39 +280,6 @@ function StatisticsCard({ data }) {
   );
 }
 
-function ChannelsCard({ data }) {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
-      <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Alertas operacionais</h3>
-      <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">Leitura operacional dos canais e lojas.</p>
-      <div className="mt-6 space-y-4">
-        {data.alerts.length ? data.alerts.map((alert) => (
-          <AlertItem key={alert.title} alert={alert} />
-        )) : <AlertItem alert={{ title: "Pipeline estavel", text: "Nenhum alerta operacional agora.", tone: "success" }} />}
-      </div>
-    </div>
-  );
-}
-
-function RecentOffers({ state, data }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Melhores oportunidades</h3>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <button className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-            <SlidersHorizontal className="size-5" /> Filter
-          </button>
-          <button className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-            See all
-          </button>
-        </div>
-      </div>
-      <OfferTable offers={data.topOffers} clicksByOffer={state.metrics.clicksByOffer} />
-    </div>
-  );
-}
-
 function Operation({ state, data, drafts, loading, api, action }) {
   return (
     <div className="space-y-4 md:space-y-6">
@@ -312,7 +288,7 @@ function Operation({ state, data, drafts, loading, api, action }) {
         {draftColumns.map(([column, title]) => {
           const columnDrafts = drafts.filter((draft) => draftColumn(draft) === column);
           return (
-            <Panel key={column} title={title} count={`${columnDrafts.length}`}>
+            <LegacyPanel key={column} title={title} count={`${columnDrafts.length}`}>
               <div className="max-h-[760px] space-y-4 overflow-y-auto pr-1 custom-scrollbar">
                 {columnDrafts.map((draft) => {
                   const offer = state.offers.find((item) => item.id === draft.offerId);
@@ -320,7 +296,7 @@ function Operation({ state, data, drafts, loading, api, action }) {
                 })}
                 {!columnDrafts.length ? <EmptyState title="Fila vazia" text="Nenhum draft neste status." /> : null}
               </div>
-            </Panel>
+            </LegacyPanel>
           );
         })}
       </div>
@@ -330,7 +306,7 @@ function Operation({ state, data, drafts, loading, api, action }) {
 
 function ActionPanel({ data, loading, api, action }) {
   return (
-    <Panel title="Acoes operacionais" count={`${data.pending} pendentes`}>
+    <LegacyPanel title="Acoes operacionais" count={`${data.pending} pendentes`}>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Button className="w-full" loading={loading.scrape} onClick={() => action("scrape", () => api("/api/run/scrape", { method: "POST" }), "Ofertas coletadas")}><Search className="size-4" /> Buscar ofertas</Button>
         <Button className="w-full" loading={loading.publish} onClick={() => action("publish", () => api("/api/run/publish", { method: "POST" }), "Publicacao executada")}><Send className="size-4" /> Publicar elegiveis</Button>
@@ -338,7 +314,7 @@ function ActionPanel({ data, loading, api, action }) {
         <Button className="w-full" variant="outline" loading={loading.refreshAffiliates} onClick={() => action("refreshAffiliates", () => api("/api/run/refresh-affiliates", { method: "POST" }), "Links recalculados")}><RefreshCcw className="size-4" /> Recalcular afiliados</Button>
       </div>
       <p className="mt-3 text-theme-xs leading-5 text-gray-500 dark:text-gray-400">Se nada sair no Telegram, consulte Configuracao no Railway: `TELEGRAM_DRY_RUN=false`, token e chat id precisam estar preenchidos.</p>
-    </Panel>
+    </LegacyPanel>
   );
 }
 
@@ -447,13 +423,13 @@ function Reports({ state, data, loading, api, action }) {
   return (
     <div className="grid grid-cols-12 gap-4 md:gap-6">
       <div className="col-span-12 xl:col-span-4">
-        <Panel title="Analise operacional" count={`${data.healthScore}/100`}>
+        <LegacyPanel title="Analise operacional" count={`${data.healthScore}/100`}>
           <p className="text-theme-sm leading-6 text-gray-500 dark:text-gray-400">Relatorios analisam cliques, categorias e gargalos do funil.</p>
           <Button className="mt-4" loading={loading.report} onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}><BarChart3 className="size-4" /> Gerar relatorio</Button>
-        </Panel>
+        </LegacyPanel>
       </div>
       <div className="col-span-12 xl:col-span-8">
-        <Panel title="Recomendacoes operacionais" count={`${(state.recommendations || data.recommendations || []).length}`}>
+        <LegacyPanel title="Recomendacoes operacionais" count={`${(state.recommendations || data.recommendations || []).length}`}>
           <div className="space-y-3">
             {(state.recommendations || data.recommendations || []).map((rec) => (
               <article key={rec.id} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -464,10 +440,10 @@ function Reports({ state, data, loading, api, action }) {
             ))}
             {!(state.recommendations || data.recommendations || []).length ? <EmptyState title="Sem recomendacoes" text="Gere uma analise para receber novas recomendacoes." /> : null}
           </div>
-        </Panel>
+        </LegacyPanel>
       </div>
       <div className="col-span-12">
-        <Panel title="Historico de relatorios" count={`${state.reports.length}`}>
+        <LegacyPanel title="Historico de relatorios" count={`${state.reports.length}`}>
           <div className="space-y-4">
             {state.reports.length ? state.reports.map((report) => (
               <article key={report.id} className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -478,7 +454,7 @@ function Reports({ state, data, loading, api, action }) {
               </article>
             )) : <EmptyState title="Nenhum relatorio" text="Gere uma analise para popular este painel." />}
           </div>
-        </Panel>
+        </LegacyPanel>
       </div>
     </div>
   );
@@ -541,23 +517,23 @@ function Config({ state, data, loading, api, action }) {
   return (
     <div className="grid grid-cols-12 gap-4 md:gap-6">
       <div className="col-span-12 xl:col-span-4">
-        <Panel title="Automacao" count={modeLabel(state.settings.mode)}>
+        <LegacyPanel title="Automacao" count={modeLabel(state.settings.mode)}>
           <label className="text-theme-sm font-medium text-gray-700 dark:text-gray-300">Modo de publicacao</label>
           <select value={state.settings.mode} onChange={(event) => action("mode", () => api("/api/settings", { method: "POST", body: { mode: event.target.value } }), "Modo atualizado")} className="mt-3 h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-theme-sm text-gray-700 shadow-theme-xs outline-hidden dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
             <option value="limited">Automatico limitado</option>
             <option value="manual">Manual</option>
             <option value="paused">Pausado</option>
           </select>
-        </Panel>
+        </LegacyPanel>
       </div>
       <div className="col-span-12 xl:col-span-4">
-        <Panel title="Links afiliados" count={`${data.missingAffiliate} pendentes`}>
+        <LegacyPanel title="Links afiliados" count={`${data.missingAffiliate} pendentes`}>
           <p className="text-theme-sm leading-6 text-gray-500 dark:text-gray-400">Recalcula URLs afiliadas usando as variaveis atuais do ambiente.</p>
           <Button className="mt-4" loading={loading.refreshAffiliates} onClick={() => action("refreshAffiliates", () => api("/api/run/refresh-affiliates", { method: "POST" }), "Links recalculados")}><RefreshCcw className="size-4" /> Recalcular</Button>
-        </Panel>
+        </LegacyPanel>
       </div>
       <div className="col-span-12 xl:col-span-4">
-        <Panel title="Telegram" count={telegramCount}>
+        <LegacyPanel title="Telegram" count={telegramCount}>
           <div className="space-y-2 text-theme-sm text-gray-500 dark:text-gray-400">
             <p>Dry-run: {telegramValue(telegram?.dryRun, "Ligado", "Desligado")}</p>
             <p>Bot token: {telegramValue(telegram?.hasBotToken, "Configurado", "Ausente")}</p>
@@ -566,15 +542,15 @@ function Config({ state, data, loading, api, action }) {
           <Button className="mt-4" variant="outline" loading={loading.telegramTest} onClick={() => action("telegramTest", () => api("/api/integrations/telegram/test", { method: "POST" }), "Teste Telegram executado")}>
             <Send className="size-4" /> Testar Telegram
           </Button>
-        </Panel>
+        </LegacyPanel>
       </div>
       <div className="col-span-12 xl:col-span-4">
-        <Panel title="Saude" count={`${data.healthScore}/100`}>
+        <LegacyPanel title="Saude" count={`${data.healthScore}/100`}>
           <div className="space-y-3">{data.alerts.map((alert) => <AlertItem key={alert.title} alert={alert} />)}</div>
-        </Panel>
+        </LegacyPanel>
       </div>
       <div className="col-span-12">
-        <Panel title="Descoberta Amazon" count={discovery.enabled ? "Ativa" : "Pausada"}>
+        <LegacyPanel title="Descoberta Amazon" count={discovery.enabled ? "Ativa" : "Pausada"}>
           <div className="grid gap-4 xl:grid-cols-2">
             <label className="text-theme-sm text-gray-700 dark:text-gray-300">
               URLs Amazon
@@ -617,7 +593,7 @@ function Config({ state, data, loading, api, action }) {
             <Button loading={loading.discoverySave} onClick={saveDiscovery}>Salvar descoberta</Button>
             <Button variant="outline" loading={loading.discoveryRun} onClick={runDiscovery}><Search className="size-4" /> Buscar agora</Button>
           </div>
-        </Panel>
+        </LegacyPanel>
       </div>
     </div>
   );
@@ -713,11 +689,18 @@ function NumberField({ label, value, onChange }) {
   );
 }
 
-function StatusLine({ label, value }) {
+function StatusLine({ label, value, tone = "neutral" }) {
+  const toneClass = {
+    success: "border-success-200 bg-success-50 text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-300",
+    warning: "border-warning-200 bg-warning-50 text-warning-700 dark:border-warning-500/20 dark:bg-warning-500/10 dark:text-warning-300",
+    danger: "border-error-200 bg-error-50 text-error-700 dark:border-error-500/20 dark:bg-error-500/10 dark:text-error-300",
+    neutral: "border-gray-200 text-gray-800 dark:border-gray-800 dark:text-white"
+  }[tone] || "border-gray-200 text-gray-800 dark:border-gray-800 dark:text-white";
+
   return (
-    <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
-      <p className="text-theme-xs text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="mt-1 text-theme-sm font-medium text-gray-800 dark:text-white">{value}</p>
+    <div className={`rounded-lg border p-3 ${toneClass}`}>
+      <p className="text-theme-xs opacity-75">{label}</p>
+      <p className="mt-1 text-theme-sm font-medium">{value}</p>
     </div>
   );
 }
@@ -730,7 +713,7 @@ function formatDate(value) {
   return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
-function Panel({ title, count, children }) {
+function LegacyPanel({ title, count, children }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -859,6 +842,7 @@ function buildDashboardData(state, selectedPeriod) {
   const inPeriod = (date) => !since || (date && new Date(date) >= since);
   const clicks = state.clicks.filter((click) => inPeriod(click.timestamp));
   const publishedDrafts = state.drafts.filter((draft) => draft.status === "published");
+  const publishedDraftsInPeriod = publishedDrafts.filter((draft) => inPeriod(draft.publishedAt || draft.updatedAt || draft.createdAt));
   const pending = state.drafts.filter((draft) => ["needs_review", "auto_ready", "approved"].includes(draft.status)).length;
   const autoReady = state.offers.filter((offer) => offer.status === "auto_ready" && offer.affiliateReady).length;
   const reviewDrafts = state.drafts.filter((draft) => draft.status === "needs_review").length;
@@ -867,7 +851,7 @@ function buildDashboardData(state, selectedPeriod) {
   const ready = state.offers.filter((offer) => offer.validationStatus === "ready" || offer.status === "auto_ready").length;
   const needsReviewOffers = state.offers.filter((offer) => offer.validationStatus === "needs_review").length;
   const failed = state.drafts.filter((draft) => ["failed", "blocked", "rejected"].includes(draft.status)).length;
-  const clickRate = Math.round((clicks.length / Math.max(publishedDrafts.length, 1)) * 100);
+  const clickRate = Math.round((clicks.length / Math.max(publishedDraftsInPeriod.length, 1)) * 100);
   const healthScore = clamp(74 + Math.min(autoReady * 3, 12) + Math.min(clicks.length, 12) - missingAffiliate * 2 - failed * 8 - reviewDrafts, 0, 100);
   const healthTone = healthScore >= 80 ? "green" : healthScore >= 55 ? "warning" : "critical";
   const heatmap = buildHeatmap([...clicks.map((item) => item.timestamp), ...publishedDrafts.map((item) => item.updatedAt || item.createdAt)].filter(Boolean).filter(inPeriod));
@@ -885,7 +869,7 @@ function buildDashboardData(state, selectedPeriod) {
   if (missingAffiliate) rec = { title: "Afiliado pendente", text: `${missingAffiliate} ofertas nao estao prontas para monetizacao.`, action: { label: "Abrir configuracao", view: "config" } };
   else if (autoReady) rec = { title: "Ofertas prontas para envio", text: `${autoReady} ofertas passaram no score e podem ir para publicacao.`, action: { label: "Abrir operacao", view: "operation" } };
   else if (reviewDrafts) rec = { title: "Revisao necessaria", text: `${reviewDrafts} drafts aguardam decisao humana.`, action: { label: "Revisar fila", view: "operation" } };
-  return { pending, autoReady, reviewDrafts, missingAffiliate, blocked, ready, needsReviewOffers, failed, clickRate, healthScore, healthTone, heatmap, statusBars, channelBars, categoryBars, topOffers, alerts, rec, recommendations: state.recommendations || [] };
+  return { pending, autoReady, reviewDrafts, missingAffiliate, blocked, ready, needsReviewOffers, failed, clickRate, clicksInPeriod: clicks.length, publishedInPeriod: publishedDraftsInPeriod.length, healthScore, healthTone, heatmap, statusBars, channelBars, categoryBars, topOffers, alerts, rec, recommendations: state.recommendations || [] };
 }
 
 function periodStart(period) {

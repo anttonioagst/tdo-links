@@ -1254,6 +1254,11 @@ test("view metadata provides contextual primary actions", () => {
   assert.equal(viewMeta.config.primaryAction, "Testar Telegram");
 });
 
+test("performance home metadata uses comfortable density", () => {
+  assert.equal(densityForView("overview"), "comfortable");
+  assert.match(viewMeta.overview.subtitle, /Clique/);
+});
+
 let failed = 0;
 for (const { name, fn } of tests) {
   try {

@@ -149,11 +149,11 @@ export function Panel({ title, count, children, density = "comfortable", action 
   const hasCount = count !== undefined && count !== null;
 
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white shadow-tdo-card ${densityClass}`}>
+    <section className={`rounded-2xl border border-slate-200 bg-white shadow-tdo-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-none ${densityClass}`}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-950 md:text-base">{title}</h2>
-          {hasCount ? <p className="mt-1 text-xs text-slate-500">{count}</p> : null}
+          <h2 className="text-sm font-semibold text-slate-950 dark:text-slate-100 md:text-base">{title}</h2>
+          {hasCount ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{count}</p> : null}
         </div>
         {action}
       </div>
@@ -164,12 +164,12 @@ export function Panel({ title, count, children, density = "comfortable", action 
 
 export function StatusBadge({ children, tone = "brand" }) {
   const classes = {
-    brand: "bg-blue-50 text-blue-700 ring-blue-200",
-    success: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    warning: "bg-amber-50 text-amber-800 ring-amber-200",
-    danger: "bg-rose-50 text-rose-700 ring-rose-200",
-    cyan: "bg-cyan-50 text-cyan-700 ring-cyan-200",
-    muted: "bg-slate-100 text-slate-600 ring-slate-200"
+    brand: "bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-400/20",
+    success: "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/20",
+    warning: "bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/20",
+    danger: "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:ring-rose-400/20",
+    cyan: "bg-cyan-50 text-cyan-700 ring-cyan-200 dark:bg-cyan-500/15 dark:text-cyan-300 dark:ring-cyan-400/20",
+    muted: "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
   };
 
   return (
@@ -215,20 +215,20 @@ export function ActionButton({
 
 export function MetricTile({ icon: Icon, label, value, tone = "brand", detail }) {
   const iconTone = {
-    brand: "bg-blue-50 text-blue-700",
-    success: "bg-emerald-50 text-emerald-700",
-    warning: "bg-amber-50 text-amber-700",
-    danger: "bg-rose-50 text-rose-700",
-    cyan: "bg-cyan-50 text-cyan-700"
-  }[tone] || "bg-blue-50 text-blue-700";
+    brand: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+    success: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+    warning: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+    danger: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
+    cyan: "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300"
+  }[tone] || "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300";
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-tdo-card">
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-tdo-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
-          {detail ? <p className="mt-1 truncate text-xs text-slate-500">{detail}</p> : null}
+          <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">{label}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{value}</p>
+          {detail ? <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{detail}</p> : null}
         </div>
         {Icon ? (
           <div className={`grid size-11 place-items-center rounded-xl ${iconTone}`}>
@@ -242,10 +242,10 @@ export function MetricTile({ icon: Icon, label, value, tone = "brand", detail })
 
 export function InsightPanel({ title, detail, action, tone = "brand", toneLabel = "Insight" }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-tdo-card">
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-tdo-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
       <StatusBadge tone={tone}>{toneLabel}</StatusBadge>
-      <h3 className="mt-3 text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-1 text-sm leading-6 text-slate-500">{detail}</p>
+      <h3 className="mt-3 text-sm font-semibold text-slate-950 dark:text-slate-100">{title}</h3>
+      <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">{detail}</p>
       {action}
     </article>
   );
