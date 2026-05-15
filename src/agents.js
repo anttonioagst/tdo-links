@@ -2,14 +2,19 @@ import { validatePost, validateXAcquisitionPost } from "./compliance.js";
 import { createTelegramCopy, createXPostCopy } from "./copywriter.js";
 import { buildAffiliateUrl, createShortCode, hasAffiliateConfig } from "./links.js";
 import { dedupeOffers, scoreOfferDetailed, statusForScore } from "./scoring.js";
-import { getLastScrapeMeta, scrapeDeals } from "./scrapers.js";
+import { getLastScrapeMeta, scrapeDeals, scrapeFeedDeals } from "./scrapers.js";
+import { publishDiscord } from "./publishers/discord.js";
 import { publishTelegram } from "./publishers/telegram.js";
 import { publishXAcquisition } from "./publishers/x.js";
 import { buildRecommendations } from "./recommendations.js";
 import { applyValidation } from "./validation.js";
 
 export async function runScrapePipeline(db, config) {
-  const rawOffers = await scrapeDeals(config);
+  const [amazonOffers, feedOffers] = await Promise.all([
+    scrapeDeals(config),
+    scrapeFeedDeals(config)
+  ]);
+  const rawOffers = [...amazonOffers, ...feedOffers];
   const incoming = dedupeOffers(db.state.offers, rawOffers).map((offer) => {
     const id = db.nextId("offer");
     const scoredOffer = {
@@ -27,7 +32,10 @@ export async function runScrapePipeline(db, config) {
 
   db.state.offers.unshift(...incoming);
   for (const offer of incoming) {
-    if (!["archived", "blocked"].includes(offer.status)) createDraftsForOffer(db, offer, config);
+    if (!["archived", "blocked"].includes(offer.status)) {
+      createDraftsForOffer(db, offer, config);
+      if (config.discordWebhookUrl) createDiscordDraft(db, offer, config);
+    }
   }
   await maybeCreateXDraft(db, config);
   await db.save();
@@ -61,6 +69,29 @@ export function createDraftsForOffer(db, offer, config) {
     disclosure: config.disclosure,
     shortCode,
     status: offer.status === "auto_ready" && compliance.ok && !hasWarnings ? "auto_ready" : "needs_review",
+    rejectionReason: compliance.ok ? "" : compliance.errors.join(","),
+    warnings: compliance.warnings || [],
+    publishedAt: null,
+    providerMessageId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  db.state.drafts.unshift(draft);
+  return draft;
+}
+
+export function createDiscordDraft(db, offer, config) {
+  const shortCode = createShortCode(db, offer.id, "discord");
+  const text = createTelegramCopy(offer, shortCode, config);
+  const compliance = validatePost(text, config.disclosure, offer);
+  const draft = {
+    id: db.nextId("draft"),
+    offerId: offer.id,
+    channel: "discord",
+    text,
+    disclosure: config.disclosure,
+    shortCode,
+    status: offer.status === "auto_ready" && compliance.ok ? "auto_ready" : "needs_review",
     rejectionReason: compliance.ok ? "" : compliance.errors.join(","),
     warnings: compliance.warnings || [],
     publishedAt: null,
@@ -146,7 +177,7 @@ export async function runPublishPipeline(db, config) {
   const autoAllowed = db.state.settings.mode === "limited";
   const eligible = db.state.drafts.filter((draft) => {
     if (draft.publishedAt || draft.status === "published") return false;
-    if (draft.channel !== "telegram") return false;
+    if (!["telegram", "discord"].includes(draft.channel)) return false;
     if (draft.status === "approved") return true;
     return autoAllowed && draft.status === "auto_ready";
   });
@@ -184,7 +215,9 @@ export async function runPublishPipeline(db, config) {
       draft.updatedAt = new Date().toISOString();
       continue;
     }
-    const result = await publishTelegram(draft, config, offer);
+    const result = draft.channel === "discord"
+      ? await publishDiscord(draft, config, offer)
+      : await publishTelegram(draft, config, offer);
     console.log("telegram_publish_result", JSON.stringify({
       draftId: draft.id,
       ok: result.ok,
@@ -237,7 +270,7 @@ export async function runPublishPipeline(db, config) {
 export async function publishApprovedX(db, config) {
   const drafts = db.state.drafts.filter((draft) => draft.channel === "x" && draft.status === "approved" && !draft.publishedAt);
   for (const draft of drafts) {
-    const result = await publishXAcquisition(draft.text, config);
+    const result = await publishXAcquisition(draft.text, config, db.state.publishLog);
     db.state.publishLog.unshift({
       id: db.nextId("pub"),
       draftId: draft.id,
