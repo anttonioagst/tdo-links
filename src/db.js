@@ -25,7 +25,7 @@ const emptyDb = {
     discord: {
       webhookUrl: "",
       enabled: false,
-      dryRun: false,
+      dryRun: true,
       lastTest: null,
       lastError: null
     }
