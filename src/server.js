@@ -338,6 +338,7 @@ function publicState(db, config) {
     publishLog: db.state.publishLog.slice(0, 20),
     integrations: db.state.integrations,
     priceHistory: db.state.priceHistory,
+    scraperMode: config.scraperMode,
     metrics: {
       offers: db.state.offers.length,
       drafts: db.state.drafts.length,

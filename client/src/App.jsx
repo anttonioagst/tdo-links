@@ -251,10 +251,11 @@ function Overview({ state, data, setPeriod, period, setView }) {
       </div>
 
       <Panel title="Saude operacional" count="Estado rapido do sistema">
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-5">
           <StatusLine label="Health score" value={`${data.healthScore}/100`} tone={healthTone} />
           <StatusLine label="Telegram" value={telegram ? (telegram.ready ? "Pronto" : "Revisar") : "Indisponivel"} tone={telegram?.ready ? "success" : "warning"} />
           <StatusLine label="Descoberta" value={discovery?.enabled ? "Ativa" : "Pausada"} tone={discovery?.enabled ? "success" : "warning"} />
+          <StatusLine label="Fonte de dados" value={state.scraperMode === "mock" ? "Amostra" : state.scraperMode === "amazon" ? "Amazon" : state.scraperMode || "Mock"} tone={state.scraperMode === "amazon" ? "success" : "warning"} />
           <StatusLine label="Backlog afiliado" value={`${data.missingAffiliate} pendentes`} tone={data.missingAffiliate ? "danger" : "success"} />
         </div>
       </Panel>
@@ -263,8 +264,17 @@ function Overview({ state, data, setPeriod, period, setView }) {
 }
 
 function Operation({ state, data, drafts, loading, api, action }) {
+  const hasMockOffers = state.offers.length > 0 && state.offers.every(o => o.source === "mock");
   return (
     <div className="space-y-4 md:space-y-6">
+      {hasMockOffers && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <div>
+            <strong>Produtos de amostra</strong> — Os drafts abaixo foram gerados com dados fictícios. Configure <code className="rounded bg-amber-100 px-1 font-mono text-xs dark:bg-amber-500/20">SCRAPER_MODE=amazon</code> no Railway para operar com produtos reais.
+          </div>
+        </div>
+      )}
       <ActionPanel data={data} loading={loading} api={api} action={action} />
       <div className="grid gap-4 xl:grid-cols-3">
         {draftColumns.map(([column, title, tone]) => {
@@ -331,8 +341,15 @@ function DraftCard({ draft, offer, loading, api, action }) {
             <StatusBadge tone={statusBadgeTone(draft.status)}>{statusLabel(draft.status)}</StatusBadge>
             {offer?.source === "amazon_discovery" ? <StatusBadge tone="cyan">Descoberta Amazon</StatusBadge> : null}
             {offer?.source === "amazon_discovery" && !offer.affiliateReady ? <StatusBadge tone="warning">Link oficial pendente</StatusBadge> : null}
+            {offer?.source === "mock" ? <StatusBadge tone="warning">Amostra</StatusBadge> : null}
           </div>
-          <h4 className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950 dark:text-slate-100">{offer?.title || "Post de aquisicao X"}</h4>
+          {offer?.originalUrl ? (
+            <a href={offer.originalUrl} target="_blank" rel="noreferrer" className="mt-2 line-clamp-2 block text-sm font-semibold text-slate-950 hover:underline dark:text-slate-100">
+              {offer.title}
+            </a>
+          ) : (
+            <h4 className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950 dark:text-slate-100">{offer?.title || "Post de aquisicao X"}</h4>
+          )}
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{channelLabel(draft.channel)} {offer ? `- ${money(offer.currentPrice)}` : ""}</p>
           {offer?.discoverySource ? (
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -401,14 +418,28 @@ function DraftCard({ draft, offer, loading, api, action }) {
         {actions.includes("regenerate") ? <ActionButton size="sm" variant="outline" loading={loading[`regen-${draft.id}`]} onClick={() => action(`regen-${draft.id}`, () => api(`/api/drafts/${draft.id}/regenerate`, { method: "POST" }), "Texto regenerado")}><RefreshCcw className="size-4" /> Regenerar</ActionButton> : null}
         {actions.includes("clone") ? <ActionButton size="sm" variant="outline" loading={loading[`clone-${draft.id}`]} onClick={() => action(`clone-${draft.id}`, () => api(`/api/drafts/${draft.id}/clone`, { method: "POST" }), "Draft duplicado")}><Copy className="size-4" /> Clonar</ActionButton> : null}
         {actions.includes("reject") ? <ActionButton size="sm" variant="danger" loading={loading[`reject-${draft.id}`]} onClick={() => action(`reject-${draft.id}`, () => api(`/api/drafts/${draft.id}/reject`, { method: "POST", body: { reason: "Rejeitado no dashboard." } }), "Draft rejeitado")}><X className="size-4" /> Rejeitar</ActionButton> : null}
+        {offer?.originalUrl ? (
+          <a href={offer.originalUrl} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+            <ExternalLink className="size-3.5" /> Ver produto
+          </a>
+        ) : null}
       </div>
     </article>
   );
 }
 
 function Offers({ state, data, offers, loading, api, action }) {
+  const allMock = offers.length > 0 && offers.every(o => o.source === "mock");
   return (
     <div className="space-y-5">
+      {allMock && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <div>
+            <strong>Modo demonstração ativo</strong> — Estas ofertas são dados de amostra gerados automaticamente. Para coletar ofertas reais da Amazon, configure <code className="rounded bg-amber-100 px-1 font-mono text-xs dark:bg-amber-500/20">SCRAPER_MODE=amazon</code> no Railway e adicione URLs de busca em Configuração → Discovery Amazon.
+          </div>
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-4">
         <MetricTile label="Prontas" value={data.autoReady} tone="success" detail="Elegiveis para publicar" />
         <MetricTile label="Afiliado pendente" value={data.missingAffiliate} tone={data.missingAffiliate ? "warning" : "success"} detail="Links oficiais faltando" />
@@ -832,11 +863,17 @@ function OfferIdentity({ offer, clicks }) {
       <div className="mb-2 flex flex-wrap gap-2">
         {offer.source === "amazon_discovery" ? <StatusBadge tone="cyan">Descoberta Amazon</StatusBadge> : null}
         {offer.source === "amazon_discovery" && !offer.affiliateReady ? <StatusBadge tone="warning">Link oficial pendente</StatusBadge> : null}
+        {offer.source === "mock" ? <StatusBadge tone="warning">Amostra</StatusBadge> : null}
       </div>
       <p className="line-clamp-2 max-w-[420px] text-sm font-medium text-slate-950 dark:text-slate-100">{offer.title}</p>
       <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
         {storeLabel(offer.store)} - {offer.category || "Tech"} - {money(offer.currentPrice)} - {clicks} cliques
       </span>
+      {offer.originalUrl ? (
+        <a href={offer.originalUrl} target="_blank" rel="noreferrer" className="mt-1 block max-w-[420px] truncate text-xs text-slate-400 hover:text-tdo-blue hover:underline dark:text-slate-600 dark:hover:text-slate-400">
+          {offer.originalUrl}
+        </a>
+      ) : null}
       {offer.discoverySource ? (
         <span className="mt-1 block max-w-[420px] truncate text-xs text-slate-500 dark:text-slate-400">
           {offer.discoverySourceType === "term" ? "Termo" : "URL"}: {offer.discoverySource}
@@ -1118,7 +1155,10 @@ function storeLabel(store) { return { amazon: "Amazon", mercado_livre: "Mercado 
 function channelLabel(channel) { return { telegram: "Telegram", x: "Twitter/X", admin: "Admin" }[channel] || channel || "Canal"; }
 function modeLabel(mode) { return { limited: "Automatico limitado", manual: "Manual", paused: "Pausado" }[mode] || mode; }
 function offerImages(offer) { return [...new Set([...(offer?.imageUrls || []), offer?.imageUrl].filter(Boolean))].slice(0, 4); }
-function offerOpenUrl(offer) { return offer?.affiliateSource === "manual" && offer.affiliateUrl ? offer.affiliateUrl : `/go/offer/${offer.id}`; }
+function offerOpenUrl(offer) {
+  if (offer?.affiliateSource === "manual" && offer.affiliateUrl) return offer.affiliateUrl;
+  return offer?.originalUrl || `/go/offer/${offer?.id}`;
+}
 function statusTone(label) { return label === "Pronto" || label === "Publicado" ? "success" : label === "Revisao" ? "brand" : label === "Arquivado" ? "gray" : "critical"; }
 function channelTone(label) { return label === "Amazon" ? "brand" : label === "Mercado Livre" ? "info" : label === "Telegram" ? "success" : "gray"; }
 function categoryTone(label) { return label.length % 3 === 0 ? "brand" : label.length % 2 === 0 ? "info" : "success"; }
