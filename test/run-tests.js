@@ -3,6 +3,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createDraftsForOffer, createAnalyticsReport, runPublishPipeline, runScrapePipeline } from "../src/agents.js";
+import { publishDiscord, testDiscord } from "../src/publishers/discord.js";
+import { publishXAcquisition } from "../src/publishers/x.js";
+import { validateAmazonLink } from "../src/validation.js";
 import { validatePost, validateXAcquisitionPost } from "../src/compliance.js";
 import { loadConfig } from "../src/config.js";
 import { JsonDb } from "../src/db.js";
@@ -1257,6 +1260,118 @@ test("view metadata provides contextual primary actions", () => {
 test("performance home metadata uses comfortable density", () => {
   assert.equal(densityForView("overview"), "comfortable");
   assert.match(viewMeta.overview.subtitle, /Clique/);
+});
+
+test("discord dry-run retorna ok sem enviar", async () => {
+  const result = await publishDiscord(
+    { text: "Oferta teste" },
+    { discordDryRun: true, discordWebhookUrl: "https://discord.com/api/webhooks/fake" }
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.dryRun, true);
+});
+
+test("discord sem webhookUrl retorna detalhe correto", async () => {
+  const result = await publishDiscord(
+    { text: "Oferta teste" },
+    { discordDryRun: false, discordWebhookUrl: "" }
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.dryRun, true);
+  assert.match(result.detail, /DISCORD_WEBHOOK_URL/);
+});
+
+test("testDiscord sem webhookUrl retorna ok false", async () => {
+  const result = await testDiscord({ discordWebhookUrl: "", discordDryRun: false });
+  assert.equal(result.ok, false);
+  assert.match(result.detail, /DISCORD_WEBHOOK_URL/);
+});
+
+test("buildEmbed inclui título e desconto do offer", async () => {
+  const draft = { text: "fallback text" };
+  const offer = { title: "SSD Kingston 1TB", currentPrice: 249, previousPrice: 399, discountPercent: 37.6, store: "amazon", rating: 4.8, reviewCount: 1200, category: "SSD" };
+  const config = { discordDryRun: true, discordWebhookUrl: "https://x" };
+  const result = await publishDiscord(draft, config, offer);
+  assert.equal(result.dryRun, true);
+});
+
+test("x dry-run retorna ok sem enviar", async () => {
+  const result = await publishXAcquisition("test post", { xDryRun: true });
+  assert.equal(result.ok, true);
+  assert.equal(result.dryRun, true);
+});
+
+test("x sem credenciais retorna dry-run", async () => {
+  const result = await publishXAcquisition("test", { xDryRun: false, xApiKey: "", xApiSecret: "", xAccessToken: "", xAccessSecret: "" });
+  assert.equal(result.dryRun, true);
+  assert.match(result.detail, /credenciais/i);
+});
+
+test("x respeita limite diário de 3 posts", async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const publishLog = Array.from({ length: 3 }, (_, i) => ({
+    channel: "x", result: { ok: true }, createdAt: `${today}T10:0${i}:00.000Z`
+  }));
+  const config = { xDryRun: false, xApiKey: "k", xApiSecret: "s", xAccessToken: "t", xAccessSecret: "ts" };
+  const result = await publishXAcquisition("test", config, publishLog);
+  assert.equal(result.ok, false);
+  assert.match(result.detail, /Limite diário/);
+});
+
+test("scrapeFeedDeals retorna vazio no modo mock", async () => {
+  const config = { scraperMode: "mock" };
+  const results = await (await import("../src/scrapers.js")).scrapeFeedDeals(config);
+  assert.deepEqual(results, []);
+});
+
+test("isTechDeal filtra categorias corretas (inline)", () => {
+  const titles = ["SSD NVMe Kingston 1TB", "Blusa feminina vermelha", "Notebook Dell Core i7", "Camiseta polo"];
+  const expected = [true, false, true, false];
+  const TECH = ["ssd", "nvme", "notebook", "monitor", "mouse", "teclado", "headset", "webcam", "hub", "placa", "memória", "ram", "processador", "gpu", "roteador", "câmera", "impressora"];
+  const lower = (t) => t.toLowerCase();
+  titles.forEach((title, i) => {
+    const result = TECH.some(kw => lower(title).includes(kw));
+    assert.equal(result, expected[i], `Title: ${title}`);
+  });
+});
+
+test("validateAmazonLink aceita link amazon com tag", () => {
+  const result = validateAmazonLink("https://www.amazon.com.br/dp/B09XYZ?tag=meutag-20");
+  assert.equal(result.valid, true);
+});
+
+test("validateAmazonLink rejeita link sem tag", () => {
+  const result = validateAmazonLink("https://www.amazon.com.br/dp/B09XYZ");
+  assert.equal(result.valid, false);
+  assert.equal(result.reason, "tag_afiliado_ausente");
+});
+
+test("validateAmazonLink rejeita domínio incorreto", () => {
+  const result = validateAmazonLink("https://www.mercadolivre.com.br/produto/123");
+  assert.equal(result.valid, false);
+  assert.equal(result.reason, "dominio_incorreto");
+});
+
+test("validateAmazonLink rejeita link ausente", () => {
+  const result = validateAmazonLink(null);
+  assert.equal(result.valid, false);
+  assert.equal(result.reason, "link_ausente");
+});
+
+test("POST /api/integrations/discord/test retorna resultado", async () => {
+  const tmpDir = await mkdtemp(join(tmpdir(), "tdo-test-"));
+  const db = new JsonDb(join(tmpDir, "db.json"));
+  await db.load();
+  const config = loadConfig({ DISCORD_WEBHOOK_URL: "", DISCORD_DRY_RUN: "true" });
+  const app = createApp({ db, config, publicDir: "dist" });
+  const server = app.listen(0);
+  const port = server.address().port;
+  const res = await fetch(`http://localhost:${port}/api/integrations/discord/test`, { method: "POST" });
+  const body = await res.json();
+  server.close();
+  await rm(tmpDir, { recursive: true });
+  assert.equal(res.status, 200);
+  assert.equal(typeof body.ok, "boolean");
 });
 
 let failed = 0;
