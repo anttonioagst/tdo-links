@@ -5,6 +5,7 @@ import { cloneDraftForRetest, createAnalyticsReport, createDraftsForOffer, publi
 import { runAmazonDiscovery, updateAmazonDiscoverySettings } from "./discovery.js";
 import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
+import { testDiscord } from "./publishers/discord.js";
 import { testTelegram } from "./publishers/telegram.js";
 import { buildRecommendations } from "./recommendations.js";
 
@@ -79,6 +80,26 @@ async function handleApi(req, res, url, db, config) {
     });
     await db.save();
     sendJson(res, 200, result);
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/integrations/discord/test") {
+    const result = await testDiscord(config);
+    db.state.integrations.discord.lastTest = new Date().toISOString();
+    if (!result.ok) db.state.integrations.discord.lastError = result.detail;
+    await db.save();
+    sendJson(res, 200, result);
+    return;
+  }
+  if (req.method === "PUT" && url.pathname === "/api/integrations/discord/settings") {
+    const body = await readJson(req);
+    db.state.integrations.discord = {
+      ...db.state.integrations.discord,
+      webhookUrl: body.webhookUrl ?? db.state.integrations.discord.webhookUrl,
+      enabled: body.enabled ?? db.state.integrations.discord.enabled,
+      dryRun: body.dryRun ?? db.state.integrations.discord.dryRun
+    };
+    await db.save();
+    sendJson(res, 200, db.state.integrations.discord);
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/offers/manual") {
@@ -179,6 +200,11 @@ async function handleApi(req, res, url, db, config) {
     if (!isValidAffiliateUrl(body.affiliateUrl)) {
       sendJson(res, 400, { error: "invalid_affiliate_url" });
       return;
+    }
+    if (body.currentPrice !== undefined) {
+      if (!db.state.priceHistory[offerId]) db.state.priceHistory[offerId] = [];
+      db.state.priceHistory[offerId].unshift({ price: body.currentPrice, timestamp: new Date().toISOString() });
+      db.state.priceHistory[offerId] = db.state.priceHistory[offerId].slice(0, 10);
     }
     db.state.offers[offerIndex] = refreshOfferDecision({
       ...db.state.offers[offerIndex],
@@ -310,6 +336,8 @@ function publicState(db, config) {
     settings: db.state.settings,
     discovery: db.state.discovery,
     publishLog: db.state.publishLog.slice(0, 20),
+    integrations: db.state.integrations,
+    priceHistory: db.state.priceHistory,
     metrics: {
       offers: db.state.offers.length,
       drafts: db.state.drafts.length,
