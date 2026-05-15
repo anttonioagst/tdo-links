@@ -21,7 +21,15 @@ const emptyDb = {
   experiments: [],
   reports: [],
   recommendations: [],
-  integrations: {},
+  integrations: {
+    discord: {
+      webhookUrl: "",
+      enabled: false,
+      dryRun: false,
+      lastTest: null,
+      lastError: null
+    }
+  },
   campaigns: [],
   discovery: structuredClone(defaultDiscovery),
   settings: {
@@ -29,7 +37,8 @@ const emptyDb = {
     autoPublishThreshold: 85,
     reviewThreshold: 70
   },
-  publishLog: []
+  publishLog: [],
+  priceHistory: {}
 };
 
 function normalizeState(state) {
@@ -44,6 +53,15 @@ function normalizeState(state) {
       ...(state.discovery?.amazon || {})
     }
   };
+  merged.integrations = {
+    ...base.integrations,
+    ...(state.integrations || {}),
+    discord: {
+      ...base.integrations.discord,
+      ...(state.integrations?.discord || {})
+    }
+  };
+  merged.priceHistory = state.priceHistory || {};
   return merged;
 }
 

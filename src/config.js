@@ -28,6 +28,12 @@ export function loadConfig(env = process.env) {
     telegramDryRun: env.TELEGRAM_DRY_RUN !== "false",
     xDryRun: env.X_DRY_RUN !== "false",
     xProfileUrl: env.X_PROFILE_URL || "",
+    xApiKey: env.X_API_KEY || "",
+    xApiSecret: env.X_API_SECRET || "",
+    xAccessToken: env.X_ACCESS_TOKEN || "",
+    xAccessSecret: env.X_ACCESS_SECRET || "",
+    discordWebhookUrl: env.DISCORD_WEBHOOK_URL || "",
+    discordDryRun: env.DISCORD_DRY_RUN !== "false",
     adminToken: env.ADMIN_TOKEN || ""
   };
 }
