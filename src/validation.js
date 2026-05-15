@@ -2,6 +2,19 @@ import { hasAffiliateConfig } from "./links.js";
 
 const MAX_PRICE_AGE_HOURS = 24;
 
+export function validateAmazonLink(url) {
+  if (!url) return { valid: false, reason: "link_ausente" };
+  let parsed;
+  try { parsed = new URL(url); } catch { return { valid: false, reason: "link_invalido" }; }
+  if (!parsed.hostname.includes("amazon.com.br")) {
+    return { valid: false, reason: "dominio_incorreto" };
+  }
+  if (!parsed.searchParams.get("tag")) {
+    return { valid: false, reason: "tag_afiliado_ausente" };
+  }
+  return { valid: true, reason: null };
+}
+
 export function validateOffer(offer, config, now = new Date()) {
   const reasons = [];
   const warnings = [];
@@ -17,6 +30,12 @@ export function validateOffer(offer, config, now = new Date()) {
   if (offer.inStock === false) reasons.push("out_of_stock");
   if (offer.store === "amazon" && offer.affiliateSource !== "manual" && !hasAffiliateConfig(offer, config)) {
     reasons.push("amazon_manual_link_required");
+  }
+  if (offer.store === "amazon" && offer.affiliateUrl) {
+    const linkCheck = validateAmazonLink(offer.affiliateUrl);
+    if (!linkCheck.valid && linkCheck.reason === "tag_afiliado_ausente") {
+      reasons.push("amazon_tag_missing");
+    }
   }
   if (!affiliateReady && !offer.imageUrl && !(offer.imageUrls || []).length) warnings.push("missing_image");
   if (offer.source === "mock") warnings.push("mock_source");
