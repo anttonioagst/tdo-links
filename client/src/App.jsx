@@ -421,7 +421,7 @@ function Offers({ state, data, offers, loading, api, action }) {
         density="compact"
         action={<StatusBadge tone={data.missingAffiliate ? "warning" : "success"}>{data.missingAffiliate} afiliado pendente</StatusBadge>}
       >
-        <OfferTable offers={offers} clicksByOffer={state.metrics.clicksByOffer} loading={loading} api={api} action={action} />
+        <OfferTable offers={offers} clicksByOffer={state.metrics.clicksByOffer} priceHistory={state.priceHistory} loading={loading} api={api} action={action} />
       </Panel>
     </div>
   );
@@ -632,6 +632,26 @@ function Config({ state, data, loading, api, action }) {
             </ActionButton>
           </Panel>
 
+          <Panel title="Discord" count={state.integrations?.discord?.enabled ? "Ativo" : "Inativo"}>
+            <div className="space-y-3">
+              <FormField label="Webhook URL">
+                <input
+                  type="text"
+                  className={configInputClass}
+                  placeholder="https://discord.com/api/webhooks/..."
+                  defaultValue={state.integrations?.discord?.webhookUrl || ""}
+                  onBlur={(e) => action("discordWebhookSave", () => api("/api/integrations/discord/settings", { method: "PUT", body: { webhookUrl: e.target.value } }), "Webhook Discord salvo")}
+                />
+              </FormField>
+            </div>
+            <ActionButton className="mt-4" variant="outline" loading={loading.discordTest} onClick={() => action("discordTest", async () => {
+              const data = await api("/api/integrations/discord/test", { method: "POST" });
+              if (!data.ok) throw new Error(data.detail);
+            }, "Discord: mensagem enviada ✓")}>
+              <Send className="size-4" /> Testar Discord
+            </ActionButton>
+          </Panel>
+
           <Panel title="Affiliate Links" count={`${data.missingAffiliate} pendentes`}>
             <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">Recalcula URLs afiliadas usando as variaveis atuais do ambiente.</p>
             <ActionButton className="mt-4" loading={loading.refreshAffiliates} onClick={() => action("refreshAffiliates", () => api("/api/run/refresh-affiliates", { method: "POST" }), "Links recalculados")}>
@@ -739,7 +759,7 @@ function discoveryReasonLabel(reason) {
   }[reason] || String(reason || "Sem execucao").replace(/_/g, " ");
 }
 
-function OfferTable({ offers, clicksByOffer, loading, api, action }) {
+function OfferTable({ offers, clicksByOffer, priceHistory, loading, api, action }) {
   const columns = [
     {
       key: "offer",
@@ -755,7 +775,7 @@ function OfferTable({ offers, clicksByOffer, loading, api, action }) {
     {
       key: "score",
       label: "Score",
-      render: (offer) => <ScoreCell offer={offer} />
+      render: (offer) => <ScoreCell offer={offer} priceHistory={priceHistory} />
     },
     {
       key: "status",
@@ -826,14 +846,26 @@ function OfferIdentity({ offer, clicks }) {
   );
 }
 
-function ScoreCell({ offer }) {
+function ScoreCell({ offer, priceHistory }) {
   const score = Math.round(Number(offer.score || 0));
   const tone = score >= 85 ? "success" : score >= 70 ? "warning" : "muted";
+  const history = priceHistory?.[offer.id] || [];
 
   return (
     <div className="min-w-[86px]">
       <StatusBadge tone={tone}>{score}</StatusBadge>
       <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{money(offer.currentPrice)}</p>
+      {history.length > 0 && (
+        <div className="flex items-center gap-1 mt-1">
+          <span className="text-xs text-slate-600 dark:text-slate-500">hist:</span>
+          {history.slice(0, 4).map((entry, i) => (
+            <span key={i} className="text-xs text-slate-500 dark:text-slate-500">
+              {i > 0 && <span className="text-slate-700 dark:text-slate-600 mx-0.5">›</span>}
+              R${Number(entry.price).toFixed(0)}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
