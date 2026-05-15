@@ -242,3 +242,81 @@ function limitByUrl(offers, limit) {
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+function extractXmlTag(xml, tag) {
+  const cdataMatch = xml.match(new RegExp(`<${tag}><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`));
+  if (cdataMatch) return cdataMatch[1].trim();
+  const plainMatch = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`));
+  return plainMatch ? plainMatch[1].trim() : "";
+}
+
+function parseRssItems(xml) {
+  const items = [];
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  let match;
+  while ((match = itemRegex.exec(xml)) !== null) {
+    const raw = match[1];
+    items.push({
+      title: extractXmlTag(raw, "title"),
+      link: extractXmlTag(raw, "link") || extractXmlTag(raw, "guid"),
+      description: extractXmlTag(raw, "description"),
+      pubDate: extractXmlTag(raw, "pubDate")
+    });
+  }
+  return items;
+}
+
+const TECH_KEYWORDS = ["ssd", "nvme", "notebook", "monitor", "mouse", "teclado", "headset", "webcam", "hub", "placa", "memória", "ram", "processador", "gpu", "roteador", "câmera", "impressora"];
+
+function isTechDeal(title) {
+  const lower = title.toLowerCase();
+  return TECH_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function normalizeFeedOffer(item, source) {
+  const priceMatch = item.description.match(/R\$\s*([\d.,]+)/);
+  const currentPrice = priceMatch ? parseFloat(priceMatch[1].replace(/\./g, "").replace(",", ".")) : null;
+  return {
+    title: item.title,
+    url: item.link,
+    currentPrice,
+    previousPrice: null,
+    discountPercent: null,
+    store: source,
+    category: "tech",
+    rating: null,
+    reviewCount: null,
+    inStock: true,
+    imageUrl: null,
+    imageUrls: [],
+    source,
+    scrapedAt: new Date().toISOString()
+  };
+}
+
+const FEED_SOURCES = [
+  { name: "pelando", url: "https://www.pelando.com.br/feed" },
+  { name: "promobit", url: "https://www.promobit.com.br/feed" }
+];
+
+export async function scrapeFeedDeals(config) {
+  if (config.scraperMode === "mock") return [];
+  const results = [];
+  for (const source of FEED_SOURCES) {
+    try {
+      const response = await fetch(source.url, {
+        headers: { "user-agent": "TDO-Links-Bot/1.0" },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!response.ok) continue;
+      const xml = await response.text();
+      const items = parseRssItems(xml)
+        .filter(item => isTechDeal(item.title))
+        .slice(0, 5);
+      results.push(...items.map(item => normalizeFeedOffer(item, source.name)));
+    } catch {
+      // fonte indisponível — continua para próxima
+    }
+  }
+  return results;
+}
