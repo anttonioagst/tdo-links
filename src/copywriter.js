@@ -1,44 +1,84 @@
 import { trackedUrl } from "./links.js";
 
+const CATEGORY_EMOJI = {
+  ssd: "💾",
+  hd: "💾",
+  pendrive: "💾",
+  mouse: "🖱️",
+  teclado: "⌨️",
+  keyboard: "⌨️",
+  notebook: "💻",
+  laptop: "💻",
+  monitor: "🖥️",
+  headphone: "🎧",
+  fone: "🎧",
+  airpods: "🎧",
+  tv: "📺",
+  celular: "📱",
+  smartphone: "📱",
+  iphone: "📱",
+  galaxy: "📱",
+  tenis: "👟",
+  tênis: "👟",
+  hub: "🔌",
+  cabo: "🔌",
+  carregador: "🔌",
+  camera: "📷",
+  câmera: "📷",
+  cadeira: "🪑",
+  impressora: "🖨️"
+};
+
+function categoryEmoji(offer) {
+  const text = `${offer.title} ${offer.category}`.toLowerCase();
+  for (const [key, emoji] of Object.entries(CATEGORY_EMOJI)) {
+    if (text.includes(key)) return emoji;
+  }
+  return "🫧";
+}
+
+function getPostUrl(offer, shortCode, config) {
+  if (offer.affiliateSource === "manual" && offer.affiliateUrl) return offer.affiliateUrl;
+  return trackedUrl(config, shortCode);
+}
+
 export function money(value) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
 export function createTelegramCopy(offer, shortCode, config) {
-  return telegramCopy(offer, trackedUrl(config, shortCode), config.disclosure);
+  return telegramCopy(offer, getPostUrl(offer, shortCode, config), config.disclosure);
 }
 
 export function createXPostCopy(offer, shortCode, config) {
-  return xCopy(offer, trackedUrl(config, shortCode));
+  return xCopy(offer, getPostUrl(offer, shortCode, config));
 }
 
 export function telegramCopy(offer, url, disclosure) {
+  const previous = offer.previousPrice ? money(offer.previousPrice) : "preço normal";
   return [
-    baseCopy(offer, "🫧"),
+    "🚨 Super Promoção:",
+    `${categoryEmoji(offer)} ${discountLine(offer)}`,
     "",
-    `Agora, na ${storeLabel(offer.store)}:`,
+    offer.title,
+    `De ${previous} | Por ${money(offer.currentPrice)}`,
+    "",
     url,
     disclosure
   ].join("\n");
 }
 
 export function xCopy(offer, url) {
-  return [
-    baseCopy(offer, "🫧"),
-    "",
-    `Ad ${storeLabel(offer.store)}: ${url}`
-  ].join("\n").slice(0, 280);
-}
-
-function baseCopy(offer, icon) {
   const previous = offer.previousPrice ? money(offer.previousPrice) : "preço normal";
   return [
     "🚨 Super Promoção:",
-    `${icon} ${discountLine(offer)}`,
+    `${categoryEmoji(offer)} ${discountLine(offer)}`,
     "",
     offer.title,
-    `De ${previous} | Por ${money(offer.currentPrice)}`
-  ].join("\n");
+    `De ${previous} | Por ${money(offer.currentPrice)}`,
+    "",
+    `Ad ${storeLabel(offer.store)}: ${url}`
+  ].join("\n").slice(0, 280);
 }
 
 export function createXAcquisitionCopy(topOffers, config) {
@@ -47,7 +87,7 @@ export function createXAcquisitionCopy(topOffers, config) {
   const link = config.xProfileUrl || "Links no Telegram.";
   return [
     "🚨 Super Promoção:",
-    `💦 ${discountLine(offer)}`,
+    `${categoryEmoji(offer)} ${discountLine(offer)}`,
     "",
     offer.title,
     `Por ${money(offer.currentPrice)}`,

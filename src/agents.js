@@ -140,6 +140,25 @@ export function regenerateDraftCopy(db, draftId, config) {
   return draft;
 }
 
+export function regenerateDraftsForOffer(db, offerId, config) {
+  const offer = db.state.offers.find((item) => item.id === offerId);
+  if (!offer) return;
+  for (const draft of db.state.drafts) {
+    if (draft.offerId !== offerId || draft.publishedAt) continue;
+    if (draft.channel === "x") {
+      draft.text = createXPostCopy(offer, draft.shortCode, config);
+      const compliance = validateXAcquisitionPost(draft.text);
+      draft.rejectionReason = compliance.ok ? "" : compliance.errors.join(",");
+    } else {
+      draft.text = createTelegramCopy(offer, draft.shortCode, config);
+      const compliance = validatePost(draft.text, config.disclosure, offer);
+      draft.rejectionReason = compliance.ok ? "" : compliance.errors.join(",");
+      draft.warnings = compliance.warnings || [];
+    }
+    draft.updatedAt = new Date().toISOString();
+  }
+}
+
 export function cloneDraftForRetest(db, draftId, config) {
   const source = db.state.drafts.find((item) => item.id === draftId);
   if (!source || !["telegram", "x"].includes(source.channel) || !source.offerId) return null;
@@ -196,7 +215,10 @@ export async function runPublishPipeline(db, config) {
     const offerIndex = db.state.offers.findIndex((item) => item.id === draft.offerId);
     const offer = offerIndex === -1 ? null : refreshOfferDecision(db.state.offers[offerIndex], db, config);
     if (offerIndex !== -1) db.state.offers[offerIndex] = offer;
-    if (!offer || offer.publishable !== true || offer.validationStatus !== "ready") {
+    const isBlocked = !offer || offer.validationStatus === "blocked";
+    const isStale = (offer?.validationReasons || []).includes("price_stale");
+    const isAutoNotReady = draft.status === "auto_ready" && offer?.validationStatus !== "ready";
+    if (isBlocked || (draft.status === "approved" && isStale) || isAutoNotReady) {
       const detail = {
         draftId: draft.id,
         offerId: draft.offerId,
@@ -205,7 +227,7 @@ export async function runPublishPipeline(db, config) {
         dryRun: false,
         providerMessageId: null,
         reason: "offer_not_publishable",
-        detail: "offer_not_publishable: validate affiliate and price before publishing.",
+        detail: isBlocked ? "offer_not_publishable: validate affiliate and price before publishing." : isStale ? "price_stale: update price before publishing." : "offer_not_publishable: validate affiliate and price before publishing.",
         outcome: "skipped"
       };
       results.push(detail);

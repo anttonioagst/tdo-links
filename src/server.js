@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
-import { cloneDraftForRetest, createAnalyticsReport, createDraftsForOffer, publishApprovedX, refreshOfferAffiliateUrls, refreshOfferDecision, regenerateDraftCopy, runPublishPipeline, runScrapePipeline } from "./agents.js";
+import { cloneDraftForRetest, createAnalyticsReport, createDraftsForOffer, publishApprovedX, refreshOfferAffiliateUrls, refreshOfferDecision, regenerateDraftCopy, regenerateDraftsForOffer, runPublishPipeline, runScrapePipeline } from "./agents.js";
 import { runAmazonDiscovery, updateAmazonDiscoverySettings } from "./discovery.js";
 import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
@@ -213,6 +213,7 @@ async function handleApi(req, res, url, db, config) {
       affiliateSource: "manual",
       updatedAt: new Date().toISOString()
     }, db, config);
+    regenerateDraftsForOffer(db, offerId, config);
     await db.save();
     sendJson(res, 200, db.state.offers[offerIndex]);
     return;
