@@ -867,8 +867,8 @@ function OfferTable({ offers, clicksByOffer, priceHistory, loading, api, action 
       label: "Cliques",
       render: (offer) => (
         <div>
-          <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">{clicksByOffer[offer.id] || 0}</p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">rastreados</p>
+          <p className="text-sm font-semibold text-slate-100">{clicksByOffer[offer.id] || 0}</p>
+          <p className="mt-1 text-xs text-slate-500">rastreados</p>
         </div>
       )
     },
@@ -876,7 +876,7 @@ function OfferTable({ offers, clicksByOffer, priceHistory, loading, api, action 
       key: "actions",
       label: "Acoes",
       render: (offer) => (
-        <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+        <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-900 px-3 text-xs font-medium text-slate-300 shadow-sm transition hover:bg-slate-800 hover:text-slate-100">
           <ExternalLink className="size-4 shrink-0" /> Abrir
         </a>
       )
