@@ -101,7 +101,7 @@ test("uses Amazon tracking tags per channel", () => {
   assert.equal(new URL(buildAffiliateUrl(offer, config, "x")).searchParams.get("tag"), "default-20");
 });
 
-test("keeps Amazon price posts in review because promo information can expire", async () => {
+test("Amazon auto_ready offer creates auto_ready draft with price review warning", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   try {
     const db = new JsonDb(join(dir, "db.json"));
@@ -117,7 +117,7 @@ test("keeps Amazon price posts in review because promo information can expire", 
       score: 95,
       status: "auto_ready"
     }, config);
-    assert.equal(draft.status, "needs_review");
+    assert.equal(draft.status, "auto_ready");
     assert.ok(draft.warnings.includes("amazon_dynamic_price_review"));
   } finally {
     await rm(dir, { recursive: true, force: true });

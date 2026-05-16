@@ -79,7 +79,7 @@ export async function publishTelegram(draft, config, offer = null) {
     return { ok: false, dryRun: false, providerMessageId: null, detail: "Telegram credentials missing." };
   }
   try {
-    const text = formatTelegramText(draft, offer);
+    const text = draft.text || "";
     const images = offerImages(offer);
     if (images.length > 1) {
       const response = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMediaGroup`, {
@@ -90,7 +90,7 @@ export async function publishTelegram(draft, config, offer = null) {
           media: images.map((image, index) => ({
             type: "photo",
             media: image,
-            ...(index === 0 ? { caption: text, parse_mode: "HTML" } : {})
+            ...(index === 0 ? { caption: text } : {})
           }))
         })
       });
@@ -100,8 +100,8 @@ export async function publishTelegram(draft, config, offer = null) {
     const hasImage = images.length === 1;
     const method = hasImage ? "sendPhoto" : "sendMessage";
     const body = hasImage
-      ? { chat_id: config.telegramChatId, photo: images[0], caption: text, parse_mode: "HTML" }
-      : { chat_id: config.telegramChatId, text, parse_mode: "HTML", disable_web_page_preview: false };
+      ? { chat_id: config.telegramChatId, photo: images[0], caption: text }
+      : { chat_id: config.telegramChatId, text, disable_web_page_preview: false };
     const response = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/${method}`, {
       method: "POST",
       headers: { "content-type": "application/json" },

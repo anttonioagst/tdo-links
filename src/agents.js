@@ -60,7 +60,6 @@ export function createDraftsForOffer(db, offer, config) {
   const shortCode = createShortCode(db, offer.id, "telegram");
   const text = createTelegramCopy(offer, shortCode, config);
   const compliance = validatePost(text, config.disclosure, offer);
-  const hasWarnings = Boolean(compliance.warnings?.length);
   const draft = {
     id: db.nextId("draft"),
     offerId: offer.id,
@@ -68,7 +67,7 @@ export function createDraftsForOffer(db, offer, config) {
     text,
     disclosure: config.disclosure,
     shortCode,
-    status: offer.status === "auto_ready" && compliance.ok && !hasWarnings ? "auto_ready" : "needs_review",
+    status: offer.status === "auto_ready" && compliance.ok ? "auto_ready" : "needs_review",
     rejectionReason: compliance.ok ? "" : compliance.errors.join(","),
     warnings: compliance.warnings || [],
     publishedAt: null,
@@ -217,7 +216,7 @@ export async function runPublishPipeline(db, config) {
     if (offerIndex !== -1) db.state.offers[offerIndex] = offer;
     const isBlocked = !offer || offer.validationStatus === "blocked";
     const isStale = (offer?.validationReasons || []).includes("price_stale");
-    const isAutoNotReady = draft.status === "auto_ready" && offer?.validationStatus !== "ready";
+    const isAutoNotReady = draft.status === "auto_ready" && offer?.validationStatus === "blocked";
     if (isBlocked || (draft.status === "approved" && isStale) || isAutoNotReady) {
       const detail = {
         draftId: draft.id,
