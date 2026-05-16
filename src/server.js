@@ -1,13 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
-import { cloneDraftForRetest, createAnalyticsReport, createDraftsForOffer, publishApprovedX, refreshOfferAffiliateUrls, refreshOfferDecision, regenerateDraftCopy, regenerateDraftsForOffer, runPublishPipeline, runScrapePipeline } from "./agents.js";
-import { generateOfferImage } from "./imagegen.js";
+import { cloneDraftForRetest, createAnalyticsReport, createDraftsForOffer, publishApprovedX, refreshOfferAffiliateUrls, refreshOfferDecision, regenerateDraftCopy, regenerateDraftsForOffer } from "./agents.js";
 import { runAmazonDiscovery, updateAmazonDiscoverySettings } from "./discovery.js";
 import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
 import { testDiscord } from "./publishers/discord.js";
 import { testTelegram } from "./publishers/telegram.js";
+import { enqueueScrape, enqueuePublish, enqueueImagegen } from "./queues/producers.js";
 import { buildRecommendations } from "./recommendations.js";
 
 const mimeTypes = {
@@ -178,13 +178,17 @@ async function handleApi(req, res, url, db, config) {
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/run/scrape") {
-    sendJson(res, 200, await runScrapePipeline(db, config));
+    sendJson(res, 200, await enqueueScrape(db, config, "manual"));
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/run/publish") {
-    const telegram = await runPublishPipeline(db, config);
-    const x = await publishApprovedX(db, config);
-    sendJson(res, 200, { telegram, x });
+    const result = await enqueuePublish(db, config, null, ["telegram", "twitter"]);
+    if (!result.queued) {
+      const x = await publishApprovedX(db, config);
+      sendJson(res, 200, { ...result, x });
+    } else {
+      sendJson(res, 200, result);
+    }
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/run/report") {
@@ -215,11 +219,8 @@ async function handleApi(req, res, url, db, config) {
       return;
     }
     try {
-      const imagePath = await generateOfferImage(db.state.offers[offerIndex], config);
-      db.state.offers[offerIndex].generatedImagePath = imagePath;
-      db.state.offers[offerIndex].generatedAt = new Date().toISOString();
-      await db.save();
-      sendJson(res, 200, { ok: true, imagePath });
+      const result = await enqueueImagegen(db, config, offerId);
+      sendJson(res, 200, result);
     } catch (err) {
       console.error("generate_image_error", JSON.stringify({ offerId, error: err.message }));
       sendJson(res, 500, { error: err.message });

@@ -3,13 +3,20 @@ import { resolve } from "node:path";
 import { createAnalyticsReport, runPublishPipeline, runScrapePipeline } from "./agents.js";
 import { loadConfig } from "./config.js";
 import { JsonDb } from "./db.js";
+import { PgDb } from "./pg-db.js";
 import { startDiscoveryScheduler } from "./discovery-scheduler.js";
+import { initQueues } from "./queues/index.js";
 import { createApp } from "./server.js";
 
 await loadEnvFile(resolve(".env"));
 const config = loadConfig();
-const db = new JsonDb(resolve(config.dataFile));
+const db = config.databaseUrl
+  ? new PgDb(config.databaseUrl)
+  : new JsonDb(resolve(config.dataFile));
 await db.load();
+console.log("db_ready", JSON.stringify({ backend: config.databaseUrl ? "postgres" : "json" }));
+
+initQueues(config.redisUrl);
 db.state.settings.mode = db.state.settings.mode || config.autoMode;
 db.state.settings.autoPublishThreshold = db.state.settings.autoPublishThreshold || config.autoPublishThreshold;
 db.state.settings.reviewThreshold = db.state.settings.reviewThreshold || config.reviewThreshold;

@@ -35,7 +35,9 @@ export function loadConfig(env = process.env) {
     discordWebhookUrl: env.DISCORD_WEBHOOK_URL || "",
     discordDryRun: env.DISCORD_DRY_RUN !== "false",
     adminToken: env.ADMIN_TOKEN || "",
-    openaiApiKey: env.OPENAI_API_KEY || ""
+    openaiApiKey: env.OPENAI_API_KEY || "",
+    databaseUrl: env.DATABASE_URL || "",
+    redisUrl: env.REDIS_URL || ""
   };
 }
 
