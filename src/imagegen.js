@@ -123,7 +123,7 @@ async function generateWithDalle(description, category, config) {
   const response = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { authorization: `Bearer ${config.openaiApiKey}`, "content-type": "application/json" },
-    body: JSON.stringify({ model: "dall-e-3", prompt, n: 1, size: "1024x1024", quality: "standard", response_format: "b64_json" })
+    body: JSON.stringify({ model: "dall-e-3", prompt, n: 1, size: "1024x1024", quality: "standard" })
   });
 
   if (!response.ok) {
@@ -132,7 +132,11 @@ async function generateWithDalle(description, category, config) {
   }
 
   const data = await response.json();
-  const b64 = data.data?.[0]?.b64_json;
-  if (!b64) throw new Error("image_generation_failed: empty response");
-  return b64;
+  const imageUrl = data.data?.[0]?.url;
+  if (!imageUrl) throw new Error("image_generation_failed: empty response");
+
+  const imageRes = await fetch(imageUrl);
+  if (!imageRes.ok) throw new Error(`image_generation_failed: could not download generated image`);
+  const buffer = await imageRes.arrayBuffer();
+  return Buffer.from(buffer).toString("base64");
 }
