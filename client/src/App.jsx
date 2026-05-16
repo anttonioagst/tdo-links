@@ -71,9 +71,10 @@ export default function App() {
   async function action(key, fn, success) {
     setLoading((items) => ({ ...items, [key]: true }));
     try {
-      await fn();
+      const msg = await fn();
       await refresh();
-      toast(success);
+      if (msg && typeof msg === "object") toast(msg.title, msg.detail || "", msg.tone || "success");
+      else toast(typeof msg === "string" ? msg : success);
     } catch (error) {
       toast("Acao nao concluida", error.message, "error");
     } finally {
@@ -307,26 +308,14 @@ function ActionPanel({ data, loading, api, action }) {
           <ActionButton size="sm" loading={loading.scrape} onClick={() => action("scrape", () => api("/api/run/scrape", { method: "POST" }), "Ofertas coletadas")}>
             <Search className="size-4" /> Buscar ofertas
           </ActionButton>
-          <ActionButton size="sm" loading={loading.publish} onClick={async () => {
-            setLoading((l) => ({ ...l, publish: true }));
-            try {
-              const result = await api("/api/run/publish", { method: "POST" });
-              await refresh();
-              const t = result.telegram || {};
-              const msg = t.published > 0
-                ? `${t.published} publicado${t.published > 1 ? "s" : ""} no Telegram`
-                : t.skipped > 0
-                  ? `0 publicados — ${t.skipped} pulados (oferta bloqueada)`
-                  : t.eligible === 0 || (t.published === 0 && t.failed === 0 && t.skipped === 0)
-                    ? "0 publicados — nenhum draft elegivel (aprove um draft primeiro)"
-                    : `0 publicados — ${t.failed || 0} falhou`;
-              toast(msg, "", t.published > 0 ? "success" : "error");
-            } catch (error) {
-              toast("Acao nao concluida", error.message, "error");
-            } finally {
-              setLoading((l) => ({ ...l, publish: false }));
-            }
-          }}>
+          <ActionButton size="sm" loading={loading.publish} onClick={() => action("publish", async () => {
+            const result = await api("/api/run/publish", { method: "POST" });
+            const t = result?.telegram || {};
+            if (t.published > 0) return { title: `${t.published} publicado${t.published > 1 ? "s" : ""} no Telegram`, tone: "success" };
+            if (t.skipped > 0) return { title: `${t.skipped} pulados — oferta bloqueada`, tone: "error" };
+            if (t.failed > 0) return { title: `${t.failed} falhou ao enviar`, tone: "error" };
+            return { title: "0 elegiveis — aprove um draft ou adicione oferta com link afiliado", tone: "error" };
+          }, "Publicando...")}>
             <Send className="size-4" /> Publicar elegiveis
           </ActionButton>
           <ActionButton size="sm" variant="outline" loading={loading.report} onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}>

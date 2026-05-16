@@ -858,7 +858,7 @@ test("compound score returns total and named components", () => {
   assert.ok(result.components.performance > 0);
 });
 
-test("blocked offer cannot publish even when draft is approved", async () => {
+test("approved draft publishes even for blocked offer (human override)", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   try {
     const db = new JsonDb(join(dir, "db.json"));
@@ -874,6 +874,7 @@ test("blocked offer cannot publish even when draft is approved", async () => {
       originalUrl: "https://www.amazon.com.br/dp/B0BLOCKED1",
       currentPrice: 349.9,
       inStock: true,
+      scrapedAt: new Date().toISOString(),
       validationStatus: "blocked",
       validationReasons: ["affiliate_not_ready"],
       publishable: false
@@ -888,13 +889,10 @@ test("blocked offer cannot publish even when draft is approved", async () => {
       providerMessageId: null
     });
     const publish = await runPublishPipeline(db, config);
-    assert.equal(publish.published, 0);
-    assert.equal(publish.skipped, 1);
-    assert.equal(publish.results.length, 1);
-    assert.equal(publish.results[0].outcome, "skipped");
-    assert.equal(publish.results[0].reason, "offer_not_publishable");
-    assert.match(publish.results[0].detail, /offer_not_publishable/);
-    assert.notEqual(db.state.drafts[0].status, "published");
+    assert.equal(publish.published, 1);
+    assert.equal(publish.dryRun, 1);
+    assert.equal(publish.results[0].outcome, "published");
+    assert.equal(db.state.drafts[0].status, "published");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

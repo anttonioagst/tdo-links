@@ -201,7 +201,7 @@ export async function runPublishPipeline(db, config) {
     if (draft.status === "auto_ready") return true;
     if (draft.status === "needs_review") {
       const offer = db.state.offers.find((o) => o.id === draft.offerId);
-      return offer?.status === "auto_ready";
+      return offer?.validationStatus !== "blocked";
     }
     return false;
   });
@@ -223,7 +223,10 @@ export async function runPublishPipeline(db, config) {
     const isBlocked = !offer || offer.validationStatus === "blocked";
     const isStale = (offer?.validationReasons || []).includes("price_stale");
     const isAutoNotReady = draft.status === "auto_ready" && offer?.validationStatus === "blocked";
-    if (isBlocked || (draft.status === "approved" && isStale) || isAutoNotReady) {
+    const shouldSkip = draft.status === "approved"
+      ? (!offer || isStale)
+      : (isBlocked || isAutoNotReady);
+    if (shouldSkip) {
       const detail = {
         draftId: draft.id,
         offerId: draft.offerId,
@@ -232,7 +235,7 @@ export async function runPublishPipeline(db, config) {
         dryRun: false,
         providerMessageId: null,
         reason: "offer_not_publishable",
-        detail: isBlocked ? "offer_not_publishable: validate affiliate and price before publishing." : isStale ? "price_stale: update price before publishing." : "offer_not_publishable: validate affiliate and price before publishing.",
+        detail: isStale ? "price_stale: update price before publishing." : "offer_not_publishable: validate affiliate and price before publishing.",
         outcome: "skipped"
       };
       results.push(detail);
