@@ -5,6 +5,7 @@ import {
   BarChart3,
   CheckCircle2,
   ExternalLink,
+  ImageIcon,
   Loader2,
   MousePointerClick,
   RefreshCcw,
@@ -32,6 +33,7 @@ export default function App() {
   const [view, setView] = useState("overview");
   const [period, setPeriod] = useState("30");
   const [loading, setLoading] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const inputRef = useRef(null);
@@ -47,7 +49,12 @@ export default function App() {
   }
 
   async function refresh() {
-    setState(await api("/api/state"));
+    setRefreshing(true);
+    try {
+      setState(await api("/api/state"));
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   function toast(title, detail = "", tone = "success") {
@@ -85,6 +92,19 @@ export default function App() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  const imagesPending = useMemo(
+    () => (state?.offers || []).some(o => o.imageStatus === "pending" || o.imageStatus === "generating"),
+    [state?.offers]
+  );
+
+  useEffect(() => {
+    if (!imagesPending) return;
+    const id = setInterval(() => {
+      fetch("/api/state").then(r => r.json()).then(setState).catch(() => {});
+    }, 5000);
+    return () => clearInterval(id);
+  }, [imagesPending]);
+
   const selectedPeriod = periods.find((item) => item.id === period) || periods[1];
   const data = useMemo(() => (state ? buildDashboardData(state, selectedPeriod) : null), [state, selectedPeriod]);
 
@@ -100,9 +120,10 @@ export default function App() {
   const topBarActions = (
     <ActionButton
       aria-label="Atualizar"
+      loading={refreshing}
       onClick={() => refresh().catch((error) => toast("Erro ao atualizar", error.message, "error"))}
     >
-      <RefreshCcw className="size-4" />
+      <RefreshCcw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
       Atualizar
     </ActionButton>
   );
@@ -118,7 +139,7 @@ export default function App() {
         view={view}
       >
         {view === "overview" && <Overview state={state} data={data} setPeriod={setPeriod} period={period} loading={loading} action={action} api={api} />}
-        {view === "pipeline" && <PipelineView state={state} />}
+        {view === "pipeline" && <PipelineView state={state} action={action} api={api} loading={loading} />}
         {view === "feed" && <FeedView state={state} />}
         {view === "rejected" && <RejectedView state={state} />}
         {view === "config" && <ConfigView state={state} loading={loading} action={action} api={api} />}
@@ -254,7 +275,7 @@ const AGENTS = [
   }
 ];
 
-function PipelineView({ state }) {
+function PipelineView({ state, action, api, loading }) {
   const publishLog = state.publishLog || [];
   const offers = state.offers || [];
   const drafts = state.drafts || [];
@@ -351,6 +372,132 @@ function PipelineView({ state }) {
           </Panel>
         </div>
       </div>
+
+      <Panel
+        title="Imagens AI"
+        count={`${offers.filter(o => o.generatedImagePath).length} geradas · ${offers.filter(o => o.imageStatus === "pending" || o.imageStatus === "generating").length} em processamento`}
+      >
+        <ImageGenPanel offers={offers} action={action} api={api} loading={loading} />
+      </Panel>
+    </div>
+  );
+}
+
+function ImageGenPanel({ offers, action, api, loading }) {
+  const [now, setNow] = useState(Date.now());
+
+  const active = offers.filter(o => o.imageStatus === "pending" || o.imageStatus === "generating");
+  const noImage = offers
+    .filter(o => !o.generatedImagePath && o.imageStatus !== "pending" && o.imageStatus !== "generating")
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    .slice(0, 10);
+  const done = offers.filter(o => o.generatedImagePath).length;
+
+  useEffect(() => {
+    if (!active.length) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [active.length]);
+
+  if (offers.length === 0) {
+    return <p className="text-sm text-slate-500">Nenhuma oferta no inventario ainda.</p>;
+  }
+
+  function progressFor(offer) {
+    if (offer.imageStatus === "pending") return 5;
+    if (offer.imageStatus === "generating") {
+      const elapsed = offer.imageStatusUpdatedAt ? now - new Date(offer.imageStatusUpdatedAt).getTime() : 0;
+      return Math.min(90, 10 + Math.round((elapsed / 28000) * 80));
+    }
+    return 0;
+  }
+
+  function stageLabel(offer) {
+    if (offer.imageStatus === "pending") return "Na fila...";
+    if (offer.imageStatus === "generating") {
+      const elapsed = offer.imageStatusUpdatedAt ? now - new Date(offer.imageStatusUpdatedAt).getTime() : 0;
+      if (elapsed < 8000) return "Analisando imagem original...";
+      if (elapsed < 22000) return "Gerando com DALL-E 3...";
+      return "Salvando imagem...";
+    }
+    return "";
+  }
+
+  return (
+    <div className="space-y-2">
+      {active.length > 0 && (
+        <>
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-slate-500">Em processamento</p>
+          {active.map(offer => {
+            const pct = progressFor(offer);
+            return (
+              <div key={offer.id} className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
+                <div className="flex items-center gap-3">
+                  <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-violet-600/20 text-violet-400">
+                    <Loader2 className="size-4 animate-spin" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-100">{offer.title}</p>
+                    <p className="text-xs text-violet-400">{stageLabel(offer)}</p>
+                    <div className="mt-2 h-1.5 rounded-full bg-slate-800">
+                      <div
+                        className="h-1.5 rounded-full bg-violet-500 transition-all duration-1000"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">{pct}% concluido — estimativa: ~30s total</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {noImage.length > 0 && <div className="h-px bg-slate-800 my-3" />}
+        </>
+      )}
+
+      {noImage.length > 0 && (
+        <>
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+            Sem imagem AI ({noImage.length} de {offers.filter(o => !o.generatedImagePath).length})
+          </p>
+          {noImage.map(offer => (
+            <div key={offer.id} className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/30 p-3">
+              {offer.imageUrl ? (
+                <img src={offer.imageUrl} alt="" className="size-10 shrink-0 rounded-lg object-cover ring-1 ring-slate-700" />
+              ) : (
+                <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-slate-800 text-slate-600">
+                  <ImageIcon className="size-4" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm text-slate-200">{offer.title}</p>
+                {offer.imageStatus === "failed" && (
+                  <p className="text-xs text-rose-400">Falhou na geracao anterior</p>
+                )}
+              </div>
+              <ActionButton
+                size="sm"
+                variant="outline"
+                loading={loading[`img_${offer.id}`]}
+                onClick={() => action(`img_${offer.id}`, () => api(`/api/offers/${offer.id}/generate-image`, { method: "POST" }), "Geracao iniciada")}
+              >
+                <Sparkles className="size-3.5" />
+                {offer.imageStatus === "failed" ? "Tentar novamente" : "Gerar AI"}
+              </ActionButton>
+            </div>
+          ))}
+        </>
+      )}
+
+      {active.length === 0 && noImage.length === 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <CheckCircle2 className="size-5 shrink-0 text-emerald-400" />
+          <div>
+            <p className="text-sm font-medium text-emerald-300">Todas as imagens geradas</p>
+            <p className="text-xs text-slate-500">{done} ofertas com imagem AI profissional</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

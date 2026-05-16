@@ -21,9 +21,25 @@ export function startWorkers(db, config, connection) {
     console.log("job_start", JSON.stringify({ queue: "imagegen", offerId }));
     const offerIndex = db.state.offers.findIndex(o => o.id === offerId);
     if (offerIndex === -1) throw new Error(`offer_not_found: ${offerId}`);
-    const imagePath = await generateOfferImage(db.state.offers[offerIndex], config);
+
+    db.state.offers[offerIndex].imageStatus = "generating";
+    db.state.offers[offerIndex].imageStatusUpdatedAt = new Date().toISOString();
+    await db.save();
+
+    let imagePath;
+    try {
+      imagePath = await generateOfferImage(db.state.offers[offerIndex], config);
+    } catch (err) {
+      db.state.offers[offerIndex].imageStatus = "failed";
+      db.state.offers[offerIndex].imageStatusUpdatedAt = new Date().toISOString();
+      await db.save();
+      throw err;
+    }
+
     db.state.offers[offerIndex].generatedImagePath = imagePath;
     db.state.offers[offerIndex].generatedAt = new Date().toISOString();
+    db.state.offers[offerIndex].imageStatus = "done";
+    db.state.offers[offerIndex].imageStatusUpdatedAt = new Date().toISOString();
     await db.save();
     console.log("job_done", JSON.stringify({ queue: "imagegen", offerId, imagePath }));
     return { imagePath };
