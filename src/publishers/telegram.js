@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 const CATEGORY_EMOJI = {
   SSD: "💾",
   notebook: "💻",
@@ -80,9 +82,15 @@ export async function publishTelegram(draft, config, offer = null) {
   }
   try {
     const text = draft.text || "";
+    const botUrl = `https://api.telegram.org/bot${config.telegramBotToken}`;
+
+    if (offer?.generatedImagePath) {
+      return await sendGeneratedImage(botUrl, config.telegramChatId, offer, text);
+    }
+
     const images = offerImages(offer);
     if (images.length > 1) {
-      const response = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMediaGroup`, {
+      const response = await fetch(`${botUrl}/sendMediaGroup`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -102,12 +110,31 @@ export async function publishTelegram(draft, config, offer = null) {
     const body = hasImage
       ? { chat_id: config.telegramChatId, photo: images[0], caption: text }
       : { chat_id: config.telegramChatId, text, disable_web_page_preview: false };
-    const response = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/${method}`, {
+    const response = await fetch(`${botUrl}/${method}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body)
     });
     const payload = await response.json().catch(() => ({}));
+    return { ok: response.ok && payload.ok, dryRun: false, providerMessageId: payload.result?.message_id || null, detail: payload.description || "ok" };
+  } catch (error) {
+    return telegramProviderFailure(error);
+  }
+}
+
+async function sendGeneratedImage(botUrl, chatId, offer, caption) {
+  try {
+    const buffer = await readFile(offer.generatedImagePath);
+    const form = new FormData();
+    form.append("chat_id", chatId);
+    form.append("caption", caption);
+    form.append("photo", new Blob([buffer], { type: "image/jpeg" }), "product.jpg");
+    const response = await fetch(`${botUrl}/sendPhoto`, { method: "POST", body: form });
+    const payload = await response.json().catch(() => ({}));
+    if (payload.result?.photo) {
+      const fileId = payload.result.photo.slice(-1)[0]?.file_id;
+      if (fileId) offer.telegramImageFileId = fileId;
+    }
     return { ok: response.ok && payload.ok, dryRun: false, providerMessageId: payload.result?.message_id || null, detail: payload.description || "ok" };
   } catch (error) {
     return telegramProviderFailure(error);

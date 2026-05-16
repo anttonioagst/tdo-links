@@ -34,7 +34,8 @@ export function loadConfig(env = process.env) {
     xAccessSecret: env.X_ACCESS_SECRET || "",
     discordWebhookUrl: env.DISCORD_WEBHOOK_URL || "",
     discordDryRun: env.DISCORD_DRY_RUN !== "false",
-    adminToken: env.ADMIN_TOKEN || ""
+    adminToken: env.ADMIN_TOKEN || "",
+    openaiApiKey: env.OPENAI_API_KEY || ""
   };
 }
 

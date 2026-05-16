@@ -395,6 +395,39 @@ function DraftCard({ draft, offer, loading, api, action }) {
       {draft.rejectionReason ? <p className="mt-2 text-xs font-medium text-rose-600 dark:text-rose-300">{draft.rejectionReason}</p> : null}
       {offer ? (
         <div className={`mt-3 rounded-xl border p-3 ${offer.affiliateReady ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-400/20 dark:bg-emerald-500/10" : "border-amber-300 bg-amber-50 shadow-[inset_3px_0_0_rgb(245_158_11)] dark:border-amber-400/30 dark:bg-amber-500/10"}`}>
+          <div className="mb-3 flex items-start gap-3">
+            {offer.generatedImagePath ? (
+              <img
+                src={`/api/offers/${offer.id}/image`}
+                alt="Imagem AI gerada"
+                className="h-20 w-20 shrink-0 rounded-lg object-cover ring-2 ring-violet-400/60"
+              />
+            ) : offer.imageUrl ? (
+              <img
+                src={offer.imageUrl}
+                alt={offer.title}
+                className="h-20 w-20 shrink-0 rounded-lg object-cover ring-1 ring-slate-200 dark:ring-slate-700"
+              />
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                  {offer.generatedImagePath ? "Imagem AI ativa" : "Imagem do produto"}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {offer.generatedImagePath ? <StatusBadge tone="brand">AI gerada</StatusBadge> : null}
+                  <ActionButton
+                    size="sm"
+                    variant="outline"
+                    loading={loading[`genimg-${offer.id}`]}
+                    onClick={() => action(`genimg-${offer.id}`, () => api(`/api/offers/${offer.id}/generate-image`, { method: "POST" }), "Imagem AI gerada")}
+                  >
+                    {offer.generatedImagePath ? "Regerar" : "Gerar imagem AI"}
+                  </ActionButton>
+                </div>
+              </div>
+            </div>
+          </div>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">Link afiliado oficial</span>
             <StatusBadge tone={offer.affiliateReady ? "success" : "warning"}>{offer.affiliateReady ? "Afiliado pronto" : "Pendente"}</StatusBadge>
