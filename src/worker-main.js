@@ -25,6 +25,13 @@ if (!queuesReady) {
 
 startWorkers(db, config, getConnection());
 
+// Keep in-memory state fresh so quota checks read current publishLog from PostgreSQL
+if (config.databaseUrl) {
+  setInterval(() => {
+    db.load().catch((err) => console.error("worker_state_reload_failed", err.message));
+  }, 15 * 1000);
+}
+
 cron.schedule("0 */2 * * *", async () => {
   console.log("cron_trigger discovery");
   runDiscovery(db, config).catch(err =>
