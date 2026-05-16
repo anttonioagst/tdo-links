@@ -193,6 +193,37 @@ async function handleApi(req, res, url, db, config) {
     }
     return;
   }
+  if (req.method === "POST" && url.pathname === "/api/debug/test-pipeline") {
+    const { validationQueue } = await import("./queues/index.js");
+    if (!validationQueue) {
+      sendJson(res, 503, { error: "validation_queue_not_available", detail: "Redis not connected" });
+      return;
+    }
+    const ts = Date.now();
+    const testOffer = {
+      title: `Headset Gamer HyperX Cloud II 7.1 Surround (test-${ts})`,
+      currentPrice: 349.90,
+      previousPrice: 549.90,
+      discountPercent: 36,
+      originalUrl: `https://www.amazon.com.br/dp/B0TEST${ts}`,
+      asin: `B0TEST${ts}`.slice(0, 10),
+      imageUrl: "https://m.media-amazon.com/images/I/71Fj-y9RWBL._AC_SX522_.jpg",
+      imageUrls: ["https://m.media-amazon.com/images/I/71Fj-y9RWBL._AC_SX522_.jpg"],
+      store: "amazon",
+      category: "tech",
+      rating: 4.7,
+      reviewCount: 3240,
+      inStock: true,
+      source: "debug_inject",
+      sourceConfidence: 0.9,
+      sourceWarnings: [],
+      scrapedAt: new Date().toISOString()
+    };
+    await validationQueue.add("validate", { offer: testOffer }, { attempts: 2 });
+    console.log("debug_test_pipeline", JSON.stringify({ title: testOffer.title }));
+    sendJson(res, 200, { ok: true, offer: testOffer, detail: "Offer enqueued to validation — watch Pipeline view" });
+    return;
+  }
   if (req.method === "POST" && url.pathname === "/api/run/publish") {
     const result = await enqueuePublish(db, config, null, ["telegram", "twitter"]);
     if (!result.queued) {
