@@ -1,5 +1,4 @@
 import { Worker } from "bullmq";
-import { runScrapePipeline, runPublishPipeline } from "../agents.js";
 import { generateOfferImage } from "../imagegen.js";
 import { validateDeal } from "../agents/validation.js";
 import { createContent } from "../agents/creative.js";
@@ -9,11 +8,10 @@ import { creativeQueue, publishQueue } from "./index.js";
 export function startWorkers(db, config, connection) {
   const opts = { connection, concurrency: 1 };
 
+  // Legacy scrape worker — drains old queued jobs without running the old pipeline
   const scrapeWorker = new Worker("scrape", async (job) => {
-    console.log("job_start", JSON.stringify({ queue: "scrape", trigger: job.data.trigger }));
-    const result = await runScrapePipeline(db, config);
-    console.log("job_done", JSON.stringify({ queue: "scrape", ...result }));
-    return result;
+    console.log("job_done", JSON.stringify({ queue: "scrape", result: "skipped_legacy" }));
+    return { skipped: true };
   }, opts);
 
   const imagegenWorker = new Worker("imagegen", async (job) => {
@@ -54,11 +52,9 @@ export function startWorkers(db, config, connection) {
       console.log("job_done", JSON.stringify({ queue: "publish", offerId: offer.id, mode: "agent" }));
       return result;
     }
-    // Legacy publish (existing)
-    console.log("job_start", JSON.stringify({ queue: "publish", draftId: job.data.draftId }));
-    const result = await runPublishPipeline(db, config);
-    console.log("job_done", JSON.stringify({ queue: "publish", ...result }));
-    return result;
+    // Legacy publish — drain without running old pipeline
+    console.log("job_done", JSON.stringify({ queue: "publish", result: "skipped_legacy" }));
+    return { skipped: true };
   }, opts);
 
   // New: Validation worker
