@@ -200,13 +200,14 @@ async function handleApi(req, res, url, db, config) {
       return;
     }
     const ts = Date.now();
+    const uniqId = ts.toString(36).toUpperCase().slice(-6);
     const testOffer = {
       title: `Headset Gamer HyperX Cloud II 7.1 Surround (test-${ts})`,
       currentPrice: 349.90,
       previousPrice: 549.90,
       discountPercent: 36,
-      originalUrl: `https://www.amazon.com.br/dp/B0TEST${ts}`,
-      asin: `B0TEST${ts}`.slice(0, 10),
+      originalUrl: `https://www.amazon.com.br/dp/B0TST${uniqId}`,
+      asin: `B0TST${uniqId}`,
       imageUrl: "https://m.media-amazon.com/images/I/71Fj-y9RWBL._AC_SX522_.jpg",
       imageUrls: ["https://m.media-amazon.com/images/I/71Fj-y9RWBL._AC_SX522_.jpg"],
       store: "amazon",
