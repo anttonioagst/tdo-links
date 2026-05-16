@@ -58,7 +58,7 @@ export async function validateDeal(offer, config) {
     }
 
     const threshold = config.aiConfidenceThreshold ?? 70;
-    const passes = parsed.valid === true && parsed.confidence >= threshold;
+    const passes = parsed.valid === true && parsed.confidence > threshold;
 
     console.log("agent_event", JSON.stringify({
       agent: "validation",

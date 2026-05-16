@@ -2,6 +2,12 @@ import { publishTelegram } from "../publishers/telegram.js";
 import { publishDiscord } from "../publishers/discord.js";
 import { publishXAcquisition } from "../publishers/x.js";
 
+const INTER_CHANNEL_DELAY_MS = 3000;
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
 function resolveCopy(template, affiliateUrl) {
   return (template || "").replace(/\{LINK\}/g, affiliateUrl || "");
 }
@@ -31,86 +37,72 @@ export async function publishDeal(offer, content, config, db) {
 
   const affiliateUrl = offer.affiliateUrl || offer.originalUrl || offer.url || "";
   const { imagePath, copy } = content;
-
-  // Attach image path to offer object so telegram publisher can use it
   const offerWithImage = imagePath ? { ...offer, generatedImagePath: imagePath } : offer;
-
   const results = {};
 
-  // Publish to all 3 channels in parallel, skipping already-published ones (retry safety)
-  const tasks = [];
+  // Build ordered list of channels to publish (lazy functions, not promises)
+  const channels = [];
 
-  // Telegram
   if (!wasAlreadyPublished(db, offer.id, "telegram")) {
-    tasks.push(
-      (async () => {
-        try {
-          const telegramText = resolveCopy(copy.telegram, affiliateUrl);
-          const draft = { text: telegramText };
-          const result = await publishTelegram(draft, config, offerWithImage);
-          results.telegram = result;
-          savePublishResult(db, offer.id, "telegram", result);
-          console.log("agent_event", JSON.stringify({ agent: "publisher", event: "telegram_done", offerId: offer.id, ok: result.ok }));
-        } catch (err) {
-          const result = { ok: false, error: err.message };
-          results.telegram = result;
-          console.log("agent_event", JSON.stringify({ agent: "publisher", event: "telegram_error", offerId: offer.id, error: err.message }));
-        }
-      })()
-    );
+    channels.push(async () => {
+      try {
+        const draft = { text: resolveCopy(copy.telegram, affiliateUrl) };
+        const result = await publishTelegram(draft, config, offerWithImage);
+        results.telegram = result;
+        savePublishResult(db, offer.id, "telegram", result);
+        console.log("agent_event", JSON.stringify({ agent: "publisher", event: "telegram_done", offerId: offer.id, ok: result.ok }));
+      } catch (err) {
+        results.telegram = { ok: false, error: err.message };
+        console.log("agent_event", JSON.stringify({ agent: "publisher", event: "telegram_error", offerId: offer.id, error: err.message }));
+      }
+    });
   } else {
-    console.log("agent_event", JSON.stringify({ agent: "publisher", event: "telegram_skipped_already_published", offerId: offer.id }));
     results.telegram = { ok: true, skipped: true, detail: "already_published" };
+    console.log("agent_event", JSON.stringify({ agent: "publisher", event: "telegram_skipped", offerId: offer.id }));
   }
 
-  // Discord
   if (!wasAlreadyPublished(db, offer.id, "discord")) {
-    tasks.push(
-      (async () => {
-        try {
-          const discordText = resolveCopy(copy.discord, affiliateUrl);
-          const draft = { text: discordText };
-          const offerForDiscord = { ...offerWithImage, affiliateUrl };
-          const result = await publishDiscord(draft, config, offerForDiscord);
-          results.discord = result;
-          savePublishResult(db, offer.id, "discord", result);
-          console.log("agent_event", JSON.stringify({ agent: "publisher", event: "discord_done", offerId: offer.id, ok: result.ok }));
-        } catch (err) {
-          const result = { ok: false, error: err.message };
-          results.discord = result;
-          console.log("agent_event", JSON.stringify({ agent: "publisher", event: "discord_error", offerId: offer.id, error: err.message }));
-        }
-      })()
-    );
+    channels.push(async () => {
+      try {
+        const draft = { text: resolveCopy(copy.discord, affiliateUrl) };
+        const offerForDiscord = { ...offerWithImage, affiliateUrl };
+        const result = await publishDiscord(draft, config, offerForDiscord);
+        results.discord = result;
+        savePublishResult(db, offer.id, "discord", result);
+        console.log("agent_event", JSON.stringify({ agent: "publisher", event: "discord_done", offerId: offer.id, ok: result.ok }));
+      } catch (err) {
+        results.discord = { ok: false, error: err.message };
+        console.log("agent_event", JSON.stringify({ agent: "publisher", event: "discord_error", offerId: offer.id, error: err.message }));
+      }
+    });
   } else {
-    console.log("agent_event", JSON.stringify({ agent: "publisher", event: "discord_skipped_already_published", offerId: offer.id }));
     results.discord = { ok: true, skipped: true, detail: "already_published" };
+    console.log("agent_event", JSON.stringify({ agent: "publisher", event: "discord_skipped", offerId: offer.id }));
   }
 
-  // X — uses copy.x directly (no affiliate link replacement, has CTA to Telegram+Discord)
   if (!wasAlreadyPublished(db, offer.id, "x")) {
-    tasks.push(
-      (async () => {
-        try {
-          const xText = copy.x || "";
-          const publishLog = db.state.publishLog || [];
-          const result = await publishXAcquisition(xText, config, publishLog);
-          results.x = result;
-          savePublishResult(db, offer.id, "x", result);
-          console.log("agent_event", JSON.stringify({ agent: "publisher", event: "x_done", offerId: offer.id, ok: result.ok }));
-        } catch (err) {
-          const result = { ok: false, error: err.message };
-          results.x = result;
-          console.log("agent_event", JSON.stringify({ agent: "publisher", event: "x_error", offerId: offer.id, error: err.message }));
-        }
-      })()
-    );
+    channels.push(async () => {
+      try {
+        const result = await publishXAcquisition(copy.x || "", config, db.state.publishLog || []);
+        results.x = result;
+        savePublishResult(db, offer.id, "x", result);
+        console.log("agent_event", JSON.stringify({ agent: "publisher", event: "x_done", offerId: offer.id, ok: result.ok }));
+      } catch (err) {
+        results.x = { ok: false, error: err.message };
+        console.log("agent_event", JSON.stringify({ agent: "publisher", event: "x_error", offerId: offer.id, error: err.message }));
+      }
+    });
   } else {
-    console.log("agent_event", JSON.stringify({ agent: "publisher", event: "x_skipped_already_published", offerId: offer.id }));
     results.x = { ok: true, skipped: true, detail: "already_published" };
+    console.log("agent_event", JSON.stringify({ agent: "publisher", event: "x_skipped", offerId: offer.id }));
   }
 
-  await Promise.all(tasks);
+  // Sequential with delay to avoid Telegram 429 rate limits
+  for (let i = 0; i < channels.length; i++) {
+    await channels[i]();
+    if (i < channels.length - 1) await sleep(INTER_CHANNEL_DELAY_MS);
+  }
+
   await db.save();
 
   console.log("agent_event", JSON.stringify({

@@ -110,16 +110,26 @@ export async function publishTelegram(draft, config, offer = null) {
     const body = hasImage
       ? { chat_id: config.telegramChatId, photo: images[0], caption: text }
       : { chat_id: config.telegramChatId, text, disable_web_page_preview: false };
-    const response = await fetch(`${botUrl}/${method}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    const payload = await response.json().catch(() => ({}));
-    return { ok: response.ok && payload.ok, dryRun: false, providerMessageId: payload.result?.message_id || null, detail: payload.description || "ok" };
+    return await telegramRequest(`${botUrl}/${method}`, body);
   } catch (error) {
     return telegramProviderFailure(error);
   }
+}
+
+async function telegramRequest(url, body, retries = 2) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (response.status === 429 && retries > 0) {
+    const retryAfter = (payload.parameters?.retry_after ?? 15) + 1;
+    console.log("telegram_rate_limit", JSON.stringify({ retryAfter, retriesLeft: retries - 1 }));
+    await new Promise(r => setTimeout(r, retryAfter * 1000));
+    return telegramRequest(url, body, retries - 1);
+  }
+  return { ok: response.ok && payload.ok === true, dryRun: false, providerMessageId: payload.result?.message_id || null, detail: payload.description || "ok" };
 }
 
 async function sendGeneratedImage(botUrl, chatId, offer, caption) {
