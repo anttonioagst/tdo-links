@@ -103,14 +103,24 @@ export async function publishTelegram(draft, config, offer = null) {
         })
       });
       const payload = await response.json().catch(() => ({}));
-      return { ok: response.ok && payload.ok, dryRun: false, providerMessageId: payload.result?.[0]?.message_id || null, detail: payload.description || "ok" };
+      if (response.ok && payload.ok) {
+        return { ok: true, dryRun: false, providerMessageId: payload.result?.[0]?.message_id || null, detail: "ok" };
+      }
+      console.log("telegram_media_group_failed", JSON.stringify({ detail: payload.description }));
     }
-    const hasImage = images.length === 1;
-    const method = hasImage ? "sendPhoto" : "sendMessage";
-    const body = hasImage
-      ? { chat_id: config.telegramChatId, photo: images[0], caption: text }
-      : { chat_id: config.telegramChatId, text, disable_web_page_preview: false };
-    return await telegramRequest(`${botUrl}/${method}`, body);
+
+    if (images.length >= 1) {
+      const photoResult = await telegramRequest(`${botUrl}/sendPhoto`, {
+        chat_id: config.telegramChatId, photo: images[0], caption: text
+      });
+      if (photoResult.ok) return photoResult;
+      console.log("telegram_photo_failed", JSON.stringify({ detail: photoResult.detail }));
+    }
+
+    // Fallback: text only (Amazon CDN often blocked by Telegram servers)
+    return await telegramRequest(`${botUrl}/sendMessage`, {
+      chat_id: config.telegramChatId, text, disable_web_page_preview: false
+    });
   } catch (error) {
     return telegramProviderFailure(error);
   }
