@@ -28,24 +28,6 @@ export function createApp({ db, config, publicDir }) {
         await handleRedirect(req, res, url, db, config);
         return;
       }
-      if (url.pathname.startsWith("/api/offers/") && url.pathname.endsWith("/image")) {
-        const offerId = url.pathname.replace("/api/offers/", "").replace("/image", "");
-        const offer = db.state.offers.find((item) => item.id === offerId);
-        if (!offer?.generatedImagePath) {
-          res.writeHead(404, { "content-type": "text/plain" });
-          res.end("No generated image.");
-          return;
-        }
-        try {
-          const body = await readFile(offer.generatedImagePath);
-          res.writeHead(200, { "content-type": "image/jpeg", "cache-control": "public, max-age=3600" });
-          res.end(body);
-        } catch {
-          res.writeHead(404, { "content-type": "text/plain" });
-          res.end("Image file not found.");
-        }
-        return;
-      }
       await serveStatic(res, publicDir, url.pathname === "/" ? "/index.html" : url.pathname);
     } catch (error) {
       sendJson(res, 500, { error: "internal_error", detail: error.message });
@@ -59,6 +41,23 @@ async function handleApi(req, res, url, db, config) {
     return;
   }
 
+  const offerImageServeMatch = url.pathname.match(/^\/api\/offers\/([^/]+)\/image$/);
+  if (req.method === "GET" && offerImageServeMatch) {
+    const [, offerId] = offerImageServeMatch;
+    const offer = db.state.offers.find((item) => item.id === offerId);
+    if (!offer?.generatedImagePath) {
+      sendJson(res, 404, { error: "no_generated_image" });
+      return;
+    }
+    try {
+      const body = await readFile(offer.generatedImagePath);
+      res.writeHead(200, { "content-type": "image/jpeg", "cache-control": "public, max-age=3600" });
+      res.end(body);
+    } catch {
+      sendJson(res, 404, { error: "image_file_not_found" });
+    }
+    return;
+  }
   if (req.method === "GET" && url.pathname === "/api/state") {
     sendJson(res, 200, publicState(db, config));
     return;
@@ -215,19 +214,16 @@ async function handleApi(req, res, url, db, config) {
       sendJson(res, 404, { error: "offer_not_found" });
       return;
     }
-    if (!config.openaiApiKey) {
-      sendJson(res, 400, { error: "openai_not_configured", detail: "Set OPENAI_API_KEY in environment." });
-      return;
+    try {
+      const imagePath = await generateOfferImage(db.state.offers[offerIndex], config);
+      db.state.offers[offerIndex].generatedImagePath = imagePath;
+      db.state.offers[offerIndex].generatedAt = new Date().toISOString();
+      await db.save();
+      sendJson(res, 200, { ok: true, imagePath });
+    } catch (err) {
+      console.error("generate_image_error", JSON.stringify({ offerId, error: err.message }));
+      sendJson(res, 500, { error: err.message });
     }
-    const imagePath = await generateOfferImage(db.state.offers[offerIndex], config);
-    if (!imagePath) {
-      sendJson(res, 500, { error: "image_generation_failed" });
-      return;
-    }
-    db.state.offers[offerIndex].generatedImagePath = imagePath;
-    db.state.offers[offerIndex].generatedAt = new Date().toISOString();
-    await db.save();
-    sendJson(res, 200, { ok: true, imagePath });
     return;
   }
   const offerAffiliateMatch = url.pathname.match(/^\/api\/offers\/([^/]+)\/affiliate$/);
