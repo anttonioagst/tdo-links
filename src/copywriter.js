@@ -1,32 +1,33 @@
 import { trackedUrl } from "./links.js";
 
 const CATEGORY_EMOJI = {
-  ssd: "💾",
-  hd: "💾",
-  pendrive: "💾",
-  mouse: "🖱️",
-  teclado: "⌨️",
-  keyboard: "⌨️",
-  notebook: "💻",
-  laptop: "💻",
+  ssd: "💾", hd: "💾", pendrive: "💾",
+  mouse: "🖱️", teclado: "⌨️", keyboard: "⌨️",
+  notebook: "💻", laptop: "💻",
   monitor: "🖥️",
-  headphone: "🎧",
-  fone: "🎧",
-  airpods: "🎧",
+  headphone: "🎧", fone: "🎧", airpods: "🎧", headset: "🎧",
   tv: "📺",
-  celular: "📱",
-  smartphone: "📱",
-  iphone: "📱",
-  galaxy: "📱",
-  tenis: "👟",
-  tênis: "👟",
-  hub: "🔌",
-  cabo: "🔌",
-  carregador: "🔌",
-  camera: "📷",
-  câmera: "📷",
+  celular: "📱", smartphone: "📱", iphone: "📱", galaxy: "📱",
+  tenis: "👟", tênis: "👟",
+  hub: "🔌", cabo: "🔌", carregador: "🔌",
+  camera: "📷", câmera: "📷",
   cadeira: "🪑",
   impressora: "🖨️"
+};
+
+const PREMIUM_LINE = {
+  notebook: "Performance e portabilidade no mesmo pacote.",
+  laptop: "Performance e portabilidade no mesmo pacote.",
+  monitor: "Mais tela, mais foco, mais produtividade.",
+  iphone: "O melhor da Apple pelo melhor preço do ano.",
+  galaxy: "Câmera incrível, tela top, desempenho fluido.",
+  smartphone: "Desempenho premium com custo-benefício real.",
+  câmera: "Qualidade profissional de imagem acessível.",
+  camera: "Qualidade profissional de imagem acessível.",
+  headset: "Áudio imersivo para gaming e reuniões.",
+  headphone: "Qualidade de som que você vai sentir a diferença.",
+  cadeira: "Ergonomia que cuida de você em longas jornadas.",
+  ssd: "Velocidade real. Tudo mais rápido no seu setup."
 };
 
 function categoryEmoji(offer) {
@@ -35,6 +36,32 @@ function categoryEmoji(offer) {
     if (text.includes(key)) return emoji;
   }
   return "🫧";
+}
+
+function shortCategory(offer) {
+  if (offer.category && offer.category !== "tech") return offer.category;
+  const title = String(offer.title || "").toLowerCase();
+  if (title.includes("ssd")) return "SSD";
+  if (title.includes("notebook") || title.includes("laptop")) return "Notebook";
+  if (title.includes("monitor")) return "Monitor";
+  if (title.includes("mouse")) return "Mouse";
+  if (title.includes("teclado") || title.includes("keyboard")) return "Teclado";
+  if (title.includes("headset") || title.includes("headphone") || title.includes("fone")) return "Áudio";
+  if (title.includes("câmera") || title.includes("camera")) return "Câmera";
+  if (title.includes("smartphone") || title.includes("celular") || title.includes("iphone") || title.includes("galaxy")) return "Smartphone";
+  if (title.includes("hub")) return "Hub USB";
+  if (title.includes("carregador")) return "Carregador";
+  if (title.includes("cabo")) return "Cabo";
+  if (title.includes("tenis") || title.includes("tênis")) return "Tênis";
+  return "Tech";
+}
+
+function premiumLine(offer) {
+  const text = `${offer.title} ${offer.category}`.toLowerCase();
+  for (const [key, line] of Object.entries(PREMIUM_LINE)) {
+    if (text.includes(key)) return line;
+  }
+  return "Custo-benefício difícil de ignorar.";
 }
 
 function getPostUrl(offer, shortCode, config) {
@@ -55,29 +82,37 @@ export function createXPostCopy(offer, shortCode, config) {
 }
 
 export function telegramCopy(offer, url, disclosure) {
-  const previous = offer.previousPrice ? money(offer.previousPrice) : "preço normal";
+  const emoji = categoryEmoji(offer);
+  const label = shortCategory(offer);
+  const current = money(offer.currentPrice);
+  const previous = offer.previousPrice ? money(offer.previousPrice) : null;
+  const priceStr = previous ? `De ${previous} | Por ${current}` : `Por ${current}`;
+  const store = storeLabel(offer.store);
+  const isPremium = (offer.currentPrice ?? 0) >= 500;
+
   return [
-    "🚨 Super Promoção:",
-    `${categoryEmoji(offer)} ${discountLine(offer)}`,
-    "",
+    `🚨 ${emoji} ${label}:`,
+    isPremium ? premiumLine(offer) : null,
     offer.title,
-    `De ${previous} | Por ${money(offer.currentPrice)}`,
-    "",
-    url,
+    priceStr,
+    `Ad ${store}: ${url}`,
     disclosure
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 export function xCopy(offer, url) {
-  const previous = offer.previousPrice ? money(offer.previousPrice) : "preço normal";
+  const emoji = categoryEmoji(offer);
+  const label = shortCategory(offer);
+  const current = money(offer.currentPrice);
+  const previous = offer.previousPrice ? money(offer.previousPrice) : null;
+  const priceStr = previous ? `De ${previous} | Por ${current}` : `Por ${current}`;
+  const store = storeLabel(offer.store);
+
   return [
-    "🚨 Super Promoção:",
-    `${categoryEmoji(offer)} ${discountLine(offer)}`,
-    "",
+    `🚨 ${emoji} ${label}:`,
     offer.title,
-    `De ${previous} | Por ${money(offer.currentPrice)}`,
-    "",
-    `Ad ${storeLabel(offer.store)}: ${url}`
+    priceStr,
+    `Ad ${store}: ${url}`
   ].join("\n").slice(0, 280);
 }
 
@@ -85,13 +120,14 @@ export function createXAcquisitionCopy(topOffers, config) {
   const offer = topOffers[0];
   if (!offer) return "";
   const link = config.xProfileUrl || "Links no Telegram.";
+  const emoji = categoryEmoji(offer);
+  const label = shortCategory(offer);
+  const current = money(offer.currentPrice);
+
   return [
-    "🚨 Super Promoção:",
-    `${categoryEmoji(offer)} ${discountLine(offer)}`,
-    "",
+    `🚨 ${emoji} ${label}:`,
     offer.title,
-    `Por ${money(offer.currentPrice)}`,
-    "",
+    `Por ${current}`,
     `Ad ${storeLabel(offer.store)}: ${link}`
   ].join("\n").slice(0, 280);
 }
@@ -105,24 +141,5 @@ export function storeLabel(store) {
     magalu: "Magalu",
     shopee: "Shopee"
   };
-  return labels[store] || store;
-}
-
-function discountLine(offer) {
-  const amountOff = offer.previousPrice && offer.previousPrice > offer.currentPrice
-    ? money(offer.previousPrice - offer.currentPrice)
-    : "";
-  if (amountOff) return `${shortCategory(offer)} com ${amountOff} OFF.`;
-  if (offer.discountPercent) return `${shortCategory(offer)} com ${offer.discountPercent}% OFF.`;
-  return "Oferta selecionada com preço em destaque.";
-}
-
-function shortCategory(offer) {
-  if (offer.category && offer.category !== "tech") return offer.category;
-  const title = String(offer.title || "").toLowerCase();
-  if (title.includes("ssd")) return "SSD";
-  if (title.includes("mouse")) return "Mouse";
-  if (title.includes("hub")) return "Hub";
-  if (title.includes("air max") || title.includes("tenis") || title.includes("tênis")) return "Tênis";
-  return "Tech";
+  return labels[store] || store || "Loja";
 }

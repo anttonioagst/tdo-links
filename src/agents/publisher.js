@@ -36,8 +36,10 @@ export async function publishDeal(offer, content, config, db) {
   console.log("agent_event", JSON.stringify({ agent: "publisher", event: "start", offerId: offer.id, title: offer.title }));
 
   const affiliateUrl = offer.affiliateUrl || offer.originalUrl || offer.url || "";
-  const { imagePath, copy } = content;
-  const offerWithImage = imagePath ? { ...offer, generatedImagePath: imagePath } : offer;
+  const { imagePaths, imagePath, copy } = content;
+  const offerWithImage = (imagePaths?.length || imagePath)
+    ? { ...offer, generatedImagePaths: imagePaths ?? (imagePath ? [imagePath] : []), generatedImagePath: imagePaths?.[0] ?? imagePath }
+    : offer;
   const results = {};
 
   // Build ordered list of channels to publish (lazy functions, not promises)

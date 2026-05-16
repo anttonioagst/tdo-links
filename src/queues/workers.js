@@ -151,10 +151,15 @@ export function startWorkers(db, config, connection) {
 
     const content = await createContent(offer, validationResult, config);
 
-    // Persist image path back to the offer in DB
+    // Persist image paths back to the offer in DB
     const offerInDb = db.state.offers.find(o => o.id === offer.id);
     if (offerInDb) {
-      if (content.imagePath) {
+      if (content.imagePaths?.length) {
+        offerInDb.generatedImagePaths = content.imagePaths;
+        offerInDb.generatedImagePath = content.imagePaths[0];
+        offerInDb.generatedAt = new Date().toISOString();
+        offerInDb.imageStatus = "done";
+      } else if (content.imagePath) {
         offerInDb.generatedImagePath = content.imagePath;
         offerInDb.generatedAt = new Date().toISOString();
         offerInDb.imageStatus = "done";
@@ -171,7 +176,7 @@ export function startWorkers(db, config, connection) {
       await publishQueue.add("publish", { offer: offerInDb || offer, content }, {
         attempts: 2, backoff: { type: "exponential", delay: 10000 }
       });
-      console.log("job_done", JSON.stringify({ queue: "creative", title: offer?.title, result: "enqueued_publish", hasImage: !!content.imagePath }));
+      console.log("job_done", JSON.stringify({ queue: "creative", title: offer?.title, result: "enqueued_publish", imageCount: content.imagePaths?.length ?? (content.imagePath ? 1 : 0) }));
     } else {
       console.log("job_done", JSON.stringify({ queue: "creative", title: offer?.title, result: "no_publish_queue" }));
     }

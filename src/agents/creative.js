@@ -1,30 +1,53 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { generateOfferImage } from "../imagegen.js";
+import { generateOfferImagePack } from "../imagegen.js";
 
 const MODEL = "claude-sonnet-4-6";
 
 function buildCopyPrompt(offer, validationResult, config) {
-  const telegramUrl = config.telegramChannelUrl || "t.me/tdolinks";
-  const discordUrl = config.discordInviteUrl || "discord.gg/tdolinks";
+  const isPremium = (offer.currentPrice ?? 0) >= 500;
+  const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
+  const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
 
-  return `Você é copywriter do canal brasileiro de deals TDO Links.
+  return `Você é o copywriter do canal TDO Links no estilo SDM Links — direto, sem enrolação, emojis variados por categoria.
 
-Produto: ${offer.title || "Produto Tech"}
-Preço: R$ ${offer.currentPrice ?? "N/A"} (era R$ ${offer.previousPrice ?? "N/A"} — ${offer.discountPercent ?? "N/A"}% off)
-Avaliação: ${offer.rating ?? "N/A"}/5
-Análise do curador: "${validationResult.reason || "Bom deal de tecnologia"}"
+Produto: ${offer.title}
+Preço atual: R$ ${currentFmt}
+Preço anterior: ${previousFmt ? `R$ ${previousFmt}` : "indisponível"}
+Avaliação: ${offer.rating ?? "N/A"}/5 (${offer.reviewCount ?? 0} avaliações)
 Categoria: ${offer.category || "tech"}
+Premium (≥R$500): ${isPremium ? "sim" : "não"}
+Curador: "${validationResult.reason || "Bom deal de tecnologia"}"
 
-Gere copy para 3 canais. JSON válido:
+Crie copy para 3 canais. Retorne JSON válido exatamente neste formato:
 {
-  "telegram": "emoji+título\\n\\nDe R$X por R$Y (-Z%)\\n⭐ rating\\n\\n✅ benefício\\n\\n{LINK}\\n\\n#tech #deals",
-  "discord": "**emoji título**\\n~~R$X~~ → **R$Y** (-Z%)\\n> benefício\\n{LINK}",
-  "x": "🔥 título curtíssimo — R$Y (-Z%)\\n\\nLink nos nossos canais:\\n📱 ${telegramUrl}\\n💬 ${discordUrl}\\n\\n#tech #ofertas"
+  "telegram": "texto aqui",
+  "discord": "texto aqui",
+  "x": "texto aqui"
 }
-Regras:
-- X: máximo 180 chars totais, sem link de afiliado, CTA duplo (Telegram + Discord)
-- Telegram/Discord: {LINK} será substituído pelo link de afiliado real
-- Emojis de categoria: 💻 tech, 🖱️ mouse, ⌨️ teclado, 🎧 audio, 📱 mobile, 💾 storage, 🖥️ monitor`;
+
+FORMATO TELEGRAM:
+🚨 [emoji da categoria] [Nome curto da categoria]:
+${isPremium ? "[1 frase curta explicando por que vale a pena — apenas para premium]\n" : ""}${offer.title}
+De R$${previousFmt ?? "?"} | Por R$${currentFmt}
+Ad [Loja]: {LINK}
+
+FORMATO DISCORD:
+**🚨 [emoji] [categoria]:**
+~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**
+> [frase de valor em 1 linha]
+{LINK}
+
+FORMATO X (máximo 220 chars, sem link afiliado):
+🚨 [emoji] [categoria]:
+[título produto ~60 chars]
+De R$${previousFmt ?? "?"} | Por R$${currentFmt}
+Veja no nosso canal 👇
+
+REGRAS:
+- Emojis: 💻 notebook/laptop, 🖱️ mouse, ⌨️ teclado, 🎧 audio/headset/fone, 📱 celular/smartphone, 💾 ssd/storage, 🖥️ monitor, 🔌 hub/cabo/carregador, 📷 câmera, 🪑 cadeira, 🫧 outros
+- Telegram/Discord: escreva {LINK} literalmente (será substituído pelo link real)
+- X: sem link afiliado, sem hashtags, máximo 220 chars
+- Nunca escreva percentual de desconto (não escreva "30% off" ou similares)`;
 }
 
 function safeParseJson(text) {
@@ -37,80 +60,67 @@ function safeParseJson(text) {
   }
 }
 
-function fallbackCopy(offer, config) {
-  const telegramUrl = config.telegramChannelUrl || "t.me/tdolinks";
-  const discordUrl = config.discordInviteUrl || "discord.gg/tdolinks";
-  const price = offer.currentPrice ? `R$ ${Number(offer.currentPrice).toFixed(2).replace(".", ",")}` : "Preço especial";
-  const discount = offer.discountPercent ? ` (-${Math.round(offer.discountPercent)}%)` : "";
+function fallbackCopy(offer) {
+  const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
+  const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
+  const priceStr = previousFmt ? `De R$${previousFmt} | Por R$${currentFmt}` : `Por R$${currentFmt}`;
+  const title = offer.title || "Oferta Tech";
 
   return {
-    telegram: `💻 ${offer.title || "Oferta Tech"}\n\n${price}${discount}\n\n{LINK}\n\n#tech #deals`,
-    discord: `**💻 ${offer.title || "Oferta Tech"}**\n${price}${discount}\n{LINK}`,
-    x: `🔥 ${(offer.title || "Oferta Tech").slice(0, 60)} ${price}${discount}\n\n📱 ${telegramUrl}\n💬 ${discordUrl}\n\n#tech #ofertas`.slice(0, 180)
+    telegram: `🚨 💻 Tech:\n${title}\n${priceStr}\nAd Loja: {LINK}`,
+    discord: `**🚨 💻 Tech:**\n~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**\n> Oferta selecionada\n{LINK}`,
+    x: `🚨 💻 Tech:\n${title.slice(0, 60)}\n${priceStr}\nVeja no nosso canal 👇`.slice(0, 220)
   };
 }
 
 export async function createContent(offer, validationResult, config) {
   console.log("agent_event", JSON.stringify({ agent: "creative", event: "start", title: offer.title }));
 
-  // Run image generation and copy writing in parallel
   const [imageResult, copyResult] = await Promise.allSettled([
-    // Image generation (may fail gracefully)
     (async () => {
       if (!config.openaiApiKey) throw new Error("openai_not_configured");
-      return await generateOfferImage(offer, config);
+      return await generateOfferImagePack(offer, config);
     })(),
 
-    // Copy generation via Claude Sonnet
     (async () => {
-      if (!config.anthropicApiKey) {
-        return fallbackCopy(offer, config);
-      }
+      if (!config.anthropicApiKey) return fallbackCopy(offer);
 
       const client = new Anthropic({ apiKey: config.anthropicApiKey });
       const message = await client.messages.create({
         model: MODEL,
-        max_tokens: 600,
-        messages: [
-          { role: "user", content: buildCopyPrompt(offer, validationResult, config) }
-        ]
+        max_tokens: 700,
+        messages: [{ role: "user", content: buildCopyPrompt(offer, validationResult, config) }]
       });
 
       const rawText = message.content?.[0]?.text || "";
       const parsed = safeParseJson(rawText);
 
-      if (!parsed || !parsed.telegram || !parsed.discord || !parsed.x) {
+      if (!parsed?.telegram || !parsed?.discord || !parsed?.x) {
         console.log("agent_event", JSON.stringify({ agent: "creative", event: "copy_parse_error", raw: rawText.slice(0, 100) }));
-        return fallbackCopy(offer, config);
+        return fallbackCopy(offer);
       }
 
-      // Enforce X char limit
-      if (parsed.x.length > 180) {
-        parsed.x = parsed.x.slice(0, 180);
-      }
-
+      if (parsed.x.length > 220) parsed.x = parsed.x.slice(0, 220);
       return parsed;
     })()
   ]);
 
-  // Image: fallback gracefully if it fails
-  let imagePath = null;
+  let imagePaths = null;
   if (imageResult.status === "fulfilled") {
-    imagePath = imageResult.value;
+    imagePaths = imageResult.value;
   } else {
     console.log("agent_event", JSON.stringify({ agent: "creative", event: "image_skipped", error: imageResult.reason?.message }));
   }
 
-  // Copy: use fallback if it fails
   let copy;
   if (copyResult.status === "fulfilled") {
     copy = copyResult.value;
   } else {
     console.log("agent_event", JSON.stringify({ agent: "creative", event: "copy_error", error: copyResult.reason?.message }));
-    copy = fallbackCopy(offer, config);
+    copy = fallbackCopy(offer);
   }
 
-  console.log("agent_event", JSON.stringify({ agent: "creative", event: "done", title: offer.title, hasImage: !!imagePath }));
+  console.log("agent_event", JSON.stringify({ agent: "creative", event: "done", title: offer.title, imageCount: imagePaths?.length ?? 0 }));
 
-  return { imagePath, copy };
+  return { imagePaths, imagePath: imagePaths?.[0] ?? null, copy };
 }
