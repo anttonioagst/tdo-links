@@ -43,7 +43,7 @@ export function loadConfig(env = process.env) {
     rssEnabled: env.RSS_ENABLED !== "false",
     maxPublicationsPerCycle: Number(env.MAX_PUBLICATIONS_PER_CYCLE || 2),
     publicationWindowHours: Number(env.PUBLICATION_WINDOW_HOURS || 2),
-    maxCandidatesPerCycle: Number(env.MAX_CANDIDATES_PER_CYCLE || 6),
+    maxCandidatesPerCycle: Number(env.MAX_CANDIDATES_PER_CYCLE || 2),
     databaseUrl: env.DATABASE_URL || "",
     redisUrl: env.REDIS_URL || ""
   };

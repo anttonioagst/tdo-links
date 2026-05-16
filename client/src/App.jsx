@@ -375,7 +375,7 @@ function PipelineView({ state, action, api, loading }) {
 
       <Panel
         title="Imagens AI"
-        count={`${offers.filter(o => o.generatedImagePath).length} geradas · ${offers.filter(o => o.imageStatus === "pending" || o.imageStatus === "generating").length} em processamento`}
+        count={`${offers.filter(o => o.generatedImagePath).length} geradas · ${offers.filter(o => o.imageStatus === "pending" || o.imageStatus === "generating").length} em processamento · pipeline: max 2 deals/ciclo`}
       >
         <ImageGenPanel offers={offers} action={action} api={api} loading={loading} />
       </Panel>
@@ -387,10 +387,17 @@ function ImageGenPanel({ offers, action, api, loading }) {
   const [now, setNow] = useState(Date.now());
 
   const active = offers.filter(o => o.imageStatus === "pending" || o.imageStatus === "generating");
-  const noImage = offers
-    .filter(o => !o.generatedImagePath && o.imageStatus !== "pending" && o.imageStatus !== "generating")
+  // "validated" status = in pipeline, image coming automatically — no button needed
+  const needsManual = offers
+    .filter(o =>
+      !o.generatedImagePath &&
+      o.imageStatus !== "pending" &&
+      o.imageStatus !== "generating" &&
+      o.status !== "validated" &&
+      (o.imageStatus === "failed" || !o.imageStatus)
+    )
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-    .slice(0, 10);
+    .slice(0, 8);
   const done = offers.filter(o => o.generatedImagePath).length;
 
   useEffect(() => {
@@ -451,16 +458,16 @@ function ImageGenPanel({ offers, action, api, loading }) {
               </div>
             );
           })}
-          {noImage.length > 0 && <div className="h-px bg-slate-800 my-3" />}
+          {needsManual.length > 0 && <div className="h-px bg-slate-800 my-3" />}
         </>
       )}
 
-      {noImage.length > 0 && (
+      {needsManual.length > 0 && (
         <>
           <p className="mb-3 text-xs font-medium uppercase tracking-wide text-slate-500">
-            Sem imagem AI ({noImage.length} de {offers.filter(o => !o.generatedImagePath).length})
+            Geracao manual ({needsManual.length} ofertas legadas)
           </p>
-          {noImage.map(offer => (
+          {needsManual.map(offer => (
             <div key={offer.id} className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/30 p-3">
               {offer.imageUrl ? (
                 <img src={offer.imageUrl} alt="" className="size-10 shrink-0 rounded-lg object-cover ring-1 ring-slate-700" />

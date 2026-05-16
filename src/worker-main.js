@@ -4,7 +4,6 @@ import { PgDb } from "./pg-db.js";
 import { JsonDb } from "./db.js";
 import { initQueues, getConnection } from "./queues/index.js";
 import { startWorkers } from "./queues/workers.js";
-import { runScrapePipeline } from "./agents.js";
 import { runDiscovery } from "./agents/discovery.js";
 import cron from "node-cron";
 
@@ -25,13 +24,6 @@ if (!queuesReady) {
 }
 
 startWorkers(db, config, getConnection());
-
-cron.schedule(`0 */${config.scrapeIntervalMinutes > 59 ? Math.round(config.scrapeIntervalMinutes / 60) : 1} * * *`, async () => {
-  console.log("cron_trigger scrape");
-  runScrapePipeline(db, config).catch(err =>
-    console.error("cron_scrape_failed", JSON.stringify({ error: err.message }))
-  );
-});
 
 cron.schedule("0 */2 * * *", async () => {
   console.log("cron_trigger discovery");

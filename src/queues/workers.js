@@ -71,12 +71,25 @@ export function startWorkers(db, config, connection) {
     const passes = validationResult.valid === true && validationResult.confidence > threshold;
 
     if (!passes) {
+      // Save rejected offer to DB so it appears in the Rejected view
+      const canonicalUrl = (offer.originalUrl || offer.url || "").split("?")[0];
+      const alreadyInDb = db.state.offers.some(o =>
+        (offer.asin && o.asin === offer.asin) ||
+        ((o.originalUrl || o.url || "").split("?")[0] === canonicalUrl && canonicalUrl)
+      );
+      if (!alreadyInDb) {
+        const id = db.nextId("offer");
+        db.state.offers.unshift({
+          id, ...offer, status: "rejected",
+          validationSummary: validationResult.reason,
+          validationConfidence: validationResult.confidence,
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+        });
+        await db.save();
+      }
       console.log("job_done", JSON.stringify({
-        queue: "validation",
-        title: offer?.title,
-        result: "rejected",
-        confidence: validationResult.confidence,
-        reason: validationResult.reason
+        queue: "validation", title: offer?.title, result: "rejected",
+        confidence: validationResult.confidence, reason: validationResult.reason
       }));
       return { ...validationResult, passes };
     }
@@ -91,28 +104,40 @@ export function startWorkers(db, config, connection) {
 
     if (recentPublished >= maxPerCycle) {
       console.log("job_done", JSON.stringify({
-        queue: "validation",
-        title: offer?.title,
-        result: "quota_reached",
-        recentPublished,
-        maxPerCycle,
-        windowHours
+        queue: "validation", title: offer?.title, result: "quota_reached",
+        recentPublished, maxPerCycle, windowHours
       }));
       return { ...validationResult, passes: false, reason: "quota_reached" };
     }
 
+    // Insert validated offer to DB so the UI shows image generation progress
+    const canonicalUrl = (offer.originalUrl || offer.url || "").split("?")[0];
+    let offerWithId = db.state.offers.find(o =>
+      (offer.asin && o.asin === offer.asin) ||
+      ((o.originalUrl || o.url || "").split("?")[0] === canonicalUrl && canonicalUrl)
+    );
+    if (!offerWithId) {
+      const id = db.nextId("offer");
+      offerWithId = {
+        id, ...offer, status: "validated",
+        validationSummary: validationResult.reason,
+        validationConfidence: validationResult.confidence,
+        imageStatus: "pending",
+        imageStatusUpdatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      };
+      db.state.offers.unshift(offerWithId);
+      await db.save();
+    }
+
     if (creativeQueue) {
-      await creativeQueue.add("creative", { offer, validationResult }, {
-        attempts: 3,
-        backoff: { type: "exponential", delay: 30000 }
+      await creativeQueue.add("creative", { offer: offerWithId, validationResult }, {
+        attempts: 3, backoff: { type: "exponential", delay: 30000 }
       });
       console.log("job_done", JSON.stringify({
-        queue: "validation",
-        title: offer?.title,
-        result: "enqueued_creative",
-        confidence: validationResult.confidence,
-        recentPublished,
-        maxPerCycle
+        queue: "validation", title: offer?.title, result: "enqueued_creative",
+        offerId: offerWithId.id, confidence: validationResult.confidence,
+        recentPublished, maxPerCycle
       }));
     }
 
@@ -126,12 +151,27 @@ export function startWorkers(db, config, connection) {
 
     const content = await createContent(offer, validationResult, config);
 
+    // Persist image path back to the offer in DB
+    const offerInDb = db.state.offers.find(o => o.id === offer.id);
+    if (offerInDb) {
+      if (content.imagePath) {
+        offerInDb.generatedImagePath = content.imagePath;
+        offerInDb.generatedAt = new Date().toISOString();
+        offerInDb.imageStatus = "done";
+      } else {
+        offerInDb.imageStatus = "failed";
+      }
+      offerInDb.imageStatusUpdatedAt = new Date().toISOString();
+      offerInDb.status = "auto_ready";
+      offerInDb.updatedAt = new Date().toISOString();
+      await db.save();
+    }
+
     if (publishQueue) {
-      await publishQueue.add("publish", { offer, content }, {
-        attempts: 2,
-        backoff: { type: "exponential", delay: 10000 }
+      await publishQueue.add("publish", { offer: offerInDb || offer, content }, {
+        attempts: 2, backoff: { type: "exponential", delay: 10000 }
       });
-      console.log("job_done", JSON.stringify({ queue: "creative", title: offer?.title, result: "enqueued_publish" }));
+      console.log("job_done", JSON.stringify({ queue: "creative", title: offer?.title, result: "enqueued_publish", hasImage: !!content.imagePath }));
     } else {
       console.log("job_done", JSON.stringify({ queue: "creative", title: offer?.title, result: "no_publish_queue" }));
     }
