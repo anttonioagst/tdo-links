@@ -41,6 +41,9 @@ export function loadConfig(env = process.env) {
     telegramChannelUrl: env.TELEGRAM_CHANNEL_URL || "",
     discordInviteUrl: env.DISCORD_INVITE_URL || "",
     rssEnabled: env.RSS_ENABLED !== "false",
+    maxPublicationsPerCycle: Number(env.MAX_PUBLICATIONS_PER_CYCLE || 2),
+    publicationWindowHours: Number(env.PUBLICATION_WINDOW_HOURS || 2),
+    maxCandidatesPerCycle: Number(env.MAX_CANDIDATES_PER_CYCLE || 6),
     databaseUrl: env.DATABASE_URL || "",
     redisUrl: env.REDIS_URL || ""
   };

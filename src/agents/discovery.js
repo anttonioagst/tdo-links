@@ -106,9 +106,22 @@ export async function runDiscovery(db, config) {
     }
   }
 
-  // Enqueue one validation job per new deal
+  // Rank by discount % (best deals first), then limit candidates per cycle
+  const maxCandidates = config.maxCandidatesPerCycle ?? 6;
+  const ranked = [...newOffers].sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
+  const candidates = ranked.slice(0, maxCandidates);
+
+  console.log("agent_event", JSON.stringify({
+    agent: "discovery",
+    event: "ranked",
+    total: newOffers.length,
+    selected: candidates.length,
+    maxCandidates
+  }));
+
+  // Enqueue one validation job per selected candidate
   let enqueued = 0;
-  for (const offer of newOffers) {
+  for (const offer of candidates) {
     try {
       const { validationQueue } = await import("../queues/index.js");
       if (validationQueue) {

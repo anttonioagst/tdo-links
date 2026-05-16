@@ -54,19 +54,49 @@ export function startWorkers(db, config, connection) {
     const threshold = config.aiConfidenceThreshold ?? 70;
     const passes = validationResult.valid === true && validationResult.confidence > threshold;
 
-    if (passes && creativeQueue) {
-      await creativeQueue.add("creative", { offer, validationResult }, {
-        attempts: 3,
-        backoff: { type: "exponential", delay: 30000 }
-      });
-      console.log("job_done", JSON.stringify({ queue: "validation", title: offer?.title, result: "enqueued_creative" }));
-    } else {
+    if (!passes) {
       console.log("job_done", JSON.stringify({
         queue: "validation",
         title: offer?.title,
         result: "rejected",
         confidence: validationResult.confidence,
         reason: validationResult.reason
+      }));
+      return { ...validationResult, passes };
+    }
+
+    // Quota check: max N publications per window before enqueuing creative
+    const maxPerCycle = config.maxPublicationsPerCycle ?? 2;
+    const windowHours = config.publicationWindowHours ?? 2;
+    const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
+    const recentPublished = (db.state.publishLog || [])
+      .filter(l => l.result?.ok && l.channel === "telegram" && l.createdAt >= windowStart)
+      .length;
+
+    if (recentPublished >= maxPerCycle) {
+      console.log("job_done", JSON.stringify({
+        queue: "validation",
+        title: offer?.title,
+        result: "quota_reached",
+        recentPublished,
+        maxPerCycle,
+        windowHours
+      }));
+      return { ...validationResult, passes: false, reason: "quota_reached" };
+    }
+
+    if (creativeQueue) {
+      await creativeQueue.add("creative", { offer, validationResult }, {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 30000 }
+      });
+      console.log("job_done", JSON.stringify({
+        queue: "validation",
+        title: offer?.title,
+        result: "enqueued_creative",
+        confidence: validationResult.confidence,
+        recentPublished,
+        maxPerCycle
       }));
     }
 
