@@ -496,7 +496,7 @@ function ImageGenPanel({ offers, action, api, loading }) {
         </>
       )}
 
-      {active.length === 0 && noImage.length === 0 && (
+      {active.length === 0 && needsManual.length === 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
           <CheckCircle2 className="size-5 shrink-0 text-emerald-400" />
           <div>
