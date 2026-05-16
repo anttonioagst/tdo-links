@@ -197,7 +197,13 @@ export async function runPublishPipeline(db, config) {
     if (draft.publishedAt || draft.status === "published") return false;
     if (!["telegram", "discord"].includes(draft.channel)) return false;
     if (draft.status === "approved") return true;
-    return autoAllowed && draft.status === "auto_ready";
+    if (!autoAllowed) return false;
+    if (draft.status === "auto_ready") return true;
+    if (draft.status === "needs_review") {
+      const offer = db.state.offers.find((o) => o.id === draft.offerId);
+      return offer?.status === "auto_ready";
+    }
+    return false;
   });
   console.log("publish_pipeline", JSON.stringify({
     mode: db.state.settings.mode,

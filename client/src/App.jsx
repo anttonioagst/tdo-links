@@ -307,7 +307,26 @@ function ActionPanel({ data, loading, api, action }) {
           <ActionButton size="sm" loading={loading.scrape} onClick={() => action("scrape", () => api("/api/run/scrape", { method: "POST" }), "Ofertas coletadas")}>
             <Search className="size-4" /> Buscar ofertas
           </ActionButton>
-          <ActionButton size="sm" loading={loading.publish} onClick={() => action("publish", () => api("/api/run/publish", { method: "POST" }), "Publicacao executada")}>
+          <ActionButton size="sm" loading={loading.publish} onClick={async () => {
+            setLoading((l) => ({ ...l, publish: true }));
+            try {
+              const result = await api("/api/run/publish", { method: "POST" });
+              await refresh();
+              const t = result.telegram || {};
+              const msg = t.published > 0
+                ? `${t.published} publicado${t.published > 1 ? "s" : ""} no Telegram`
+                : t.skipped > 0
+                  ? `0 publicados — ${t.skipped} pulados (oferta bloqueada)`
+                  : t.eligible === 0 || (t.published === 0 && t.failed === 0 && t.skipped === 0)
+                    ? "0 publicados — nenhum draft elegivel (aprove um draft primeiro)"
+                    : `0 publicados — ${t.failed || 0} falhou`;
+              toast(msg, "", t.published > 0 ? "success" : "error");
+            } catch (error) {
+              toast("Acao nao concluida", error.message, "error");
+            } finally {
+              setLoading((l) => ({ ...l, publish: false }));
+            }
+          }}>
             <Send className="size-4" /> Publicar elegiveis
           </ActionButton>
           <ActionButton size="sm" variant="outline" loading={loading.report} onClick={() => action("report", () => api("/api/run/report", { method: "POST" }), "Relatorio gerado")}>
