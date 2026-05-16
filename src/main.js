@@ -1,10 +1,8 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { createAnalyticsReport, runPublishPipeline, runScrapePipeline } from "./agents.js";
 import { loadConfig } from "./config.js";
 import { JsonDb } from "./db.js";
 import { PgDb } from "./pg-db.js";
-import { startDiscoveryScheduler } from "./discovery-scheduler.js";
 import { initQueues } from "./queues/index.js";
 import { createApp } from "./server.js";
 
@@ -24,10 +22,8 @@ await db.save();
 
 const app = createApp({ db, config, publicDir: existsSync(resolve("dist")) ? resolve("dist") : resolve("public") });
 app.listen(config.port, config.host, () => {
-  console.log(`Affiliate Deal Agents MVP running at ${config.publicBaseUrl}`);
+  console.log(`TDO Links running at ${config.publicBaseUrl}`);
 });
-
-startDiscoveryScheduler(db, config);
 
 // Keep in-memory state fresh when worker writes to PostgreSQL
 if (config.databaseUrl) {
@@ -37,16 +33,7 @@ if (config.databaseUrl) {
 }
 
 setInterval(() => {
-  runScrapePipeline(db, config).catch((error) => console.error("scrape_failed", error));
-}, config.scrapeIntervalMinutes * 60 * 1000);
-
-setInterval(() => {
-  runPublishPipeline(db, config).catch((error) => console.error("publish_failed", error));
-}, config.publishIntervalMinutes * 60 * 1000);
-
-setInterval(() => {
-  createAnalyticsReport(db);
-  db.save().catch((error) => console.error("report_save_failed", error));
+  db.save().catch((error) => console.error("analytics_save_failed", error));
 }, 24 * 60 * 60 * 1000);
 
 async function loadEnvFile(filePath) {
