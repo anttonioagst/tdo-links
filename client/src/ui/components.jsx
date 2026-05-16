@@ -8,12 +8,8 @@ import { Badge } from "../components/ui/badge.jsx";
 
 export function AppShell({
   children,
-  darkMode,
   inputRef,
-  query,
-  setDarkMode,
   setMobileOpen,
-  setQuery,
   mobileOpen,
   view,
   setView,
@@ -32,12 +28,8 @@ export function AppShell({
       ) : null}
       <div className="min-h-screen transition lg:pl-[92px]">
         <TopContextBar
-          darkMode={darkMode}
           inputRef={inputRef}
-          query={query}
-          setDarkMode={setDarkMode}
           setMobileOpen={setMobileOpen}
-          setQuery={setQuery}
           view={view}
           {...topBar}
         />
@@ -95,16 +87,7 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
   );
 }
 
-export function TopContextBar({
-  actions,
-  darkMode,
-  inputRef,
-  query,
-  setDarkMode,
-  setMobileOpen,
-  setQuery,
-  view
-}) {
+export function TopContextBar({ actions, inputRef, setMobileOpen, view }) {
   const meta = viewMeta[view] || viewMeta.overview;
 
   return (
@@ -124,25 +107,7 @@ export function TopContextBar({
             <p className="truncate text-xs text-slate-500">{meta.subtitle}</p>
           </div>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="relative min-w-0 sm:w-[280px]">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
-            <input
-              aria-label="Buscar ofertas, canais e status"
-              ref={inputRef}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="h-10 w-full rounded-xl border border-slate-700 bg-slate-900 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition"
-              placeholder="Buscar ofertas, canais, status..."
-            />
-          </label>
-          <button
-            className="h-10 rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
-            onClick={() => setDarkMode(!darkMode)}
-            type="button"
-          >
-            {darkMode ? "Claro" : "Escuro"}
-          </button>
+        <div className="flex items-center gap-2">
           {actions}
         </div>
       </div>
