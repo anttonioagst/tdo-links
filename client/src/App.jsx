@@ -111,8 +111,8 @@ export default function App() {
 
   if (!state || !data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 text-gray-700 dark:bg-gray-950 dark:text-gray-300">
-        <Loader2 className="mr-3 size-5 animate-spin text-brand-500" />
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
+        <Loader2 className="mr-3 size-5 animate-spin text-violet-400" />
         Carregando TDO Links Admin...
       </div>
     );
@@ -202,7 +202,7 @@ function Overview({ state, data, setPeriod, period, setView }) {
               <select
                 value={period}
                 onChange={(event) => setPeriod(event.target.value)}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none tdo-focus dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                className="h-10 rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm text-slate-200 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition"
               >
                 {periods.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
@@ -269,10 +269,10 @@ function Operation({ state, data, drafts, loading, api, action }) {
   return (
     <div className="space-y-4 md:space-y-6">
       {hasMockOffers && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300">
+        <div className="flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <div>
-            <strong>Produtos de amostra</strong> — Os drafts abaixo foram gerados com dados fictícios. Configure <code className="rounded bg-amber-100 px-1 font-mono text-xs dark:bg-amber-500/20">SCRAPER_MODE=amazon</code> no Railway para operar com produtos reais.
+            <strong>Produtos de amostra</strong> — Os drafts abaixo foram gerados com dados fictícios. Configure <code className="rounded bg-amber-500/20 px-1 font-mono text-xs">SCRAPER_MODE=amazon</code> no Railway para operar com produtos reais.
           </div>
         </div>
       )}
@@ -325,9 +325,9 @@ function ActionPanel({ data, loading, api, action }) {
             <RefreshCcw className="size-4" /> Recalcular afiliados
           </ActionButton>
         </div>
-        <p className="text-xs leading-5 text-slate-500 dark:text-slate-400 xl:max-w-md">
+        <p className="text-xs leading-5 text-slate-500 xl:max-w-md">
           Sem envio no Telegram? Revise Configuracao/Railway:{" "}
-          <code className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">TELEGRAM_DRY_RUN=false</code>
+          <code className="rounded-md bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] text-slate-200">TELEGRAM_DRY_RUN=false</code>
           {", token e chat id preenchidos."}
         </p>
       </div>
@@ -342,7 +342,7 @@ function DraftCard({ draft, offer, loading, api, action }) {
   useEffect(() => setAffiliateUrl(offer?.affiliateSource === "manual" ? offer.affiliateUrl || "" : ""), [offer?.affiliateUrl, offer?.affiliateSource]);
   const actions = draftActionsForStatus(draft.status);
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950/55 dark:shadow-none dark:hover:border-slate-700">
+    <article className="rounded-xl border border-slate-800 bg-slate-900 p-3 shadow-sm transition hover:border-violet-500/30 hover:bg-slate-800/60">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap gap-1.5">
@@ -352,23 +352,23 @@ function DraftCard({ draft, offer, loading, api, action }) {
             {offer?.source === "mock" ? <StatusBadge tone="warning">Amostra</StatusBadge> : null}
           </div>
           {offer?.originalUrl ? (
-            <a href={offer.originalUrl} target="_blank" rel="noreferrer" className="mt-2 line-clamp-2 block text-sm font-semibold text-slate-950 hover:underline dark:text-slate-100">
+            <a href={offer.originalUrl} target="_blank" rel="noreferrer" className="mt-2 line-clamp-2 block text-sm font-semibold text-slate-100 hover:underline hover:text-violet-300">
               {offer.title}
             </a>
           ) : (
-            <h4 className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950 dark:text-slate-100">{offer?.title || "Post de aquisicao X"}</h4>
+            <h4 className="mt-2 line-clamp-2 text-sm font-semibold text-slate-100">{offer?.title || "Post de aquisicao X"}</h4>
           )}
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{channelLabel(draft.channel)} {offer ? `- ${money(offer.currentPrice)}` : ""}</p>
+          <p className="mt-1 text-xs text-slate-500">{channelLabel(draft.channel)} {offer ? `- ${money(offer.currentPrice)}` : ""}</p>
           {offer?.discoverySource ? (
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs text-slate-500">
               {offer.discoverySourceType === "term" ? "Termo" : "URL"}: {offer.discoverySource}
             </p>
           ) : null}
           {offer?.validationSummary ? (
-            <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{offer.validationSummary}</p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">{offer.validationSummary}</p>
           ) : null}
           {offer?.scoreBreakdown ? (
-            <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px] text-slate-500">
               <span>Confianca {offer.scoreBreakdown.reliability}</span>
               <span>Atratividade {offer.scoreBreakdown.attractiveness}</span>
               <span>Potencial {offer.scoreBreakdown.potential}</span>
@@ -376,7 +376,7 @@ function DraftCard({ draft, offer, loading, api, action }) {
             </div>
           ) : null}
         </div>
-        <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+        <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-800 text-slate-400">
           {draft.channel === "x" ? <Zap className="size-4" /> : <Send className="size-4" />}
         </div>
       </div>
@@ -385,16 +385,16 @@ function DraftCard({ draft, offer, loading, api, action }) {
         value={text}
         onChange={(event) => setText(event.target.value)}
         rows={6}
-        className="w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-5 text-slate-700 outline-none tdo-focus dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+        className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950/60 p-3 text-sm leading-5 text-slate-200 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition"
       />
       {draft.warnings?.length ? (
-        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-300">
+        <div className="mt-2 rounded-lg border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-300">
           {draft.warnings.map(warningLabel).join(" ")}
         </div>
       ) : null}
-      {draft.rejectionReason ? <p className="mt-2 text-xs font-medium text-rose-600 dark:text-rose-300">{draft.rejectionReason}</p> : null}
+      {draft.rejectionReason ? <p className="mt-2 text-xs font-medium text-rose-400">{draft.rejectionReason}</p> : null}
       {offer ? (
-        <div className={`mt-3 rounded-xl border p-3 ${offer.affiliateReady ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-400/20 dark:bg-emerald-500/10" : "border-amber-300 bg-amber-50 shadow-[inset_3px_0_0_rgb(245_158_11)] dark:border-amber-400/30 dark:bg-amber-500/10"}`}>
+        <div className={`mt-3 rounded-xl border p-3 ${offer.affiliateReady ? "border-emerald-400/20 bg-emerald-500/10" : "border-amber-400/30 bg-amber-500/10 shadow-[inset_3px_0_0_rgb(217_119_6)]"}`}>
           <div className="mb-3 flex items-start gap-3">
             {offer.generatedImagePath ? (
               <img
@@ -411,7 +411,7 @@ function DraftCard({ draft, offer, loading, api, action }) {
             ) : null}
             <div className="min-w-0 flex-1">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                <span className="text-xs font-semibold text-slate-200">
                   {offer.generatedImagePath ? "Imagem AI ativa" : "Imagem do produto"}
                 </span>
                 <div className="flex items-center gap-1.5">
@@ -429,7 +429,7 @@ function DraftCard({ draft, offer, loading, api, action }) {
             </div>
           </div>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">Link afiliado oficial</span>
+            <span className="text-xs font-semibold text-slate-200">Link afiliado oficial</span>
             <StatusBadge tone={offer.affiliateReady ? "success" : "warning"}>{offer.affiliateReady ? "Afiliado pronto" : "Pendente"}</StatusBadge>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -438,7 +438,7 @@ function DraftCard({ draft, offer, loading, api, action }) {
               value={affiliateUrl}
               onChange={(event) => setAffiliateUrl(event.target.value)}
               placeholder="Cole o link do SiteStripe ou amzn.to"
-              className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none tdo-focus dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+              className="h-10 min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition"
             />
             <ActionButton
               size="sm"
@@ -460,7 +460,7 @@ function DraftCard({ draft, offer, loading, api, action }) {
         {actions.includes("clone") ? <ActionButton size="sm" variant="outline" loading={loading[`clone-${draft.id}`]} onClick={() => action(`clone-${draft.id}`, () => api(`/api/drafts/${draft.id}/clone`, { method: "POST" }), "Draft duplicado")}><Copy className="size-4" /> Clonar</ActionButton> : null}
         {actions.includes("reject") ? <ActionButton size="sm" variant="danger" loading={loading[`reject-${draft.id}`]} onClick={() => action(`reject-${draft.id}`, () => api(`/api/drafts/${draft.id}/reject`, { method: "POST", body: { reason: "Rejeitado no dashboard." } }), "Draft rejeitado")}><X className="size-4" /> Rejeitar</ActionButton> : null}
         {offer?.originalUrl ? (
-          <a href={offer.originalUrl} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+          <a href={offer.originalUrl} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-300 shadow-sm transition hover:bg-slate-800 hover:text-slate-100">
             <ExternalLink className="size-3.5" /> Ver produto
           </a>
         ) : null}
@@ -474,10 +474,10 @@ function Offers({ state, data, offers, loading, api, action }) {
   return (
     <div className="space-y-5">
       {allMock && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300">
+        <div className="flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <div>
-            <strong>Modo demonstração ativo</strong> — Estas ofertas são dados de amostra gerados automaticamente. Para coletar ofertas reais da Amazon, configure <code className="rounded bg-amber-100 px-1 font-mono text-xs dark:bg-amber-500/20">SCRAPER_MODE=amazon</code> no Railway e adicione URLs de busca em Configuração → Discovery Amazon.
+            <strong>Modo demonstração ativo</strong> — Estas ofertas são dados de amostra gerados automaticamente. Para coletar ofertas reais da Amazon, configure <code className="rounded bg-amber-500/20 px-1 font-mono text-xs">SCRAPER_MODE=amazon</code> no Railway e adicione URLs de busca em Configuração → Discovery Amazon.
           </div>
         </div>
       )}
@@ -513,19 +513,19 @@ function Reports({ state, data, loading, api, action }) {
           action={<StatusBadge tone={reportTone}>{data.healthTone === "critical" ? "Critico" : data.healthTone === "warning" ? "Atencao" : "Estavel"}</StatusBadge>}
         >
           <div className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40">
-              <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+              <p className="text-sm leading-6 text-slate-300">
                 Relatorios analisam cliques, categorias, gargalos do funil e proximas acoes para gerar trafego afiliado seguro.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/30">
-                <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">Recomendacoes</p>
-                <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{recommendations.length}</p>
+              <div className="rounded-xl border border-slate-800 bg-slate-950/30 p-3">
+                <p className="text-xs font-medium uppercase text-slate-500">Recomendacoes</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-100">{recommendations.length}</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/30">
-                <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">Historico</p>
-                <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{reports.length}</p>
+              <div className="rounded-xl border border-slate-800 bg-slate-950/30 p-3">
+                <p className="text-xs font-medium uppercase text-slate-500">Historico</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-100">{reports.length}</p>
               </div>
             </div>
             <ActionButton
@@ -564,14 +564,14 @@ function Reports({ state, data, loading, api, action }) {
         <Panel title="Historico de relatorios" count={`${reports.length} analises geradas`}>
           <div className="space-y-4">
             {reports.length ? reports.map((report) => (
-              <article key={report.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/35">
+              <article key={report.id} className="rounded-2xl border border-slate-800 bg-slate-950/35 p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <span className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">{report.period}</span>
+                  <span className="text-xs font-medium uppercase text-slate-500">{report.period}</span>
                   <StatusBadge tone="cyan">Relatorio IA</StatusBadge>
                 </div>
-                <h4 className="mt-3 break-words text-sm font-semibold leading-6 text-slate-950 dark:text-slate-100">{report.expectedImpact}</h4>
-                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600 dark:text-slate-300">{Array.isArray(report.conclusions) ? report.conclusions.join(" ") : ""}</p>
-                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600 dark:text-slate-300">{Array.isArray(report.suggestions) ? report.suggestions.join(" ") : ""}</p>
+                <h4 className="mt-3 break-words text-sm font-semibold leading-6 text-slate-100">{report.expectedImpact}</h4>
+                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-400">{Array.isArray(report.conclusions) ? report.conclusions.join(" ") : ""}</p>
+                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-400">{Array.isArray(report.suggestions) ? report.suggestions.join(" ") : ""}</p>
               </article>
             )) : (
               <DesignEmptyState
@@ -646,8 +646,8 @@ function Config({ state, data, loading, api, action }) {
     }
   }), "Descoberta Amazon atualizada");
   const runDiscovery = () => action("discoveryRun", () => api("/api/discovery/amazon/run", { method: "POST" }), "Descoberta Amazon executada");
-  const configInputClass = "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none tdo-focus dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
-  const configTextareaClass = "min-h-32 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 outline-none tdo-focus dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
+  const configInputClass = "h-11 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition";
+  const configTextareaClass = "min-h-32 w-full rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm text-slate-200 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition";
   const healthTone = data.healthTone === "critical" ? "danger" : data.healthTone === "warning" ? "warning" : "success";
   const discoveryStatus = discoveryRunStatus(discovery.lastRun);
 
@@ -684,7 +684,7 @@ function Config({ state, data, loading, api, action }) {
               <select
                 value={state.settings.mode}
                 onChange={(event) => action("mode", () => api("/api/settings", { method: "POST", body: { mode: event.target.value } }), "Modo atualizado")}
-                className={configInputClass}
+              className={configInputClass}
               >
                 <option value="limited">Automatico limitado</option>
                 <option value="manual">Manual</option>
@@ -694,7 +694,7 @@ function Config({ state, data, loading, api, action }) {
           </Panel>
 
           <Panel title="Telegram" count={telegramCount}>
-            <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+            <div className="space-y-2 text-sm text-slate-400">
               <p>Dry-run: {telegramValue(telegram?.dryRun, "Ligado", "Desligado")}</p>
               <p>Bot token: {telegramValue(telegram?.hasBotToken, "Configurado", "Ausente")}</p>
               <p>Chat ID: {telegramValue(telegram?.hasChatId, "Configurado", "Ausente")}</p>
@@ -725,7 +725,7 @@ function Config({ state, data, loading, api, action }) {
           </Panel>
 
           <Panel title="Affiliate Links" count={`${data.missingAffiliate} pendentes`}>
-            <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">Recalcula URLs afiliadas usando as variaveis atuais do ambiente.</p>
+            <p className="text-sm leading-6 text-slate-500">Recalcula URLs afiliadas usando as variaveis atuais do ambiente.</p>
             <ActionButton className="mt-4" loading={loading.refreshAffiliates} onClick={() => action("refreshAffiliates", () => api("/api/run/refresh-affiliates", { method: "POST" }), "Links recalculados")}>
               <RefreshCcw className="size-4" /> Recalcular
             </ActionButton>
@@ -783,7 +783,7 @@ function Config({ state, data, loading, api, action }) {
                 />
               </FormField>
               <FormField label="Automatica" help="Permite execucao agendada.">
-                <span className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+                <span className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-300">
                   <input
                     type="checkbox"
                     checked={discoveryForm.enabled}
@@ -906,17 +906,17 @@ function OfferIdentity({ offer, clicks }) {
         {offer.source === "amazon_discovery" && !offer.affiliateReady ? <StatusBadge tone="warning">Link oficial pendente</StatusBadge> : null}
         {offer.source === "mock" ? <StatusBadge tone="warning">Amostra</StatusBadge> : null}
       </div>
-      <p className="line-clamp-2 max-w-[420px] text-sm font-medium text-slate-950 dark:text-slate-100">{offer.title}</p>
-      <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+      <p className="line-clamp-2 max-w-[420px] text-sm font-medium text-slate-100">{offer.title}</p>
+      <span className="mt-1 block text-xs text-slate-500">
         {storeLabel(offer.store)} - {offer.category || "Tech"} - {money(offer.currentPrice)} - {clicks} cliques
       </span>
       {offer.originalUrl ? (
-        <a href={offer.originalUrl} target="_blank" rel="noreferrer" className="mt-1 block max-w-[420px] truncate text-xs text-slate-400 hover:text-tdo-blue hover:underline dark:text-slate-600 dark:hover:text-slate-400">
+        <a href={offer.originalUrl} target="_blank" rel="noreferrer" className="mt-1 block max-w-[420px] truncate text-xs text-slate-600 hover:text-violet-400 hover:underline">
           {offer.originalUrl}
         </a>
       ) : null}
       {offer.discoverySource ? (
-        <span className="mt-1 block max-w-[420px] truncate text-xs text-slate-500 dark:text-slate-400">
+        <span className="mt-1 block max-w-[420px] truncate text-xs text-slate-500">
           {offer.discoverySourceType === "term" ? "Termo" : "URL"}: {offer.discoverySource}
         </span>
       ) : null}
@@ -932,13 +932,13 @@ function ScoreCell({ offer, priceHistory }) {
   return (
     <div className="min-w-[86px]">
       <StatusBadge tone={tone}>{score}</StatusBadge>
-      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{money(offer.currentPrice)}</p>
+      <p className="mt-2 text-xs text-slate-500">{money(offer.currentPrice)}</p>
       {history.length > 0 && (
         <div className="flex items-center gap-1 mt-1">
-          <span className="text-xs text-slate-600 dark:text-slate-500">hist:</span>
+          <span className="text-xs text-slate-600">hist:</span>
           {history.slice(0, 4).map((entry, i) => (
-            <span key={i} className="text-xs text-slate-500 dark:text-slate-500">
-              {i > 0 && <span className="text-slate-700 dark:text-slate-600 mx-0.5">›</span>}
+            <span key={i} className="text-xs text-slate-500">
+              {i > 0 && <span className="text-slate-600 mx-0.5">›</span>}
               R${Number(entry.price).toFixed(0)}
             </span>
           ))}
@@ -950,7 +950,7 @@ function ScoreCell({ offer, priceHistory }) {
 
 function OfferMobileCard({ offer, clicks, loading, api, action }) {
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <article className="rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-sm">
       <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="flex items-start gap-3">
         <ProductThumb offer={offer} />
         <OfferIdentity offer={offer} clicks={clicks} />
@@ -967,7 +967,7 @@ function OfferMobileCard({ offer, clicks, loading, api, action }) {
           <StatusBadge tone={offer.affiliateReady ? "success" : "warning"}>{offer.affiliateReady ? "Afiliado pronto" : "Afiliado pendente"}</StatusBadge>
         )}
       </div>
-      <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="mt-4 inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800">
+      <a href={offerOpenUrl(offer)} target="_blank" rel="noreferrer" className="mt-4 inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-3 text-xs font-medium text-slate-300 shadow-sm transition hover:bg-slate-800 hover:text-slate-100">
         <ExternalLink className="size-4 shrink-0" /> Abrir oferta
       </a>
     </article>
@@ -984,7 +984,7 @@ function InlineAffiliateForm({ offer, loading, api, action }) {
         value={affiliateUrl}
         onChange={(event) => setAffiliateUrl(event.target.value)}
         placeholder="SiteStripe/amzn.to"
-        className="h-9 min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-theme-xs text-gray-700 outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300"
+        className="h-9 min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 text-xs text-slate-200 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition"
       />
       <ActionButton
         className="w-full sm:w-auto"
@@ -1002,19 +1002,19 @@ function InlineAffiliateForm({ offer, loading, api, action }) {
 
 function StatusLine({ label, value, tone = "neutral" }) {
   const toneClass = {
-    brand: "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-300",
-    cyan: "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-300",
-    muted: "border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-800/40 dark:text-gray-300",
-    success: "border-success-200 bg-success-50 text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-300",
-    warning: "border-warning-200 bg-warning-50 text-warning-700 dark:border-warning-500/20 dark:bg-warning-500/10 dark:text-warning-300",
-    danger: "border-error-200 bg-error-50 text-error-700 dark:border-error-500/20 dark:bg-error-500/10 dark:text-error-300",
-    neutral: "border-gray-200 text-gray-800 dark:border-gray-800 dark:text-white"
-  }[tone] || "border-gray-200 text-gray-800 dark:border-gray-800 dark:text-white";
+    brand: "border-violet-500/20 bg-violet-500/10 text-violet-300",
+    cyan: "border-cyan-500/20 bg-cyan-500/10 text-cyan-300",
+    muted: "border-slate-700 bg-slate-800/40 text-slate-400",
+    success: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+    warning: "border-amber-500/20 bg-amber-500/10 text-amber-300",
+    danger: "border-rose-500/20 bg-rose-500/10 text-rose-300",
+    neutral: "border-slate-700 text-slate-200"
+  }[tone] || "border-slate-700 text-slate-200";
 
   return (
     <div className={`rounded-lg border p-3 ${toneClass}`}>
-      <p className="text-theme-xs opacity-75">{label}</p>
-      <p className="mt-1 text-theme-sm font-medium">{value}</p>
+      <p className="text-xs opacity-75">{label}</p>
+      <p className="mt-1 text-sm font-medium">{value}</p>
     </div>
   );
 }
@@ -1032,10 +1032,10 @@ function Heatmap({ heatmap }) {
     <div className="overflow-x-auto">
       <div className="grid min-w-[720px] grid-cols-[44px_repeat(24,minmax(0,1fr))] gap-1">
         <div />
-        {Array.from({ length: 24 }, (_, hour) => <div key={hour} className="text-center text-[10px] text-gray-400">{hour}</div>)}
+        {Array.from({ length: 24 }, (_, hour) => <div key={hour} className="text-center text-[10px] text-slate-600">{hour}</div>)}
         {heatmap.map((row, day) => (
           <React.Fragment key={day}>
-            <div className="text-theme-xs text-gray-500 dark:text-gray-400">{dayLabels[day]}</div>
+            <div className="text-xs text-slate-600">{dayLabels[day]}</div>
             {row.map((value, hour) => <div key={hour} className={`h-6 rounded-md border ${heatClass(intensity(value, heatmap.max))}`} title={`${value} atividades`} />)}
           </React.Fragment>
         ))}
@@ -1047,14 +1047,14 @@ function Heatmap({ heatmap }) {
 function Bars({ title, items }) {
   return (
     <div>
-      <h4 className="mb-4 text-theme-sm font-medium text-gray-800 dark:text-white/90">{title}</h4>
+      <h4 className="mb-4 text-sm font-medium text-slate-300">{title}</h4>
       <div className="space-y-4">
         {items.map((item) => (
           <div key={item.label}>
-            <div className="mb-1 flex items-center justify-between text-theme-xs text-gray-500 dark:text-gray-400">
+            <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
               <span>{item.label}</span><span>{item.value}</span>
             </div>
-            <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-800">
+            <div className="h-2 rounded-full bg-slate-800">
               <div className={`h-2 rounded-full ${barClass(item.tone)}`} style={{ width: `${item.percent}%` }} />
             </div>
           </div>
@@ -1067,8 +1067,8 @@ function Bars({ title, items }) {
 function ProductThumb({ offer }) {
   const [image] = offerImages(offer);
   return (
-    <div className="grid size-[50px] shrink-0 place-items-center overflow-hidden rounded-md bg-gray-100 dark:bg-gray-800">
-      {image ? <img src={image} alt="" className="size-[50px] object-contain p-1" loading="lazy" /> : <Box className="size-5 text-gray-400" />}
+    <div className="grid size-[50px] shrink-0 place-items-center overflow-hidden rounded-md bg-slate-800">
+      {image ? <img src={image} alt="" className="size-[50px] object-contain p-1" loading="lazy" /> : <Box className="size-5 text-slate-600" />}
     </div>
   );
 }
@@ -1079,8 +1079,8 @@ function AlertItem({ alert }) {
       <div className="flex items-start gap-3">
         {alert.tone === "critical" ? <AlertTriangle className="mt-0.5 size-5" /> : <CheckCircle2 className="mt-0.5 size-5" />}
         <div>
-          <p className="text-theme-sm font-semibold">{alert.title}</p>
-          <p className="mt-1 text-theme-sm leading-5 opacity-80">{alert.text}</p>
+          <p className="text-sm font-semibold">{alert.title}</p>
+          <p className="mt-1 text-sm leading-5 opacity-80">{alert.text}</p>
         </div>
       </div>
     </div>
@@ -1089,22 +1089,22 @@ function AlertItem({ alert }) {
 
 function EmptyState({ title, text }) {
   return (
-    <div className="rounded-xl border border-dashed border-gray-200 p-5 text-center dark:border-gray-800">
-      <Package className="mx-auto mb-2 size-6 text-gray-400" />
-      <p className="text-theme-sm font-medium text-gray-700 dark:text-gray-200">{title}</p>
-      <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">{text}</p>
+    <div className="rounded-xl border border-dashed border-slate-700 p-5 text-center">
+      <Package className="mx-auto mb-2 size-6 text-slate-600" />
+      <p className="text-sm font-medium text-slate-300">{title}</p>
+      <p className="mt-1 text-sm text-slate-500">{text}</p>
     </div>
   );
 }
 
 function ToastStack({ toasts, setToasts }) {
   return (
-    <div className="fixed bottom-5 right-5 z-99999 grid w-[min(380px,calc(100vw-40px))] gap-3">
+    <div className="fixed bottom-5 right-5 z-[99999] grid w-[min(380px,calc(100vw-40px))] gap-3">
       {toasts.map((item) => (
-        <div key={item.id} className={`flex items-start justify-between gap-3 rounded-xl border bg-white p-4 shadow-theme-lg dark:bg-gray-900 ${item.tone === "error" ? "border-error-200 text-error-700 dark:border-error-500/30 dark:text-error-300" : "border-success-200 text-success-700 dark:border-success-500/30 dark:text-success-300"}`}>
+        <div key={item.id} className={`flex items-start justify-between gap-3 rounded-xl border bg-slate-900 p-4 shadow-xl ${item.tone === "error" ? "border-rose-500/30 text-rose-300" : "border-emerald-500/30 text-emerald-300"}`}>
           <div>
-            <p className="text-theme-sm font-semibold">{item.title}</p>
-            {item.detail ? <p className="mt-1 text-theme-sm opacity-80">{item.detail}</p> : null}
+            <p className="text-sm font-semibold">{item.title}</p>
+            {item.detail ? <p className="mt-1 text-sm opacity-80">{item.detail}</p> : null}
           </div>
           <button type="button" aria-label={`Fechar aviso: ${item.title}`} onClick={() => setToasts((items) => items.filter((toast) => toast.id !== item.id))}><X className="size-4" /></button>
         </div>
@@ -1226,22 +1226,22 @@ function warningLabel(warning) {
   }[warning] || warning;
 }
 function barClass(tone) {
-  return { success: "bg-success-500", brand: "bg-brand-500", info: "bg-blue-light-500", critical: "bg-error-500", gray: "bg-gray-400" }[tone] || "bg-brand-500";
+  return { success: "bg-emerald-500", brand: "bg-violet-500", info: "bg-sky-500", critical: "bg-rose-500", gray: "bg-slate-500" }[tone] || "bg-violet-500";
 }
 function heatClass(level) {
   return [
-    "border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-800",
-    "border-brand-200 bg-brand-100 dark:border-brand-500/20 dark:bg-brand-500/10",
-    "border-brand-300 bg-brand-200 dark:border-brand-500/30 dark:bg-brand-500/20",
-    "border-brand-400 bg-brand-300 dark:border-brand-500/40 dark:bg-brand-500/40",
-    "border-brand-500 bg-brand-400 dark:border-brand-400 dark:bg-brand-500/70",
-    "border-brand-600 bg-brand-500 dark:border-brand-300 dark:bg-brand-400"
-  ][level] || "border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-800";
+    "border-slate-800 bg-slate-800",
+    "border-violet-500/20 bg-violet-500/10",
+    "border-violet-500/30 bg-violet-500/20",
+    "border-violet-500/40 bg-violet-500/40",
+    "border-violet-500/60 bg-violet-500/60",
+    "border-violet-400 bg-violet-500"
+  ][level] || "border-slate-800 bg-slate-800";
 }
 function alertClass(tone) {
   return {
-    critical: "border-error-200 bg-error-50 text-error-700 dark:border-error-500/20 dark:bg-error-500/10 dark:text-error-300",
-    warning: "border-warning-200 bg-warning-50 text-warning-700 dark:border-warning-500/20 dark:bg-warning-500/10 dark:text-warning-300",
-    success: "border-success-200 bg-success-50 text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-300"
-  }[tone] || "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300";
+    critical: "border-rose-500/20 bg-rose-500/10 text-rose-300",
+    warning: "border-amber-500/20 bg-amber-500/10 text-amber-300",
+    success: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+  }[tone] || "border-slate-700 bg-slate-800/30 text-slate-300";
 }

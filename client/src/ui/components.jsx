@@ -1,6 +1,10 @@
 import React from "react";
 import { Loader2, Menu, Search } from "lucide-react";
 import { commandItems, statusTone, viewMeta } from "./tokens.js";
+import { cn } from "../lib/utils.js";
+import { Button } from "../components/ui/button.jsx";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../components/ui/card.jsx";
+import { Badge } from "../components/ui/badge.jsx";
 
 export function AppShell({
   children,
@@ -16,11 +20,11 @@ export function AppShell({
   topBar
 }) {
   return (
-    <div className="min-h-screen bg-tdo-surface text-tdo-ink dark:bg-slate-950 dark:text-slate-100">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
       <CommandRail view={view} setView={setView} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       {mobileOpen ? (
         <button
-          className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/80 lg:hidden"
           onClick={() => setMobileOpen(false)}
           aria-label="Fechar menu"
           type="button"
@@ -47,9 +51,9 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
   const railState = mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0";
 
   return (
-    <aside className={`fixed inset-y-0 left-0 z-50 w-[86px] border-r border-white/10 bg-tdo-rail px-3 py-4 text-white transition ${railState}`}>
+    <aside className={`fixed inset-y-0 left-0 z-50 w-[86px] border-r border-slate-800 bg-slate-950 px-3 py-4 text-white transition ${railState}`}>
       <button
-        className="mb-6 grid size-12 place-items-center rounded-xl bg-tdo-blue text-sm font-bold shadow-tdo-glow"
+        className="mb-6 grid size-12 place-items-center rounded-xl bg-violet-600 text-sm font-bold shadow-lg shadow-violet-900/40 hover:bg-violet-500 transition"
         onClick={() => {
           setView("overview");
           setMobileOpen(false);
@@ -57,18 +61,20 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
         type="button"
         aria-label="Ir para Performance"
       >
-        T
+        <span className="text-white font-bold text-base">T</span>
       </button>
       <nav className="space-y-2">
         {commandItems.map(({ icon: Icon, label, view: itemView }) => {
-          const activeClass = view === itemView
-            ? "bg-white text-tdo-rail"
-            : "text-slate-300 hover:bg-white/10 hover:text-white";
-
+          const isActive = view === itemView;
           return (
             <button
               aria-label={label}
-              className={`group relative grid size-12 place-items-center rounded-xl transition ${activeClass}`}
+              className={cn(
+                "group relative grid size-12 place-items-center rounded-xl transition",
+                isActive
+                  ? "bg-violet-600/20 text-violet-400 ring-1 ring-violet-500/30"
+                  : "text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+              )}
               key={itemView}
               onClick={() => {
                 setView(itemView);
@@ -78,7 +84,7 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
               type="button"
             >
               <Icon className="size-5" />
-              <span className="pointer-events-none absolute left-14 top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-950 px-2 py-1 text-xs text-white shadow-lg group-hover:block">
+              <span className="pointer-events-none absolute left-14 top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-xs text-slate-200 shadow-lg group-hover:block">
                 {label}
               </span>
             </button>
@@ -102,11 +108,11 @@ export function TopContextBar({
   const meta = viewMeta[view] || viewMeta.overview;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-tdo-surface/95 backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/95">
-      <div className="mx-auto flex min-h-[76px] max-w-[1540px] flex-col gap-3 px-4 py-3 md:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+    <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur">
+      <div className="mx-auto flex min-h-[72px] max-w-[1540px] flex-col gap-3 px-4 py-3 md:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <button
-            className="grid size-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 lg:hidden"
+            className="grid size-10 place-items-center rounded-xl border border-slate-700 bg-slate-900 text-slate-300 transition hover:bg-slate-800 lg:hidden"
             onClick={() => setMobileOpen(true)}
             type="button"
             aria-label="Abrir menu"
@@ -114,24 +120,24 @@ export function TopContextBar({
             <Menu className="size-5" />
           </button>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold text-slate-950 dark:text-white">{meta.title}</h1>
-            <p className="truncate text-sm text-slate-500 dark:text-slate-400">{meta.subtitle}</p>
+            <h1 className="truncate text-lg font-semibold text-slate-100">{meta.title}</h1>
+            <p className="truncate text-xs text-slate-500">{meta.subtitle}</p>
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <label className="relative min-w-0 sm:w-[280px]">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
             <input
               aria-label="Buscar ofertas, canais e status"
               ref={inputRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 tdo-focus dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+              className="h-10 w-full rounded-xl border border-slate-700 bg-slate-900 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition"
               placeholder="Buscar ofertas, canais, status..."
             />
           </label>
           <button
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="h-10 rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
             onClick={() => setDarkMode(!darkMode)}
             type="button"
           >
@@ -149,11 +155,14 @@ export function Panel({ title, count, children, density = "comfortable", action 
   const hasCount = count !== undefined && count !== null;
 
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white shadow-tdo-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-none ${densityClass}`}>
+    <section className={cn(
+      "rounded-2xl border border-slate-800 bg-slate-900 shadow-sm",
+      densityClass
+    )}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-950 dark:text-slate-100 md:text-base">{title}</h2>
-          {hasCount ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{count}</p> : null}
+          <h2 className="text-sm font-semibold text-slate-100 md:text-base">{title}</h2>
+          {hasCount ? <p className="mt-1 text-xs text-slate-500">{count}</p> : null}
         </div>
         {action}
       </div>
@@ -164,13 +173,13 @@ export function Panel({ title, count, children, density = "comfortable", action 
 
 export function QueueColumn({ title, count, children, tone = "brand" }) {
   const accentClass = {
-    brand: "bg-blue-500",
+    brand: "bg-violet-500",
     success: "bg-emerald-500",
     warning: "bg-amber-500",
     danger: "bg-rose-500",
     cyan: "bg-cyan-500",
-    muted: "bg-slate-400"
-  }[tone] || "bg-blue-500";
+    muted: "bg-slate-500"
+  }[tone] || "bg-violet-500";
 
   return (
     <Panel
@@ -191,19 +200,18 @@ export function QueueColumn({ title, count, children, tone = "brand" }) {
 }
 
 export function StatusBadge({ children, tone = "brand" }) {
-  const classes = {
-    brand: "bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-400/20",
-    success: "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/20",
-    warning: "bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/20",
-    danger: "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:ring-rose-400/20",
-    cyan: "bg-cyan-50 text-cyan-700 ring-cyan-200 dark:bg-cyan-500/15 dark:text-cyan-300 dark:ring-cyan-400/20",
-    muted: "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
+  const variantMap = {
+    brand: "default",
+    success: "success",
+    warning: "warning",
+    danger: "danger",
+    cyan: "cyan",
+    muted: "muted",
   };
-
   return (
-    <span className={`inline-flex min-h-6 items-center rounded-full px-2.5 text-xs font-medium ring-1 ${classes[tone] || classes.brand}`}>
+    <Badge variant={variantMap[tone] || "default"}>
       {children}
-    </span>
+    </Badge>
   );
 }
 
@@ -216,74 +224,79 @@ export function ActionButton({
   className = "",
   ...props
 }) {
-  const variants = {
-    primary: "bg-tdo-blue text-white hover:bg-blue-700",
-    secondary: "bg-slate-950 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white",
-    outline: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
-    danger: "bg-rose-600 text-white hover:bg-rose-700",
-    ghost: "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+  const variantMap = {
+    primary: "default",
+    secondary: "secondary",
+    outline: "outline",
+    danger: "destructive",
+    ghost: "ghost",
   };
-  const sizes = {
-    sm: "h-9 px-3 text-xs",
-    md: "h-10 px-4 text-sm"
+  const sizeMap = {
+    sm: "sm",
+    md: "default",
   };
 
   return (
-    <button
-      className={`inline-flex max-w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl font-medium transition disabled:cursor-not-allowed disabled:opacity-60 [&>svg]:shrink-0 ${variants[variant]} ${sizes[size]} ${className}`}
+    <Button
+      className={cn("font-medium", className)}
+      variant={variantMap[variant] || "default"}
+      size={sizeMap[size] || "default"}
       disabled={loading || disabled}
-      type="button"
       {...props}
     >
       {loading ? <Loader2 className="size-4 animate-spin" /> : null}
       {children}
-    </button>
+    </Button>
   );
 }
 
 export function MetricTile({ icon: Icon, label, value, tone = "brand", detail }) {
   const iconTone = {
-    brand: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-    success: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-    warning: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-    danger: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
-    cyan: "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300"
-  }[tone] || "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300";
+    brand: "bg-violet-500/15 text-violet-400",
+    success: "bg-emerald-500/15 text-emerald-400",
+    warning: "bg-amber-500/15 text-amber-400",
+    danger: "bg-rose-500/15 text-rose-400",
+    cyan: "bg-cyan-500/15 text-cyan-400"
+  }[tone] || "bg-violet-500/15 text-violet-400";
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-tdo-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">{label}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{value}</p>
-          {detail ? <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{detail}</p> : null}
-        </div>
-        {Icon ? (
-          <div className={`grid size-11 place-items-center rounded-xl ${iconTone}`}>
-            <Icon className="size-5" />
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+            <p className="mt-2 text-2xl font-bold text-slate-100">{value}</p>
+            {detail ? <p className="mt-1 truncate text-xs text-slate-500">{detail}</p> : null}
           </div>
-        ) : null}
-      </div>
-    </article>
+          {Icon ? (
+            <div className={cn("grid size-11 place-items-center rounded-xl", iconTone)}>
+              <Icon className="size-5" />
+            </div>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
 export function InsightPanel({ title, detail, action, tone = "brand", toneLabel = "Insight" }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-tdo-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
-      <StatusBadge tone={tone}>{toneLabel}</StatusBadge>
-      <h3 className="mt-3 text-sm font-semibold text-slate-950 dark:text-slate-100">{title}</h3>
-      <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">{detail}</p>
-      {action}
-    </article>
+    <Card>
+      <CardContent className="p-5">
+        <StatusBadge tone={tone}>{toneLabel}</StatusBadge>
+        <h3 className="mt-3 text-sm font-semibold text-slate-100">{title}</h3>
+        <p className="mt-1 text-sm leading-6 text-slate-400">{detail}</p>
+        {action}
+      </CardContent>
+    </Card>
   );
 }
 
 export function EmptyState({ title, text, action }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-900/60">
-      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{text}</p>
+    <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 p-6 text-center">
+      <h3 className="text-sm font-semibold text-slate-300">{title}</h3>
+      <p className="mt-1 text-sm text-slate-500">{text}</p>
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
@@ -303,15 +316,15 @@ export function FormField({ label, help, error, children }) {
     : children;
 
   return (
-    <div className="block text-sm text-slate-700 dark:text-slate-300">
+    <div className="block text-sm text-slate-300">
       {canBindControl ? (
-        <label className="font-medium text-slate-800 dark:text-slate-100" htmlFor={children.props.id || fieldId}>{label}</label>
+        <label className="font-medium text-slate-200" htmlFor={children.props.id || fieldId}>{label}</label>
       ) : (
-        <span className="font-medium text-slate-800 dark:text-slate-100">{label}</span>
+        <span className="font-medium text-slate-200">{label}</span>
       )}
-      {help ? <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400" id={helpId}>{help}</span> : null}
+      {help ? <span className="mt-1 block text-xs leading-5 text-slate-500" id={helpId}>{help}</span> : null}
       <div className="mt-2">{control}</div>
-      {error ? <span className="mt-1 block text-xs text-rose-600 dark:text-rose-400" id={errorId}>{error}</span> : null}
+      {error ? <span className="mt-1 block text-xs text-rose-400" id={errorId}>{error}</span> : null}
     </div>
   );
 }
@@ -319,14 +332,14 @@ export function FormField({ label, help, error, children }) {
 export function DataTable({ columns, rows, getKey, renderMobileCard }) {
   return (
     <>
-      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 lg:block">
-        <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-          <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900">
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-800 lg:block">
+        <table className="min-w-full divide-y divide-slate-800 text-sm">
+          <thead className="sticky top-0 bg-slate-900/90 backdrop-blur">
             <tr>
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className={`px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 ${column.className || ""}`}
+                  className={cn("px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500", column.className)}
                   scope="col"
                 >
                   {column.label}
@@ -334,13 +347,13 @@ export function DataTable({ columns, rows, getKey, renderMobileCard }) {
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-950/30">
+          <tbody className="divide-y divide-slate-800/60 bg-slate-950/30">
             {rows.map((row) => (
-              <tr key={getKey(row)} className="transition hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+              <tr key={getKey(row)} className="transition hover:bg-slate-800/30">
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={`px-4 py-3 align-top text-slate-700 dark:text-slate-300 ${column.cellClassName || ""}`}
+                    className={cn("px-4 py-3 align-top text-slate-300", column.cellClassName)}
                   >
                     {column.render(row)}
                   </td>
