@@ -85,11 +85,15 @@ export async function publishTelegram(draft, config, offer = null) {
     const botUrl = `https://api.telegram.org/bot${config.telegramBotToken}`;
 
     if (offer?.generatedImagePaths?.length) {
-      return await sendGeneratedImagePack(botUrl, config.telegramChatId, offer, text);
-    }
-
-    if (offer?.generatedImagePath) {
-      return await sendGeneratedImage(botUrl, config.telegramChatId, offer, text);
+      const packResult = await sendGeneratedImagePack(botUrl, config.telegramChatId, offer, text);
+      if (packResult.ok) return packResult;
+      console.log("telegram_pack_failed_fallback", JSON.stringify({ detail: packResult.detail }));
+      // fall through to URL images or text
+    } else if (offer?.generatedImagePath) {
+      const imgResult = await sendGeneratedImage(botUrl, config.telegramChatId, offer, text);
+      if (imgResult.ok) return imgResult;
+      console.log("telegram_image_failed_fallback", JSON.stringify({ detail: imgResult.detail }));
+      // fall through to URL images or text
     }
 
     const images = offerImages(offer);

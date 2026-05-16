@@ -225,6 +225,17 @@ async function handleApi(req, res, url, db, config) {
     sendJson(res, 200, { ok: true, offer: testOffer, detail: "Offer enqueued to validation — watch Pipeline view" });
     return;
   }
+  if (req.method === "POST" && url.pathname === "/api/debug/clear-quota") {
+    const windowHours = config.publicationWindowHours ?? 2;
+    const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
+    const before = (db.state.publishLog || []).length;
+    db.state.publishLog = (db.state.publishLog || []).filter(l => l.createdAt < windowStart);
+    const removed = before - db.state.publishLog.length;
+    await db.save();
+    console.log("debug_clear_quota", JSON.stringify({ removed, remaining: db.state.publishLog.length }));
+    sendJson(res, 200, { ok: true, removed, remaining: db.state.publishLog.length });
+    return;
+  }
   if (req.method === "POST" && url.pathname === "/api/run/publish") {
     const result = await enqueuePublish(db, config, null, ["telegram", "twitter"]);
     if (!result.queued) {
