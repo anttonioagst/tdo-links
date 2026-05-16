@@ -73,7 +73,7 @@ export default function App() {
     try {
       const msg = await fn();
       await refresh();
-      if (msg && typeof msg === "object") toast(msg.title, msg.detail || "", msg.tone || "success");
+      if (msg && typeof msg === "object" && msg.title) toast(msg.title, msg.detail || "", msg.tone || "success");
       else toast(typeof msg === "string" ? msg : success);
     } catch (error) {
       toast("Acao nao concluida", error.message, "error");

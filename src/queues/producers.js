@@ -7,9 +7,10 @@ export async function enqueueScrape(db, config, trigger = "manual") {
     await scrapeQueue.add("scrape", { trigger }, {
       attempts: 2, backoff: { type: "exponential", delay: 60000 }
     });
-    return { queued: true, trigger };
+    return { title: "Busca iniciada", detail: "Ofertas aparecem em segundos", tone: "success" };
   }
-  return runScrapePipeline(db, config);
+  const result = await runScrapePipeline(db, config);
+  return { title: `${result.inserted} oferta(s) encontrada(s)`, tone: result.inserted > 0 ? "success" : "warning" };
 }
 
 export async function enqueueImagegen(db, config, offerId) {
@@ -17,7 +18,7 @@ export async function enqueueImagegen(db, config, offerId) {
     await imagegenQueue.add("imagegen", { offerId }, {
       attempts: 3, backoff: { type: "exponential", delay: 30000 }
     });
-    return { queued: true, offerId };
+    return { title: "Imagem sendo gerada", detail: "Aparece em alguns segundos", tone: "success" };
   }
   const offer = db.state.offers.find(o => o.id === offerId);
   if (!offer) throw new Error("offer_not_found");
@@ -33,7 +34,7 @@ export async function enqueuePublish(db, config, draftId, channels) {
     await publishQueue.add("publish", { draftId, channels }, {
       attempts: 2, backoff: { type: "exponential", delay: 10000 }
     });
-    return { queued: true, draftId };
+    return { title: "Publicação iniciada", detail: "Posts enviados em background", tone: "success" };
   }
   return runPublishPipeline(db, config);
 }

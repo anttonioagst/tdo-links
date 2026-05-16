@@ -29,6 +29,13 @@ app.listen(config.port, config.host, () => {
 
 startDiscoveryScheduler(db, config);
 
+// Keep in-memory state fresh when worker writes to PostgreSQL
+if (config.databaseUrl) {
+  setInterval(() => {
+    db.load().catch((err) => console.error("state_reload_failed", err.message));
+  }, 15 * 1000);
+}
+
 setInterval(() => {
   runScrapePipeline(db, config).catch((error) => console.error("scrape_failed", error));
 }, config.scrapeIntervalMinutes * 60 * 1000);
