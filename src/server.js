@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { cloneDraftForRetest, createAnalyticsReport, createDraftsForOffer, publishApprovedX, refreshOfferAffiliateUrls, refreshOfferDecision, regenerateDraftCopy, regenerateDraftsForOffer } from "./agents.js";
 import { runAmazonDiscovery, updateAmazonDiscoverySettings } from "./discovery.js";
+import { runDiscovery } from "./agents/discovery.js";
 import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
 import { testDiscord } from "./publishers/discord.js";
@@ -178,7 +179,18 @@ async function handleApi(req, res, url, db, config) {
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/run/scrape") {
-    sendJson(res, 200, await enqueueScrape(db, config, "manual"));
+    // Use autonomous discovery pipeline when Anthropic API key is configured
+    if (config.anthropicApiKey) {
+      try {
+        const result = await runDiscovery(db, config);
+        sendJson(res, 200, { title: `${result.found} deal(s) encontrado(s), ${result.enqueued} enfileirado(s)`, tone: result.enqueued > 0 ? "success" : "warning", ...result });
+      } catch (err) {
+        console.error("discovery_error", JSON.stringify({ error: err.message }));
+        sendJson(res, 500, { error: "discovery_failed", detail: err.message });
+      }
+    } else {
+      sendJson(res, 200, await enqueueScrape(db, config, "manual"));
+    }
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/run/publish") {

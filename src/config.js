@@ -36,6 +36,11 @@ export function loadConfig(env = process.env) {
     discordDryRun: env.DISCORD_DRY_RUN !== "false",
     adminToken: env.ADMIN_TOKEN || "",
     openaiApiKey: env.OPENAI_API_KEY || "",
+    anthropicApiKey: env.ANTHROPIC_API_KEY || "",
+    aiConfidenceThreshold: Number(env.AI_CONFIDENCE_THRESHOLD || 70),
+    telegramChannelUrl: env.TELEGRAM_CHANNEL_URL || "",
+    discordInviteUrl: env.DISCORD_INVITE_URL || "",
+    rssEnabled: env.RSS_ENABLED !== "false",
     databaseUrl: env.DATABASE_URL || "",
     redisUrl: env.REDIS_URL || ""
   };

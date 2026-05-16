@@ -5,6 +5,7 @@ import { JsonDb } from "./db.js";
 import { initQueues, getConnection } from "./queues/index.js";
 import { startWorkers } from "./queues/workers.js";
 import { runScrapePipeline } from "./agents.js";
+import { runDiscovery } from "./agents/discovery.js";
 import cron from "node-cron";
 
 await loadEnvFile(resolve(".env"));
@@ -34,6 +35,9 @@ cron.schedule(`0 */${config.scrapeIntervalMinutes > 59 ? Math.round(config.scrap
 
 cron.schedule("0 */2 * * *", async () => {
   console.log("cron_trigger discovery");
+  runDiscovery(db, config).catch(err =>
+    console.error("cron_discovery_failed", JSON.stringify({ error: err.message }))
+  );
 });
 
 console.log("worker_ready — aguardando jobs");
