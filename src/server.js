@@ -226,14 +226,21 @@ async function handleApi(req, res, url, db, config) {
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/debug/clear-quota") {
+    const { creativeQueue, publishQueue, validationQueue } = await import("./queues/index.js");
+    // Clear publish log for the current window
     const windowHours = config.publicationWindowHours ?? 2;
     const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
     const before = (db.state.publishLog || []).length;
     db.state.publishLog = (db.state.publishLog || []).filter(l => l.createdAt < windowStart);
     const removed = before - db.state.publishLog.length;
     await db.save();
-    console.log("debug_clear_quota", JSON.stringify({ removed, remaining: db.state.publishLog.length }));
-    sendJson(res, 200, { ok: true, removed, remaining: db.state.publishLog.length });
+    // Also drain BullMQ queues to prevent backlog from firing after reset
+    const drained = {};
+    if (validationQueue) { await validationQueue.drain(); drained.validation = true; }
+    if (creativeQueue) { await creativeQueue.drain(); drained.creative = true; }
+    if (publishQueue) { await publishQueue.drain(); drained.publish = true; }
+    console.log("debug_clear_quota", JSON.stringify({ removed, remaining: db.state.publishLog.length, drained }));
+    sendJson(res, 200, { ok: true, removed, remaining: db.state.publishLog.length, drained });
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/run/publish") {

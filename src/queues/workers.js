@@ -142,12 +142,24 @@ export function startWorkers(db, config, connection) {
     }
 
     return { ...validationResult, passes };
-  }, { ...opts, concurrency: 3 });
+  }, opts);
 
   // New: Creative worker
   const creativeWorker = new Worker("creative", async (job) => {
     const { offer, validationResult } = job.data;
     console.log("job_start", JSON.stringify({ queue: "creative", title: offer?.title }));
+
+    // Second quota gate — prevents backlogged creative jobs from all publishing at once
+    const maxPerCycle = config.maxPublicationsPerCycle ?? 2;
+    const windowHours = config.publicationWindowHours ?? 2;
+    const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
+    const recentPublished = (db.state.publishLog || [])
+      .filter(l => l.result?.ok && l.channel === "telegram" && l.createdAt >= windowStart)
+      .length;
+    if (recentPublished >= maxPerCycle) {
+      console.log("job_done", JSON.stringify({ queue: "creative", title: offer?.title, result: "quota_reached_at_creative", recentPublished, maxPerCycle }));
+      return { skipped: true, reason: "quota_reached" };
+    }
 
     const content = await createContent(offer, validationResult, config);
 
