@@ -225,6 +225,13 @@ async function handleApi(req, res, url, db, config) {
     sendJson(res, 200, { ok: true, offer: testOffer, detail: "Offer enqueued to validation — watch Pipeline view" });
     return;
   }
+  if (req.method === "GET" && url.pathname === "/api/debug/publish-log") {
+    const rows = db.pool
+      ? (await db.pool.query("SELECT id, channel, result, created_at FROM publish_log ORDER BY created_at DESC LIMIT 20")).rows
+      : (db.state.publishLog || []).slice(0, 20);
+    sendJson(res, 200, { source: db.pool ? "postgres" : "json", count: rows.length, rows });
+    return;
+  }
   if (req.method === "POST" && url.pathname === "/api/debug/clear-quota") {
     const { creativeQueue, publishQueue, validationQueue, scrapeQueue, imagegenQueue } = await import("./queues/index.js");
     const windowHours = config.publicationWindowHours ?? 2;
