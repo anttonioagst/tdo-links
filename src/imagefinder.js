@@ -15,6 +15,13 @@ export async function findOfficialProductImages(offer, config) {
     return scraped;
   }
 
+  // Last resort: ask GPT-4o-mini for direct CDN URLs it knows for this product
+  const gptImages = await findImageUrlsFromGpt(offer, officialUrl, config);
+  if (gptImages.length) {
+    console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: gptImages.length, source: "gpt_known_cdn" }));
+    return gptImages;
+  }
+
   console.log("imagefinder_no_images", JSON.stringify({ offerId: offer.id, officialUrl }));
   return [];
 }
@@ -83,6 +90,71 @@ Reply with the URL only, nothing else.`
   }
 }
 
+async function findImageUrlsFromGpt(offer, officialUrl, config) {
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { authorization: `Bearer ${config.openaiApiKey}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0,
+        max_tokens: 300,
+        messages: [{
+          role: "user",
+          content: `You are finding product images for an affiliate channel.
+
+Product: "${offer.title}"
+Official page: ${officialUrl}
+
+List up to 3 direct image URLs from this manufacturer's CDN that show this specific product.
+Only include URLs you are highly confident exist (from your training data).
+These must be real image files (.jpg, .png, .webp) that serve product photos.
+
+Return JSON array of URL strings only, e.g. ["https://...", "https://..."]
+If you are not confident about any URLs, return: []`
+        }]
+      })
+    });
+
+    if (!response.ok) return [];
+    const data = await response.json();
+    const raw = data.choices?.[0]?.message?.content?.trim() || "[]";
+    let urls;
+    try {
+      const match = raw.match(/\[[\s\S]*\]/);
+      urls = match ? JSON.parse(match[0]) : [];
+    } catch {
+      return [];
+    }
+
+    if (!Array.isArray(urls) || !urls.length) return [];
+
+    // Validate: only keep URLs that actually serve images
+    const validated = (await Promise.all(
+      urls.filter(u => typeof u === "string" && u.startsWith("http")).map(async (url) => {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 8000);
+          const res = await fetch(url, {
+            method: "HEAD",
+            signal: controller.signal,
+            headers: { "User-Agent": "Mozilla/5.0 (compatible; TDOLinks/1.0)" }
+          });
+          clearTimeout(timeout);
+          const ct = res.headers.get("content-type") || "";
+          return res.ok && ct.startsWith("image/") ? url : null;
+        } catch {
+          return null;
+        }
+      })
+    )).filter(Boolean);
+
+    return validated.slice(0, 4);
+  } catch {
+    return [];
+  }
+}
+
 async function scrapeProductImages(url) {
   try {
     const controller = new AbortController();
@@ -106,23 +178,47 @@ async function scrapeProductImages(url) {
       try {
         const items = [JSON.parse(m[1])].flat();
         for (const item of items) {
-          const imgs = [item.image, item.image?.url].flat().filter(Boolean);
+          const imgs = [item.image, item.image?.url, ...(Array.isArray(item.image) ? item.image : [])].flat().filter(Boolean);
           imgs.forEach(i => typeof i === "string" && i.startsWith("http") && images.add(i));
         }
       } catch {}
     }
 
-    // 2. Open Graph (og:image)
+    // 2. Next.js __NEXT_DATA__ (extracts all product images from SSR page data)
+    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*type="application\/json"[^>]*>([\s\S]*?)<\/script>/i);
+    if (nextDataMatch) {
+      try {
+        const extractUrls = (obj) => {
+          if (typeof obj === "string" && obj.startsWith("http") && /\.(jpg|jpeg|png|webp)/i.test(obj)) images.add(obj);
+          else if (Array.isArray(obj)) obj.forEach(extractUrls);
+          else if (obj && typeof obj === "object") Object.values(obj).forEach(extractUrls);
+        };
+        extractUrls(JSON.parse(nextDataMatch[1]));
+      } catch {}
+    }
+
+    // 3. Open Graph — both attribute orders
     for (const m of html.matchAll(/<meta[^>]*property=["']og:image(?::secure_url)?["'][^>]*content=["']([^"']+)["']/gi)) {
       if (m[1].startsWith("http")) images.add(m[1]);
     }
-
-    // 3. Twitter card
-    for (const m of html.matchAll(/<meta[^>]*name=["']twitter:image(?::src)?["'][^>]*content=["']([^"']+)["']/gi)) {
+    for (const m of html.matchAll(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image(?::secure_url)?["']/gi)) {
       if (m[1].startsWith("http")) images.add(m[1]);
     }
 
-    // 4. <img> tags — data-src (lazy load) and src
+    // 4. Twitter card — both attribute orders
+    for (const m of html.matchAll(/<meta[^>]*name=["']twitter:image(?::src)?["'][^>]*content=["']([^"']+)["']/gi)) {
+      if (m[1].startsWith("http")) images.add(m[1]);
+    }
+    for (const m of html.matchAll(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image(?::src)?["']/gi)) {
+      if (m[1].startsWith("http")) images.add(m[1]);
+    }
+
+    // 5. <link rel="image_src">
+    for (const m of html.matchAll(/<link[^>]*rel=["']image_src["'][^>]*href=["']([^"']+)["']/gi)) {
+      if (m[1].startsWith("http")) images.add(m[1]);
+    }
+
+    // 6. <img> tags — data-src (lazy load) and src
     for (const m of html.matchAll(/<img[^>]+(?:data-src|src)=["']([^"']+)["'][^>]*>/gi)) {
       const src = m[1];
       if (src && src.startsWith("http") && src.length > 30) images.add(src);
@@ -132,7 +228,7 @@ async function scrapeProductImages(url) {
       .filter(u => !/favicon|logo|icon|sprite|banner|badge|avatar|placeholder|blank|pixel|tracking|1x1/i.test(u))
       .filter(u =>
         /\.(jpg|jpeg|png|webp)(\?|$)/i.test(u) ||
-        /\/(image|photo|img|media|product|cdn)\//i.test(u) ||
+        /\/(images?|photo|img|media|product|cdn)\//i.test(u) ||
         /is\/image\//i.test(u)
       )
       .slice(0, 4);
@@ -140,4 +236,3 @@ async function scrapeProductImages(url) {
     return [];
   }
 }
-
