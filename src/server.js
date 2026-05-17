@@ -202,21 +202,21 @@ async function handleApi(req, res, url, db, config) {
     const ts = Date.now();
     const uniqId = ts.toString(36).toUpperCase().slice(-6);
     const testOffer = {
-      title: `Headset Gamer HyperX Cloud II 7.1 Surround (test-${ts})`,
-      currentPrice: 349.90,
-      previousPrice: 549.90,
-      discountPercent: 36,
-      originalUrl: `https://www.amazon.com.br/dp/B0TST${uniqId}`,
-      asin: `B0TST${uniqId}`,
-      imageUrl: "https://m.media-amazon.com/images/I/71Fj-y9RWBL._AC_SX522_.jpg",
-      imageUrls: ["https://m.media-amazon.com/images/I/71Fj-y9RWBL._AC_SX522_.jpg"],
+      title: `Headset Gamer Logitech G Pro X 2 Lightspeed sem fio (test-${ts})`,
+      currentPrice: 899.00,
+      previousPrice: 1299.00,
+      discountPercent: 31,
+      originalUrl: `https://www.amazon.com.br/dp/B0TS${uniqId}`,
+      asin: `B0TS${uniqId}`,
+      imageUrl: "https://m.media-amazon.com/images/I/61jbKWwNY3L._AC_SX679_.jpg",
+      imageUrls: ["https://m.media-amazon.com/images/I/61jbKWwNY3L._AC_SX679_.jpg"],
       store: "amazon",
-      category: "tech",
-      rating: 4.7,
-      reviewCount: 3240,
+      category: "headset",
+      rating: 4.6,
+      reviewCount: 1820,
       inStock: true,
       source: "debug_inject",
-      sourceConfidence: 0.9,
+      sourceConfidence: 0.95,
       sourceWarnings: [],
       scrapedAt: new Date().toISOString()
     };
