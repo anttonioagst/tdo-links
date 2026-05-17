@@ -159,17 +159,11 @@ export function startWorkers(db, config, connection) {
 
     const content = await createContent(offer, validationResult, config);
 
-    // Persist image paths back to the offer in DB
+    // Persist official image URLs back to the offer in DB
     const offerInDb = db.state.offers.find(o => o.id === offer.id);
     if (offerInDb) {
-      if (content.imagePaths?.length) {
-        offerInDb.generatedImagePaths = content.imagePaths;
-        offerInDb.generatedImagePath = content.imagePaths[0];
-        offerInDb.generatedAt = new Date().toISOString();
-        offerInDb.imageStatus = "done";
-      } else if (content.imagePath) {
-        offerInDb.generatedImagePath = content.imagePath;
-        offerInDb.generatedAt = new Date().toISOString();
+      if (content.imageUrls?.length) {
+        offerInDb.officialImageUrls = content.imageUrls;
         offerInDb.imageStatus = "done";
       } else {
         offerInDb.imageStatus = "failed";

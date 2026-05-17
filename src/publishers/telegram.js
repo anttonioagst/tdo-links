@@ -84,16 +84,19 @@ export async function publishTelegram(draft, config, offer = null) {
     const text = draft.text || "";
     const botUrl = `https://api.telegram.org/bot${config.telegramBotToken}`;
 
-    if (offer?.generatedImagePaths?.length) {
+    if (offer?.officialImageUrls?.length) {
+      const result = await sendOfficialImages(botUrl, config.telegramChatId, offer.officialImageUrls, text);
+      if (result.ok) return result;
+      console.log("telegram_official_images_fallback", JSON.stringify({ detail: result.detail }));
+      // fall through to store CDN or text
+    } else if (offer?.generatedImagePaths?.length) {
       const packResult = await sendGeneratedImagePack(botUrl, config.telegramChatId, offer, text);
       if (packResult.ok) return packResult;
       console.log("telegram_pack_failed_fallback", JSON.stringify({ detail: packResult.detail }));
-      // fall through to URL images or text
     } else if (offer?.generatedImagePath) {
       const imgResult = await sendGeneratedImage(botUrl, config.telegramChatId, offer, text);
       if (imgResult.ok) return imgResult;
       console.log("telegram_image_failed_fallback", JSON.stringify({ detail: imgResult.detail }));
-      // fall through to URL images or text
     }
 
     const images = offerImages(offer);
@@ -148,6 +151,53 @@ async function telegramRequest(url, body, retries = 2) {
     return telegramRequest(url, body, retries - 1);
   }
   return { ok: response.ok && payload.ok === true, dryRun: false, providerMessageId: payload.result?.message_id || null, detail: payload.description || "ok" };
+}
+
+async function sendOfficialImages(botUrl, chatId, urls, caption) {
+  // Download images to memory to bypass CDN blocks on Telegram's servers
+  const downloaded = (await Promise.all(
+    urls.slice(0, 4).map(async (url) => {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; TDOLinks/1.0)" }
+        });
+        clearTimeout(timeout);
+        if (!res.ok) return null;
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const contentType = (res.headers.get("content-type") || "image/jpeg").split(";")[0];
+        return { buffer, contentType };
+      } catch {
+        return null;
+      }
+    })
+  )).filter(Boolean);
+
+  if (!downloaded.length) return { ok: false, dryRun: false, providerMessageId: null, detail: "no_images_downloaded" };
+
+  if (downloaded.length === 1) {
+    const form = new FormData();
+    form.append("chat_id", chatId);
+    form.append("caption", caption.slice(0, 1024));
+    form.append("photo", new Blob([downloaded[0].buffer], { type: downloaded[0].contentType }), "product.jpg");
+    const response = await fetch(`${botUrl}/sendPhoto`, { method: "POST", body: form });
+    const payload = await response.json().catch(() => ({}));
+    return { ok: response.ok && payload.ok, dryRun: false, providerMessageId: payload.result?.message_id || null, detail: payload.description || "ok" };
+  }
+
+  const form = new FormData();
+  form.append("chat_id", chatId);
+  const mediaArr = [];
+  for (let i = 0; i < downloaded.length; i++) {
+    form.append(`photo${i}`, new Blob([downloaded[i].buffer], { type: downloaded[i].contentType }), `product_${i + 1}.jpg`);
+    mediaArr.push({ type: "photo", media: `attach://photo${i}`, ...(i === 0 ? { caption: caption.slice(0, 1024) } : {}) });
+  }
+  form.append("media", JSON.stringify(mediaArr));
+  const response = await fetch(`${botUrl}/sendMediaGroup`, { method: "POST", body: form });
+  const payload = await response.json().catch(() => ({}));
+  return { ok: response.ok && payload.ok, dryRun: false, providerMessageId: payload.result?.[0]?.message_id || null, detail: payload.description || "ok" };
 }
 
 async function sendGeneratedImagePack(botUrl, chatId, offer, caption) {

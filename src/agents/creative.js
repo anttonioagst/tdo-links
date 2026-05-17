@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { generateOfferImagePack } from "../imagegen.js";
+import { findOfficialProductImages } from "../imagefinder.js";
 
 const MODEL = "claude-sonnet-4-6";
 
@@ -79,7 +79,7 @@ export async function createContent(offer, validationResult, config) {
   const [imageResult, copyResult] = await Promise.allSettled([
     (async () => {
       if (!config.openaiApiKey) throw new Error("openai_not_configured");
-      return await generateOfferImagePack(offer, config);
+      return await findOfficialProductImages(offer, config);
     })(),
 
     (async () => {
@@ -105,9 +105,9 @@ export async function createContent(offer, validationResult, config) {
     })()
   ]);
 
-  let imagePaths = null;
-  if (imageResult.status === "fulfilled") {
-    imagePaths = imageResult.value;
+  let imageUrls = null;
+  if (imageResult.status === "fulfilled" && imageResult.value?.length) {
+    imageUrls = imageResult.value;
   } else {
     console.log("agent_event", JSON.stringify({ agent: "creative", event: "image_skipped", error: imageResult.reason?.message }));
   }
@@ -120,7 +120,7 @@ export async function createContent(offer, validationResult, config) {
     copy = fallbackCopy(offer);
   }
 
-  console.log("agent_event", JSON.stringify({ agent: "creative", event: "done", title: offer.title, imageCount: imagePaths?.length ?? 0 }));
+  console.log("agent_event", JSON.stringify({ agent: "creative", event: "done", title: offer.title, imageCount: imageUrls?.length ?? 0 }));
 
-  return { imagePaths, imagePath: imagePaths?.[0] ?? null, copy };
+  return { imageUrls, copy };
 }

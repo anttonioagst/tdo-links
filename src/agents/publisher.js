@@ -36,9 +36,9 @@ export async function publishDeal(offer, content, config, db) {
   console.log("agent_event", JSON.stringify({ agent: "publisher", event: "start", offerId: offer.id, title: offer.title }));
 
   const affiliateUrl = offer.affiliateUrl || offer.originalUrl || offer.url || "";
-  const { imagePaths, imagePath, copy } = content;
-  const offerWithImage = (imagePaths?.length || imagePath)
-    ? { ...offer, generatedImagePaths: imagePaths ?? (imagePath ? [imagePath] : []), generatedImagePath: imagePaths?.[0] ?? imagePath }
+  const { imageUrls, copy } = content;
+  const offerWithImage = imageUrls?.length
+    ? { ...offer, officialImageUrls: imageUrls }
     : offer;
   const results = {};
 
