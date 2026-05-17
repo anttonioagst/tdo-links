@@ -15,7 +15,14 @@ export async function findOfficialProductImages(offer, config) {
     return scraped;
   }
 
-  // 2. Fallback: Google Custom Search API (handles SPA/JS-heavy sites)
+  // 2. Jina AI Reader — renders JS/SPA pages server-side, free, no API key
+  const jinaImages = await jinaImageSearch(officialUrl, offer.id);
+  if (jinaImages.length) {
+    console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: jinaImages.length, source: "jina_ai" }));
+    return jinaImages;
+  }
+
+  // 3. Google Custom Search API (when configured)
   if (config.googleCseApiKey && config.googleCseId) {
     const domain = extractDomain(officialUrl);
     const googleImages = await googleImageSearch(offer.title, domain, config);
@@ -97,6 +104,44 @@ Reply with the URL only, nothing else.`
     return url;
   } catch {
     return null;
+  }
+}
+
+async function jinaImageSearch(url, offerId) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    const res = await fetch(`https://r.jina.ai/${url}`, {
+      signal: controller.signal,
+      headers: {
+        "Accept": "application/json",
+        "X-Return-Format": "json",
+        "User-Agent": "TDOLinks/1.0"
+      }
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      console.log("imagefinder_jina_error", JSON.stringify({ offerId, status: res.status }));
+      return [];
+    }
+
+    const data = await res.json();
+    const images = (data.images || data.data?.images || [])
+      .map(img => img.url || img.src || img)
+      .filter(u => typeof u === "string" && u.startsWith("http"))
+      .filter(u => !/favicon|logo|icon|sprite|banner|badge|avatar|placeholder|1x1/i.test(u))
+      .filter(u =>
+        /\.(jpg|jpeg|png|webp)(\?|$)/i.test(u) ||
+        /\/(images?|photo|img|media|product|cdn)\//i.test(u) ||
+        /is\/image\//i.test(u)
+      );
+
+    console.log("imagefinder_jina", JSON.stringify({ offerId, total: (data.images || data.data?.images || []).length, filtered: images.length }));
+    return images.slice(0, 4);
+  } catch (err) {
+    console.log("imagefinder_jina_error", JSON.stringify({ offerId, error: err.message }));
+    return [];
   }
 }
 
