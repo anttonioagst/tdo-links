@@ -127,7 +127,11 @@ If you are not confident about any URLs, return: []`
       return [];
     }
 
-    if (!Array.isArray(urls) || !urls.length) return [];
+    if (!Array.isArray(urls) || !urls.length) {
+      console.log("imagefinder_gpt_cdn", JSON.stringify({ result: "empty_response", raw: raw.slice(0, 80) }));
+      return [];
+    }
+    console.log("imagefinder_gpt_cdn", JSON.stringify({ result: "validating", count: urls.length, urls }));
 
     // Validate: only keep URLs that actually serve images
     const validated = (await Promise.all(
@@ -168,6 +172,7 @@ async function scrapeProductImages(url) {
       }
     });
     clearTimeout(timeout);
+    console.log("imagefinder_scrape", JSON.stringify({ url, status: res.status, finalUrl: res.url }));
     if (!res.ok) return [];
 
     const html = await res.text();
@@ -224,15 +229,18 @@ async function scrapeProductImages(url) {
       if (src && src.startsWith("http") && src.length > 30) images.add(src);
     }
 
-    return [...images]
+    const raw = [...images];
+    const filtered = raw
       .filter(u => !/favicon|logo|icon|sprite|banner|badge|avatar|placeholder|blank|pixel|tracking|1x1/i.test(u))
       .filter(u =>
         /\.(jpg|jpeg|png|webp)(\?|$)/i.test(u) ||
         /\/(images?|photo|img|media|product|cdn)\//i.test(u) ||
         /is\/image\//i.test(u)
-      )
-      .slice(0, 4);
-  } catch {
+      );
+    console.log("imagefinder_scrape_result", JSON.stringify({ url, rawCount: raw.length, filteredCount: filtered.length }));
+    return filtered.slice(0, 4);
+  } catch (err) {
+    console.log("imagefinder_scrape_error", JSON.stringify({ url, error: err.message }));
     return [];
   }
 }
