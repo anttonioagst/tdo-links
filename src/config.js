@@ -45,7 +45,9 @@ export function loadConfig(env = process.env) {
     publicationWindowHours: Number(env.PUBLICATION_WINDOW_HOURS || 2),
     maxCandidatesPerCycle: Number(env.MAX_CANDIDATES_PER_CYCLE || 2),
     databaseUrl: env.DATABASE_URL || "",
-    redisUrl: env.REDIS_URL || ""
+    redisUrl: env.REDIS_URL || "",
+    googleCseApiKey: env.GOOGLE_CSE_API_KEY || "",
+    googleCseId: env.GOOGLE_CSE_ID || ""
   };
 }
 

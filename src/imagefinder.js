@@ -6,20 +6,23 @@ export async function findOfficialProductImages(offer, config) {
 
   const officialUrl = await identifyOfficialUrl(offer, config);
   console.log("imagefinder_url", JSON.stringify({ offerId: offer.id, officialUrl }));
-
   if (!officialUrl) return [];
 
+  // 1. Try static HTML scraping (fast, no cost)
   const scraped = await scrapeProductImages(officialUrl);
   if (scraped.length) {
-    console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: scraped.length, source: "official_site" }));
+    console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: scraped.length, source: "html_scrape" }));
     return scraped;
   }
 
-  // Last resort: ask GPT-4o-mini for direct CDN URLs it knows for this product
-  const gptImages = await findImageUrlsFromGpt(offer, officialUrl, config);
-  if (gptImages.length) {
-    console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: gptImages.length, source: "gpt_known_cdn" }));
-    return gptImages;
+  // 2. Fallback: Google Custom Search API (handles SPA/JS-heavy sites)
+  if (config.googleCseApiKey && config.googleCseId) {
+    const domain = extractDomain(officialUrl);
+    const googleImages = await googleImageSearch(offer.title, domain, config);
+    if (googleImages.length) {
+      console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: googleImages.length, source: "google_cse", domain }));
+      return googleImages;
+    }
   }
 
   console.log("imagefinder_no_images", JSON.stringify({ offerId: offer.id, officialUrl }));
@@ -48,6 +51,14 @@ export async function downloadImageBuffers(urls) {
     })
   );
   return results.filter(Boolean);
+}
+
+function extractDomain(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
 }
 
 async function identifyOfficialUrl(offer, config) {
@@ -82,7 +93,6 @@ Reply with the URL only, nothing else.`
     const data = await response.json();
     const url = data.choices?.[0]?.message?.content?.trim();
     if (!url || url.toLowerCase() === "unknown" || !url.startsWith("http")) return null;
-    // Sanity check: not a store/marketplace
     if (/amazon|mercadolivre|shopee|kabum|magalu|aliexpress/i.test(url)) return null;
     return url;
   } catch {
@@ -90,71 +100,34 @@ Reply with the URL only, nothing else.`
   }
 }
 
-async function findImageUrlsFromGpt(offer, officialUrl, config) {
+async function googleImageSearch(productTitle, domain, config) {
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { authorization: `Bearer ${config.openaiApiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        temperature: 0,
-        max_tokens: 300,
-        messages: [{
-          role: "user",
-          content: `You are finding product images for an affiliate channel.
+    const query = encodeURIComponent(productTitle);
+    const siteParam = domain ? `&siteSearch=${encodeURIComponent(domain)}&siteSearchFilter=i` : "";
+    const apiUrl = `https://www.googleapis.com/customsearch/v1?key=${config.googleCseApiKey}&cx=${config.googleCseId}&q=${query}&searchType=image&num=4&imgType=photo&safe=active${siteParam}`;
 
-Product: "${offer.title}"
-Official page: ${officialUrl}
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(apiUrl, { signal: controller.signal });
+    clearTimeout(timeout);
 
-List up to 3 direct image URLs from this manufacturer's CDN that show this specific product.
-Only include URLs you are highly confident exist (from your training data).
-These must be real image files (.jpg, .png, .webp) that serve product photos.
-
-Return JSON array of URL strings only, e.g. ["https://...", "https://..."]
-If you are not confident about any URLs, return: []`
-        }]
-      })
-    });
-
-    if (!response.ok) return [];
-    const data = await response.json();
-    const raw = data.choices?.[0]?.message?.content?.trim() || "[]";
-    let urls;
-    try {
-      const match = raw.match(/\[[\s\S]*\]/);
-      urls = match ? JSON.parse(match[0]) : [];
-    } catch {
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.log("imagefinder_google_error", JSON.stringify({ status: res.status, message: err?.error?.message }));
       return [];
     }
 
-    if (!Array.isArray(urls) || !urls.length) {
-      console.log("imagefinder_gpt_cdn", JSON.stringify({ result: "empty_response", raw: raw.slice(0, 80) }));
-      return [];
-    }
-    console.log("imagefinder_gpt_cdn", JSON.stringify({ result: "validating", count: urls.length, urls }));
+    const data = await res.json();
+    const items = data.items || [];
+    const urls = items
+      .map(item => item.link)
+      .filter(u => u && u.startsWith("http"))
+      .filter(u => !/favicon|logo|icon|sprite|banner|badge|avatar|placeholder/i.test(u));
 
-    // Validate: only keep URLs that actually serve images
-    const validated = (await Promise.all(
-      urls.filter(u => typeof u === "string" && u.startsWith("http")).map(async (url) => {
-        try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 8000);
-          const res = await fetch(url, {
-            method: "HEAD",
-            signal: controller.signal,
-            headers: { "User-Agent": "Mozilla/5.0 (compatible; TDOLinks/1.0)" }
-          });
-          clearTimeout(timeout);
-          const ct = res.headers.get("content-type") || "";
-          return res.ok && ct.startsWith("image/") ? url : null;
-        } catch {
-          return null;
-        }
-      })
-    )).filter(Boolean);
-
-    return validated.slice(0, 4);
-  } catch {
+    console.log("imagefinder_google_raw", JSON.stringify({ domain, count: urls.length }));
+    return urls.slice(0, 4);
+  } catch (err) {
+    console.log("imagefinder_google_error", JSON.stringify({ error: err.message }));
     return [];
   }
 }
@@ -172,13 +145,13 @@ async function scrapeProductImages(url) {
       }
     });
     clearTimeout(timeout);
-    console.log("imagefinder_scrape", JSON.stringify({ url, status: res.status, finalUrl: res.url }));
+    console.log("imagefinder_scrape", JSON.stringify({ url, status: res.status }));
     if (!res.ok) return [];
 
     const html = await res.text();
     const images = new Set();
 
-    // 1. JSON-LD product schema (most reliable)
+    // 1. JSON-LD product schema
     for (const m of html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
       try {
         const items = [JSON.parse(m[1])].flat();
@@ -190,7 +163,7 @@ async function scrapeProductImages(url) {
     }
 
     // 2. Next.js __NEXT_DATA__ (extracts all product images from SSR page data)
-    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*type="application\/json"[^>]*>([\s\S]*?)<\/script>/i);
+    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
     if (nextDataMatch) {
       try {
         const extractUrls = (obj) => {
@@ -218,26 +191,21 @@ async function scrapeProductImages(url) {
       if (m[1].startsWith("http")) images.add(m[1]);
     }
 
-    // 5. <link rel="image_src">
-    for (const m of html.matchAll(/<link[^>]*rel=["']image_src["'][^>]*href=["']([^"']+)["']/gi)) {
-      if (m[1].startsWith("http")) images.add(m[1]);
-    }
-
-    // 6. <img> tags — data-src (lazy load) and src
+    // 5. <img> tags with data-src or src
     for (const m of html.matchAll(/<img[^>]+(?:data-src|src)=["']([^"']+)["'][^>]*>/gi)) {
       const src = m[1];
       if (src && src.startsWith("http") && src.length > 30) images.add(src);
     }
 
-    const raw = [...images];
-    const filtered = raw
+    const filtered = [...images]
       .filter(u => !/favicon|logo|icon|sprite|banner|badge|avatar|placeholder|blank|pixel|tracking|1x1/i.test(u))
       .filter(u =>
         /\.(jpg|jpeg|png|webp)(\?|$)/i.test(u) ||
         /\/(images?|photo|img|media|product|cdn)\//i.test(u) ||
         /is\/image\//i.test(u)
       );
-    console.log("imagefinder_scrape_result", JSON.stringify({ url, rawCount: raw.length, filteredCount: filtered.length }));
+
+    console.log("imagefinder_scrape_result", JSON.stringify({ url, rawCount: images.size, filteredCount: filtered.length }));
     return filtered.slice(0, 4);
   } catch (err) {
     console.log("imagefinder_scrape_error", JSON.stringify({ url, error: err.message }));
