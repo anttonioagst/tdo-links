@@ -7,7 +7,6 @@ function buildCopyPrompt(offer, validationResult, config) {
   const isPremium = (offer.currentPrice ?? 0) >= 500;
   const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
   const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
-  const storeName = offer.store === "amazon" ? "Amazon" : offer.store === "mercado_livre" ? "Mercado Livre" : (offer.store || "Loja");
 
   return `Você é o copywriter do canal TDO Links no estilo SDM Links — direto, sem enrolação, emojis variados por categoria.
 
@@ -31,7 +30,7 @@ FORMATO TELEGRAM:
 
 ${isPremium ? "[1 frase curta explicando por que vale a pena — apenas para premium]\n\n" : ""}${offer.title}
 De R$${previousFmt ?? "?"} | Por R$${currentFmt}
-Ad ${storeName}: {LINK}
+{LINK}
 
 FORMATO DISCORD:
 **🚨 [emoji] [categoria]:**
@@ -70,7 +69,7 @@ function fallbackCopy(offer) {
   const storeName = offer.store === "amazon" ? "Amazon" : offer.store === "mercado_livre" ? "Mercado Livre" : (offer.store || "Loja");
 
   return {
-    telegram: `🚨 💻 Tech:\n\n${title}\n${priceStr}\nAd ${storeName}: {LINK}`,
+    telegram: `🚨 💻 Tech:\n\n${title}\n${priceStr}\n{LINK}`,
     discord: `**🚨 💻 Tech:**\n~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**\n> Oferta selecionada\n{LINK}`,
     x: `🚨 💻 Tech:\n${title.slice(0, 60)}\n${priceStr}\nVeja no nosso canal 👇`.slice(0, 220)
   };
