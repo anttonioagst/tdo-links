@@ -2,12 +2,12 @@
 // instead of generating them with AI
 
 export async function findOfficialProductImages(offer, config) {
-  if (!config.openaiApiKey) return fallbackUrls(offer);
+  if (!config.openaiApiKey) return [];
 
   const officialUrl = await identifyOfficialUrl(offer, config);
   console.log("imagefinder_url", JSON.stringify({ offerId: offer.id, officialUrl }));
 
-  if (!officialUrl) return fallbackUrls(offer);
+  if (!officialUrl) return [];
 
   const scraped = await scrapeProductImages(officialUrl);
   if (scraped.length) {
@@ -15,9 +15,8 @@ export async function findOfficialProductImages(offer, config) {
     return scraped;
   }
 
-  const fallback = fallbackUrls(offer);
-  console.log("imagefinder_fallback", JSON.stringify({ offerId: offer.id, count: fallback.length, source: "store_cdn" }));
-  return fallback;
+  console.log("imagefinder_no_images", JSON.stringify({ offerId: offer.id, officialUrl }));
+  return [];
 }
 
 // Download images from URLs into memory buffers (avoids ephemeral disk + CDN blocks on Telegram)
@@ -123,18 +122,22 @@ async function scrapeProductImages(url) {
       if (m[1].startsWith("http")) images.add(m[1]);
     }
 
+    // 4. <img> tags — data-src (lazy load) and src
+    for (const m of html.matchAll(/<img[^>]+(?:data-src|src)=["']([^"']+)["'][^>]*>/gi)) {
+      const src = m[1];
+      if (src && src.startsWith("http") && src.length > 30) images.add(src);
+    }
+
     return [...images]
-      .filter(u => !/favicon|logo|icon|sprite|banner|badge/i.test(u))
-      .filter(u => /\.(jpg|jpeg|png|webp)(\?|$)/i.test(u) || u.includes("image") || u.includes("photo"))
+      .filter(u => !/favicon|logo|icon|sprite|banner|badge|avatar|placeholder|blank|pixel|tracking|1x1/i.test(u))
+      .filter(u =>
+        /\.(jpg|jpeg|png|webp)(\?|$)/i.test(u) ||
+        /\/(image|photo|img|media|product|cdn)\//i.test(u) ||
+        /is\/image\//i.test(u)
+      )
       .slice(0, 4);
   } catch {
     return [];
   }
 }
 
-function fallbackUrls(offer) {
-  return [
-    ...(Array.isArray(offer.imageUrls) ? offer.imageUrls : []),
-    ...(offer.imageUrl ? [offer.imageUrl] : [])
-  ].filter(u => /^https?:\/\//i.test(u || "")).slice(0, 4);
-}
