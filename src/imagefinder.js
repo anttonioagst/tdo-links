@@ -4,27 +4,13 @@
 export async function findOfficialProductImages(offer, config) {
   if (!config.openaiApiKey) return [];
 
-  const officialUrl = await identifyOfficialUrl(offer, config);
-  console.log("imagefinder_url", JSON.stringify({ offerId: offer.id, officialUrl }));
-  if (!officialUrl) return [];
+  // Ask GPT for brand domain only — much more reliable than full product page URL
+  const domain = await identifyBrandDomain(offer, config);
+  console.log("imagefinder_domain", JSON.stringify({ offerId: offer.id, domain }));
+  if (!domain) return [];
 
-  // 1. Try static HTML scraping (fast, no cost)
-  const scraped = await scrapeProductImages(officialUrl);
-  if (scraped.length) {
-    console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: scraped.length, source: "html_scrape" }));
-    return scraped;
-  }
-
-  // 2. Jina AI Reader — renders JS/SPA pages server-side, free, no API key
-  const jinaImages = await jinaImageSearch(officialUrl, offer.id);
-  if (jinaImages.length) {
-    console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: jinaImages.length, source: "jina_ai" }));
-    return jinaImages;
-  }
-
-  // 3. Google Custom Search API (when configured)
+  // Google Custom Search API — searches images on the brand's official domain
   if (config.googleCseApiKey && config.googleCseId) {
-    const domain = extractDomain(officialUrl);
     const googleImages = await googleImageSearch(offer.title, domain, config);
     if (googleImages.length) {
       console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: googleImages.length, source: "google_cse", domain }));
@@ -32,7 +18,18 @@ export async function findOfficialProductImages(offer, config) {
     }
   }
 
-  console.log("imagefinder_no_images", JSON.stringify({ offerId: offer.id, officialUrl }));
+  // Fallback: static HTML scrape of official product page
+  const officialUrl = await identifyOfficialUrl(offer, config);
+  if (officialUrl) {
+    console.log("imagefinder_url", JSON.stringify({ offerId: offer.id, officialUrl }));
+    const scraped = await scrapeProductImages(officialUrl);
+    if (scraped.length) {
+      console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: scraped.length, source: "html_scrape" }));
+      return scraped;
+    }
+  }
+
+  console.log("imagefinder_no_images", JSON.stringify({ offerId: offer.id, domain }));
   return [];
 }
 
@@ -68,6 +65,43 @@ function extractDomain(url) {
   }
 }
 
+async function identifyBrandDomain(offer, config) {
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { authorization: `Bearer ${config.openaiApiKey}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0,
+        max_tokens: 60,
+        messages: [{
+          role: "user",
+          content: `What is the official manufacturer website domain for this product?
+
+Product: "${offer.title}"
+
+Rules:
+- Return ONLY the domain (e.g. sony.com, logitech.com, samsung.com)
+- Do NOT return amazon, mercadolivre, shopee, kabum, magalu or any reseller
+- If multiple regional sites exist, use the global/international domain
+- If unsure, return: unknown
+
+Reply with the domain only, nothing else.`
+        }]
+      })
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    const domain = data.choices?.[0]?.message?.content?.trim().toLowerCase();
+    if (!domain || domain === "unknown" || domain.includes(" ") || domain.length > 60) return null;
+    if (/amazon|mercadolivre|shopee|kabum|magalu|aliexpress/i.test(domain)) return null;
+    return domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  } catch {
+    return null;
+  }
+}
+
 async function identifyOfficialUrl(offer, config) {
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -79,16 +113,14 @@ async function identifyOfficialUrl(offer, config) {
         max_tokens: 120,
         messages: [{
           role: "user",
-          content: `Find the official manufacturer product page for this product.
+          content: `Find the official manufacturer product page URL for this product.
 
 Product: "${offer.title}"
 Amazon URL: ${offer.originalUrl || offer.url || ""}
 
 Rules:
-- Return ONLY the exact URL of the manufacturer/brand official website product page
+- Return ONLY the exact URL of the official manufacturer product page
 - Do NOT return Amazon, Mercado Livre, or any reseller URL
-- Prefer the global/international site (en-US) over regional sites
-- The URL must point to a specific product page (not a homepage or category)
 - If you are not confident (>80%) about the exact URL, return: unknown
 
 Reply with the URL only, nothing else.`
@@ -104,44 +136,6 @@ Reply with the URL only, nothing else.`
     return url;
   } catch {
     return null;
-  }
-}
-
-async function jinaImageSearch(url, offerId) {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
-    const res = await fetch(`https://r.jina.ai/${url}`, {
-      signal: controller.signal,
-      headers: {
-        "Accept": "application/json",
-        "X-Return-Format": "json",
-        "User-Agent": "TDOLinks/1.0"
-      }
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      console.log("imagefinder_jina_error", JSON.stringify({ offerId, status: res.status }));
-      return [];
-    }
-
-    const data = await res.json();
-    const images = (data.images || data.data?.images || [])
-      .map(img => img.url || img.src || img)
-      .filter(u => typeof u === "string" && u.startsWith("http"))
-      .filter(u => !/favicon|logo|icon|sprite|banner|badge|avatar|placeholder|1x1/i.test(u))
-      .filter(u =>
-        /\.(jpg|jpeg|png|webp)(\?|$)/i.test(u) ||
-        /\/(images?|photo|img|media|product|cdn)\//i.test(u) ||
-        /is\/image\//i.test(u)
-      );
-
-    console.log("imagefinder_jina", JSON.stringify({ offerId, total: (data.images || data.data?.images || []).length, filtered: images.length }));
-    return images.slice(0, 4);
-  } catch (err) {
-    console.log("imagefinder_jina_error", JSON.stringify({ offerId, error: err.message }));
-    return [];
   }
 }
 
