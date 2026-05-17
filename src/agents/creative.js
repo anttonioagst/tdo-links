@@ -7,6 +7,7 @@ function buildCopyPrompt(offer, validationResult, config) {
   const isPremium = (offer.currentPrice ?? 0) >= 500;
   const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
   const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
+  const storeName = offer.store === "amazon" ? "Amazon" : offer.store === "mercado_livre" ? "Mercado Livre" : (offer.store || "Loja");
 
   return `Você é o copywriter do canal TDO Links no estilo SDM Links — direto, sem enrolação, emojis variados por categoria.
 
@@ -27,9 +28,10 @@ Crie copy para 3 canais. Retorne JSON válido exatamente neste formato:
 
 FORMATO TELEGRAM:
 🚨 [emoji da categoria] [Nome curto da categoria]:
-${isPremium ? "[1 frase curta explicando por que vale a pena — apenas para premium]\n" : ""}${offer.title}
+
+${isPremium ? "[1 frase curta explicando por que vale a pena — apenas para premium]\n\n" : ""}${offer.title}
 De R$${previousFmt ?? "?"} | Por R$${currentFmt}
-Ad [Loja]: {LINK}
+Ad ${storeName}: {LINK}
 
 FORMATO DISCORD:
 **🚨 [emoji] [categoria]:**
@@ -65,9 +67,10 @@ function fallbackCopy(offer) {
   const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
   const priceStr = previousFmt ? `De R$${previousFmt} | Por R$${currentFmt}` : `Por R$${currentFmt}`;
   const title = offer.title || "Oferta Tech";
+  const storeName = offer.store === "amazon" ? "Amazon" : offer.store === "mercado_livre" ? "Mercado Livre" : (offer.store || "Loja");
 
   return {
-    telegram: `🚨 💻 Tech:\n${title}\n${priceStr}\nAd Loja: {LINK}`,
+    telegram: `🚨 💻 Tech:\n\n${title}\n${priceStr}\nAd ${storeName}: {LINK}`,
     discord: `**🚨 💻 Tech:**\n~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**\n> Oferta selecionada\n{LINK}`,
     x: `🚨 💻 Tech:\n${title.slice(0, 60)}\n${priceStr}\nVeja no nosso canal 👇`.slice(0, 220)
   };

@@ -1,6 +1,7 @@
 import { publishTelegram } from "../publishers/telegram.js";
 import { publishDiscord } from "../publishers/discord.js";
 import { publishXAcquisition } from "../publishers/x.js";
+import { buildAffiliateUrl } from "../links.js";
 
 const INTER_CHANNEL_DELAY_MS = 3000;
 
@@ -35,7 +36,12 @@ function savePublishResult(db, offerId, channel, result) {
 export async function publishDeal(offer, content, config, db) {
   console.log("agent_event", JSON.stringify({ agent: "publisher", event: "start", offerId: offer.id, title: offer.title }));
 
-  const affiliateUrl = offer.affiliateUrl || offer.originalUrl || offer.url || "";
+  let affiliateUrl;
+  try {
+    affiliateUrl = buildAffiliateUrl(offer, config, "telegram");
+  } catch {
+    affiliateUrl = offer.affiliateUrl || offer.originalUrl || offer.url || "";
+  }
   const { imageUrls, copy } = content;
   const offerWithImage = imageUrls?.length
     ? { ...offer, officialImageUrls: imageUrls }
