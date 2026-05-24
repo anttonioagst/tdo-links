@@ -46,8 +46,8 @@ export function loadConfig(env = process.env) {
     maxCandidatesPerCycle: Number(env.MAX_CANDIDATES_PER_CYCLE || 2),
     databaseUrl: env.DATABASE_URL || "",
     redisUrl: env.REDIS_URL || "",
-    googleCseApiKey: env.GOOGLE_CSE_API_KEY || "",
-    googleCseId: env.GOOGLE_CSE_ID || ""
+    bingImageSearchApiKey: env.BING_IMAGE_SEARCH_KEY || "",
+    serpApiKey: env.SERP_API_KEY || ""
   };
 }
 

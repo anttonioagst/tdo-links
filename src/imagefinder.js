@@ -9,12 +9,21 @@ export async function findOfficialProductImages(offer, config) {
   console.log("imagefinder_domain", JSON.stringify({ offerId: offer.id, domain }));
   if (!domain) return [];
 
-  // Google Custom Search API — searches images on the brand's official domain
-  if (config.googleCseApiKey && config.googleCseId) {
-    const googleImages = await googleImageSearch(offer.title, domain, config);
-    if (googleImages.length) {
-      console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: googleImages.length, source: "google_cse", domain }));
-      return googleImages;
+  // Bing Image Search — primary source
+  if (config.bingImageSearchApiKey) {
+    const bingImages = await bingImageSearch(offer.title, domain, config);
+    if (bingImages.length) {
+      console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: bingImages.length, source: "bing", domain }));
+      return bingImages;
+    }
+  }
+
+  // SerpAPI — secondary fallback
+  if (config.serpApiKey) {
+    const serpImages = await serpApiImageSearch(offer.title, domain, config);
+    if (serpImages.length) {
+      console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: serpImages.length, source: "serpapi", domain }));
+      return serpImages;
     }
   }
 
@@ -139,34 +148,71 @@ Reply with the URL only, nothing else.`
   }
 }
 
-async function googleImageSearch(productTitle, domain, config) {
+async function serpApiImageSearch(productTitle, domain, config) {
   try {
-    const query = encodeURIComponent(productTitle);
-    const siteParam = domain ? `&siteSearch=${encodeURIComponent(domain)}&siteSearchFilter=i` : "";
-    const apiUrl = `https://www.googleapis.com/customsearch/v1?key=${config.googleCseApiKey}&cx=${config.googleCseId}&q=${query}&searchType=image&num=4&imgType=photo&safe=active${siteParam}`;
+    const params = new URLSearchParams({
+      engine: "google_images",
+      q: productTitle,
+      api_key: config.serpApiKey,
+      num: "4",
+      safe: "active"
+    });
+    if (domain) params.set("as_sitesearch", domain);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
-    const res = await fetch(apiUrl, { signal: controller.signal });
+    const res = await fetch(`https://serpapi.com/search.json?${params}`, { signal: controller.signal });
     clearTimeout(timeout);
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      console.log("imagefinder_google_error", JSON.stringify({ status: res.status, message: err?.error?.message }));
+      console.log("imagefinder_serp_error", JSON.stringify({ status: res.status, message: err?.error }));
       return [];
     }
 
     const data = await res.json();
-    const items = data.items || [];
-    const urls = items
-      .map(item => item.link)
+    const urls = (data.images_results || [])
+      .map(item => item.original)
       .filter(u => u && u.startsWith("http"))
       .filter(u => !/favicon|logo|icon|sprite|banner|badge|avatar|placeholder/i.test(u));
 
-    console.log("imagefinder_google_raw", JSON.stringify({ domain, count: urls.length }));
+    console.log("imagefinder_serp_raw", JSON.stringify({ domain, count: urls.length }));
     return urls.slice(0, 4);
   } catch (err) {
-    console.log("imagefinder_google_error", JSON.stringify({ error: err.message }));
+    console.log("imagefinder_serp_error", JSON.stringify({ error: err.message }));
+    return [];
+  }
+}
+
+async function bingImageSearch(productTitle, domain, config) {
+  try {
+    const q = domain ? `${productTitle} site:${domain}` : productTitle;
+    const params = new URLSearchParams({ q, count: "4", imageType: "Photo", safeSearch: "Strict", mkt: "pt-BR" });
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(`https://api.bing.microsoft.com/v7.0/images/search?${params}`, {
+      signal: controller.signal,
+      headers: { "Ocp-Apim-Subscription-Key": config.bingImageSearchApiKey }
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.log("imagefinder_bing_error", JSON.stringify({ status: res.status, message: err?.error?.message }));
+      return [];
+    }
+
+    const data = await res.json();
+    const urls = (data.value || [])
+      .map(item => item.contentUrl)
+      .filter(u => u && u.startsWith("http"))
+      .filter(u => !/favicon|logo|icon|sprite|banner|badge|avatar|placeholder/i.test(u));
+
+    console.log("imagefinder_bing_raw", JSON.stringify({ domain, count: urls.length }));
+    return urls.slice(0, 4);
+  } catch (err) {
+    console.log("imagefinder_bing_error", JSON.stringify({ error: err.message }));
     return [];
   }
 }
