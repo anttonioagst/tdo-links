@@ -52,9 +52,12 @@ export function startWorkers(db, config, connection) {
       console.log("job_done", JSON.stringify({ queue: "publish", offerId: offer.id, mode: "agent" }));
       return result;
     }
-    // Legacy publish — drain without running old pipeline
-    console.log("job_done", JSON.stringify({ queue: "publish", result: "skipped_legacy" }));
-    return { skipped: true };
+    // Legacy publish — drafts manually approved via dashboard
+    const { runPublishPipeline } = await import("../agents.js");
+    console.log("job_start", JSON.stringify({ queue: "publish", mode: "legacy" }));
+    const result = await runPublishPipeline(db, config);
+    console.log("job_done", JSON.stringify({ queue: "publish", mode: "legacy", published: result.published }));
+    return result;
   }, opts);
 
   // New: Validation worker
