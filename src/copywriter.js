@@ -95,7 +95,7 @@ export function telegramCopy(offer, url, disclosure) {
     isPremium ? premiumLine(offer) : null,
     offer.title,
     priceStr,
-    `Ad ${store}: ${url}`,
+    url,
     disclosure
   ].filter(Boolean).join("\n");
 }
@@ -112,7 +112,7 @@ export function xCopy(offer, url) {
     `🚨 ${emoji} ${label}:`,
     offer.title,
     priceStr,
-    `Ad ${store}: ${url}`
+    url
   ].join("\n").slice(0, 280);
 }
 
@@ -128,7 +128,7 @@ export function createXAcquisitionCopy(topOffers, config) {
     `🚨 ${emoji} ${label}:`,
     offer.title,
     `Por ${current}`,
-    `Ad ${storeLabel(offer.store)}: ${link}`
+    link
   ].join("\n").slice(0, 280);
 }
 
