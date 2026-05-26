@@ -11,12 +11,14 @@ CREATE TABLE IF NOT EXISTS offers (
   affiliate_ready boolean DEFAULT false,
   image_url text, image_urls jsonb DEFAULT '[]',
   generated_image_path text, generated_at timestamptz,
+  telegram_image_file_id text,
   category text, rating numeric, review_count integer,
   in_stock boolean DEFAULT true, status text, score integer,
   source_confidence numeric, source_warnings jsonb DEFAULT '[]',
   store_reputation text, scraped_at timestamptz,
   created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()
 );
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS telegram_image_file_id text;
 CREATE TABLE IF NOT EXISTS drafts (
   id text PRIMARY KEY,
   offer_id text REFERENCES offers(id) ON DELETE CASCADE,
@@ -43,6 +45,13 @@ CREATE TABLE IF NOT EXISTS settings (
   key text PRIMARY KEY,
   value jsonb
 );
+CREATE TABLE IF NOT EXISTS offer_images (
+  offer_id text NOT NULL,
+  angle integer NOT NULL,
+  image_data bytea NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  PRIMARY KEY (offer_id, angle)
+);
 `;
 
 const OFFER_COLS = [
@@ -50,6 +59,7 @@ const OFFER_COLS = [
   "current_price", "previous_price", "discount_percent",
   "original_url", "affiliate_url", "affiliate_source", "affiliate_ready",
   "image_url", "image_urls", "generated_image_path", "generated_at",
+  "telegram_image_file_id",
   "category", "rating", "review_count", "in_stock", "status", "score",
   "source_confidence", "source_warnings", "store_reputation", "scraped_at",
   "created_at", "updated_at"
@@ -81,6 +91,7 @@ function offerToRow(o) {
     image_urls: JSON.stringify(o.imageUrls || []),
     generated_image_path: o.generatedImagePath || null,
     generated_at: o.generatedAt || null,
+    telegram_image_file_id: o.telegramImageFileId || null,
     category: o.category || null,
     rating: o.rating != null ? String(o.rating) : null,
     review_count: o.reviewCount ?? null,
@@ -106,6 +117,7 @@ function rowToOffer(r) {
     imageUrls: Array.isArray(r.image_urls) ? r.image_urls : JSON.parse(r.image_urls || "[]"),
     generatedImagePath: r.generated_image_path,
     generatedAt: r.generated_at?.toISOString?.() ?? r.generated_at,
+    telegramImageFileId: r.telegram_image_file_id || null,
     category: r.category, rating: r.rating != null ? Number(r.rating) : null,
     reviewCount: r.review_count, inStock: r.in_stock,
     status: r.status, score: r.score,
@@ -183,6 +195,32 @@ async function batchInsertIgnore(client, table, rows, cols, conflictCol) {
      ON CONFLICT ("${conflictCol}") DO NOTHING`,
     params
   );
+}
+
+export async function saveOfferImages(pool, offerId, buffers) {
+  if (!pool || !buffers.length) return;
+  const client = await pool.connect();
+  try {
+    for (let i = 0; i < buffers.length; i++) {
+      await client.query(
+        `INSERT INTO offer_images (offer_id, angle, image_data)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (offer_id, angle) DO UPDATE SET image_data = excluded.image_data, created_at = now()`,
+        [offerId, i + 1, buffers[i]]
+      );
+    }
+  } finally {
+    client.release();
+  }
+}
+
+export async function loadOfferImages(pool, offerId) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    "SELECT image_data FROM offer_images WHERE offer_id = $1 ORDER BY angle",
+    [offerId]
+  );
+  return rows.map(r => r.image_data);
 }
 
 export class PgDb {
