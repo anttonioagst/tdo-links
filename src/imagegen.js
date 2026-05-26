@@ -88,11 +88,14 @@ export async function generateOfferImagePack(offer, config) {
   await mkdir(imageDir, { recursive: true });
 
   const savedPaths = [];
+  const savedBuffers = [];
   for (let i = 0; i < results.length; i++) {
     if (results[i].status === "fulfilled") {
+      const buf = Buffer.from(results[i].value, "base64");
       const path = join(imageDir, `${offer.id}_${i + 1}.jpg`);
-      await writeFile(path, Buffer.from(results[i].value, "base64"));
+      await writeFile(path, buf).catch(() => {});
       savedPaths.push(path);
+      savedBuffers.push(buf);
     } else {
       console.error("imagegen_angle_failed", JSON.stringify({ offerId: offer.id, angle: i + 1, error: results[i].reason?.message }));
     }
@@ -101,12 +104,12 @@ export async function generateOfferImagePack(offer, config) {
   if (!savedPaths.length) throw new Error("image_generation_failed: all angles failed");
 
   console.log("imagegen_done", JSON.stringify({ offerId: offer.id, count: savedPaths.length, mode: sourceImage ? "edit" : "text" }));
-  return savedPaths;
+  return { paths: savedPaths, buffers: savedBuffers };
 }
 
 // Legacy single-image fallback (used by manual trigger)
 export async function generateOfferImage(offer, config) {
-  const paths = await generateOfferImagePack(offer, config);
+  const { paths } = await generateOfferImagePack(offer, config);
   return paths[0];
 }
 
@@ -115,7 +118,7 @@ export async function generateImagesForOffers(offers, config, db) {
     const offerInDb = db.state.offers.find((o) => o.id === offer.id);
     if (!offerInDb) continue;
     try {
-      const imagePaths = await generateOfferImagePack(offerInDb, config);
+      const { paths: imagePaths } = await generateOfferImagePack(offerInDb, config);
       offerInDb.generatedImagePaths = imagePaths;
       offerInDb.generatedImagePath = imagePaths[0];
       offerInDb.generatedAt = new Date().toISOString();
