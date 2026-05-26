@@ -256,7 +256,7 @@ export async function runPublishPipeline(db, config) {
     }
     const result = draft.channel === "discord"
       ? await publishDiscord(draft, config, offer)
-      : await publishTelegram(draft, config, offer);
+      : await publishTelegram(draft, config, offer, db.pool || null);
     console.log("telegram_publish_result", JSON.stringify({
       draftId: draft.id,
       ok: result.ok,
@@ -290,6 +290,9 @@ export async function runPublishPipeline(db, config) {
       draft.providerMessageId = result.providerMessageId;
       draft.updatedAt = new Date().toISOString();
       published += 1;
+      if (offer?.telegramImageFileId && offerIndex !== -1) {
+        db.state.offers[offerIndex].telegramImageFileId = offer.telegramImageFileId;
+      }
     } else {
       draft.status = "failed";
       draft.rejectionReason = result.detail;

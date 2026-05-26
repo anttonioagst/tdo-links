@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { loadOfferImages } from "../pg-db.js";
 
 const CATEGORY_EMOJI = {
   SSD: "💾",
@@ -73,7 +74,7 @@ export async function testTelegram(config) {
   }
 }
 
-export async function publishTelegram(draft, config, offer = null) {
+export async function publishTelegram(draft, config, offer = null, pool = null) {
   if (config.telegramDryRun) {
     return { ok: true, dryRun: true, providerMessageId: null, detail: "Telegram dry-run ativo." };
   }
@@ -84,17 +85,20 @@ export async function publishTelegram(draft, config, offer = null) {
     const text = draft.text || "";
     const botUrl = `https://api.telegram.org/bot${config.telegramBotToken}`;
 
+    // Use cached Telegram file_id — no re-upload needed
+    if (offer?.telegramImageFileId) {
+      const result = await telegramRequest(`${botUrl}/sendPhoto`, {
+        chat_id: config.telegramChatId, photo: offer.telegramImageFileId, caption: text
+      });
+      if (result.ok) return result;
+    }
+
     if (offer?.officialImageUrls?.length) {
       const result = await sendOfficialImages(botUrl, config.telegramChatId, offer.officialImageUrls, text);
       if (result.ok) return result;
       console.log("telegram_official_images_fallback", JSON.stringify({ detail: result.detail }));
-      // fall through to store CDN or text
-    } else if (offer?.generatedImagePaths?.length) {
-      const packResult = await sendGeneratedImagePack(botUrl, config.telegramChatId, offer, text);
-      if (packResult.ok) return packResult;
-      console.log("telegram_pack_failed_fallback", JSON.stringify({ detail: packResult.detail }));
-    } else if (offer?.generatedImagePath) {
-      const imgResult = await sendGeneratedImage(botUrl, config.telegramChatId, offer, text);
+    } else if (offer?.generatedImagePaths?.length || offer?.generatedImagePath || (pool && offer?.id)) {
+      const imgResult = await sendGeneratedImage(botUrl, config.telegramChatId, offer, text, pool);
       if (imgResult.ok) return imgResult;
       console.log("telegram_image_failed_fallback", JSON.stringify({ detail: imgResult.detail }));
     }
@@ -200,18 +204,42 @@ async function sendOfficialImages(botUrl, chatId, urls, caption) {
   return { ok: response.ok && payload.ok, dryRun: false, providerMessageId: payload.result?.[0]?.message_id || null, detail: payload.description || "ok" };
 }
 
-async function sendGeneratedImagePack(botUrl, chatId, offer, caption) {
-  const paths = (offer.generatedImagePaths || []).filter(Boolean);
-  if (!paths.length) return sendGeneratedImage(botUrl, chatId, offer, caption);
-  if (paths.length === 1) return sendGeneratedImage(botUrl, chatId, { ...offer, generatedImagePath: paths[0] }, caption);
-
+async function sendGeneratedImage(botUrl, chatId, offer, caption, pool = null) {
   try {
+    let buffers = [];
+    if (pool) {
+      buffers = await loadOfferImages(pool, offer.id);
+    }
+    if (!buffers.length) {
+      const paths = (offer.generatedImagePaths || []).filter(Boolean);
+      if (!paths.length && offer.generatedImagePath) paths.push(offer.generatedImagePath);
+      for (const p of paths) {
+        try { buffers.push(await readFile(p)); } catch {}
+      }
+    }
+    if (!buffers.length) {
+      return { ok: false, dryRun: false, providerMessageId: null, detail: "no_generated_image_available" };
+    }
+
+    if (buffers.length === 1) {
+      const form = new FormData();
+      form.append("chat_id", chatId);
+      form.append("caption", caption.slice(0, 1024));
+      form.append("photo", new Blob([buffers[0]], { type: "image/jpeg" }), "product.jpg");
+      const response = await fetch(`${botUrl}/sendPhoto`, { method: "POST", body: form });
+      const payload = await response.json().catch(() => ({}));
+      if (payload.result?.photo) {
+        const fileId = payload.result.photo.slice(-1)[0]?.file_id;
+        if (fileId) offer.telegramImageFileId = fileId;
+      }
+      return { ok: response.ok && payload.ok, dryRun: false, providerMessageId: payload.result?.message_id || null, detail: payload.description || "ok" };
+    }
+
     const form = new FormData();
     form.append("chat_id", chatId);
     const mediaArr = [];
-    for (let i = 0; i < paths.length; i++) {
-      const buffer = await readFile(paths[i]);
-      form.append(`photo${i}`, new Blob([buffer], { type: "image/jpeg" }), `product_${i + 1}.jpg`);
+    for (let i = 0; i < buffers.length; i++) {
+      form.append(`photo${i}`, new Blob([buffers[i]], { type: "image/jpeg" }), `product_${i + 1}.jpg`);
       mediaArr.push({ type: "photo", media: `attach://photo${i}`, ...(i === 0 ? { caption: caption.slice(0, 1024) } : {}) });
     }
     form.append("media", JSON.stringify(mediaArr));
@@ -223,27 +251,18 @@ async function sendGeneratedImagePack(botUrl, chatId, offer, caption) {
       return { ok: true, dryRun: false, providerMessageId: payload.result?.[0]?.message_id || null, detail: "ok" };
     }
     console.log("telegram_pack_failed", JSON.stringify({ detail: payload.description }));
-    // Fall back to single image
-    return sendGeneratedImage(botUrl, chatId, { ...offer, generatedImagePath: paths[0] }, caption);
-  } catch (error) {
-    return telegramProviderFailure(error);
-  }
-}
-
-async function sendGeneratedImage(botUrl, chatId, offer, caption) {
-  try {
-    const buffer = await readFile(offer.generatedImagePath);
-    const form = new FormData();
-    form.append("chat_id", chatId);
-    form.append("caption", caption);
-    form.append("photo", new Blob([buffer], { type: "image/jpeg" }), "product.jpg");
-    const response = await fetch(`${botUrl}/sendPhoto`, { method: "POST", body: form });
-    const payload = await response.json().catch(() => ({}));
-    if (payload.result?.photo) {
-      const fileId = payload.result.photo.slice(-1)[0]?.file_id;
+    // Fallback: send first image only
+    const fallbackForm = new FormData();
+    fallbackForm.append("chat_id", chatId);
+    fallbackForm.append("caption", caption.slice(0, 1024));
+    fallbackForm.append("photo", new Blob([buffers[0]], { type: "image/jpeg" }), "product.jpg");
+    const fbRes = await fetch(`${botUrl}/sendPhoto`, { method: "POST", body: fallbackForm });
+    const fbPayload = await fbRes.json().catch(() => ({}));
+    if (fbPayload.result?.photo) {
+      const fileId = fbPayload.result.photo.slice(-1)[0]?.file_id;
       if (fileId) offer.telegramImageFileId = fileId;
     }
-    return { ok: response.ok && payload.ok, dryRun: false, providerMessageId: payload.result?.message_id || null, detail: payload.description || "ok" };
+    return { ok: fbRes.ok && fbPayload.ok, dryRun: false, providerMessageId: fbPayload.result?.message_id || null, detail: fbPayload.description || "ok" };
   } catch (error) {
     return telegramProviderFailure(error);
   }

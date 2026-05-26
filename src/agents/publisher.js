@@ -55,9 +55,13 @@ export async function publishDeal(offer, content, config, db) {
     channels.push(async () => {
       try {
         const draft = { text: resolveCopy(copy.telegram, affiliateUrl) };
-        const result = await publishTelegram(draft, config, offerWithImage);
+        const result = await publishTelegram(draft, config, offerWithImage, db.pool || null);
         results.telegram = result;
         savePublishResult(db, offer.id, "telegram", result);
+        if (result.ok && offerWithImage.telegramImageFileId) {
+          const offerInDb = db.state.offers.find(o => o.id === offer.id);
+          if (offerInDb) offerInDb.telegramImageFileId = offerWithImage.telegramImageFileId;
+        }
         console.log("agent_event", JSON.stringify({ agent: "publisher", event: "telegram_done", offerId: offer.id, ok: result.ok }));
       } catch (err) {
         results.telegram = { ok: false, error: err.message };
