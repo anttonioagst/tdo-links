@@ -231,8 +231,9 @@ export async function runPublishPipeline(db, config) {
     const isBlocked = !offer || offer.validationStatus === "blocked";
     const isStale = (offer?.validationReasons || []).includes("price_stale");
     const isAutoNotReady = draft.status === "auto_ready" && offer?.validationStatus === "blocked";
+    // Human approval overrides staleness — only skip if offer is missing or truly blocked
     const shouldSkip = draft.status === "approved"
-      ? (!offer || isStale)
+      ? !offer
       : (isBlocked || isAutoNotReady);
     if (shouldSkip) {
       const detail = {
