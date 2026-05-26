@@ -1,6 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { loadOfferImages } from "../pg-db.js";
-
 const CATEGORY_EMOJI = {
   SSD: "💾",
   notebook: "💻",
@@ -74,7 +71,7 @@ export async function testTelegram(config) {
   }
 }
 
-export async function publishTelegram(draft, config, offer = null, pool = null) {
+export async function publishTelegram(draft, config, offer = null) {
   if (config.telegramDryRun) {
     return { ok: true, dryRun: true, providerMessageId: null, detail: "Telegram dry-run ativo." };
   }
@@ -93,16 +90,14 @@ export async function publishTelegram(draft, config, offer = null, pool = null) 
       if (result.ok) return result;
     }
 
+    // Official product images fetched by the creative agent
     if (offer?.officialImageUrls?.length) {
-      const result = await sendOfficialImages(botUrl, config.telegramChatId, offer.officialImageUrls, text);
+      const result = await sendOfficialImages(botUrl, config.telegramChatId, offer.officialImageUrls, text, offer);
       if (result.ok) return result;
       console.log("telegram_official_images_fallback", JSON.stringify({ detail: result.detail }));
-    } else if (offer?.generatedImagePaths?.length || offer?.generatedImagePath || (pool && offer?.id)) {
-      const imgResult = await sendGeneratedImage(botUrl, config.telegramChatId, offer, text, pool);
-      if (imgResult.ok) return imgResult;
-      console.log("telegram_image_failed_fallback", JSON.stringify({ detail: imgResult.detail }));
     }
 
+    // Legacy imageUrl/imageUrls fields (scrape pipeline)
     const images = offerImages(offer);
     if (images.length > 1) {
       const response = await fetch(`${botUrl}/sendMediaGroup`, {
@@ -157,8 +152,9 @@ async function telegramRequest(url, body, retries = 2) {
   return { ok: response.ok && payload.ok === true, dryRun: false, providerMessageId: payload.result?.message_id || null, detail: payload.description || "ok" };
 }
 
-async function sendOfficialImages(botUrl, chatId, urls, caption) {
-  // Download images to memory to bypass CDN blocks on Telegram's servers
+// Downloads product images and uploads them directly to bypass CDN blocks.
+// Mutates offer.telegramImageFileId on success so future sends skip the upload.
+async function sendOfficialImages(botUrl, chatId, urls, caption, offer = null) {
   const downloaded = (await Promise.all(
     urls.slice(0, 4).map(async (url) => {
       try {
@@ -188,6 +184,10 @@ async function sendOfficialImages(botUrl, chatId, urls, caption) {
     form.append("photo", new Blob([downloaded[0].buffer], { type: downloaded[0].contentType }), "product.jpg");
     const response = await fetch(`${botUrl}/sendPhoto`, { method: "POST", body: form });
     const payload = await response.json().catch(() => ({}));
+    if (offer && payload.result?.photo) {
+      const fileId = payload.result.photo.slice(-1)[0]?.file_id;
+      if (fileId) offer.telegramImageFileId = fileId;
+    }
     return { ok: response.ok && payload.ok, dryRun: false, providerMessageId: payload.result?.message_id || null, detail: payload.description || "ok" };
   }
 
@@ -201,71 +201,14 @@ async function sendOfficialImages(botUrl, chatId, urls, caption) {
   form.append("media", JSON.stringify(mediaArr));
   const response = await fetch(`${botUrl}/sendMediaGroup`, { method: "POST", body: form });
   const payload = await response.json().catch(() => ({}));
-  return { ok: response.ok && payload.ok, dryRun: false, providerMessageId: payload.result?.[0]?.message_id || null, detail: payload.description || "ok" };
-}
-
-async function sendGeneratedImage(botUrl, chatId, offer, caption, pool = null) {
-  try {
-    let buffers = [];
-    if (pool) {
-      buffers = await loadOfferImages(pool, offer.id);
-    }
-    if (!buffers.length) {
-      const paths = (offer.generatedImagePaths || []).filter(Boolean);
-      if (!paths.length && offer.generatedImagePath) paths.push(offer.generatedImagePath);
-      for (const p of paths) {
-        try { buffers.push(await readFile(p)); } catch {}
-      }
-    }
-    if (!buffers.length) {
-      return { ok: false, dryRun: false, providerMessageId: null, detail: "no_generated_image_available" };
-    }
-
-    if (buffers.length === 1) {
-      const form = new FormData();
-      form.append("chat_id", chatId);
-      form.append("caption", caption.slice(0, 1024));
-      form.append("photo", new Blob([buffers[0]], { type: "image/jpeg" }), "product.jpg");
-      const response = await fetch(`${botUrl}/sendPhoto`, { method: "POST", body: form });
-      const payload = await response.json().catch(() => ({}));
-      if (payload.result?.photo) {
-        const fileId = payload.result.photo.slice(-1)[0]?.file_id;
-        if (fileId) offer.telegramImageFileId = fileId;
-      }
-      return { ok: response.ok && payload.ok, dryRun: false, providerMessageId: payload.result?.message_id || null, detail: payload.description || "ok" };
-    }
-
-    const form = new FormData();
-    form.append("chat_id", chatId);
-    const mediaArr = [];
-    for (let i = 0; i < buffers.length; i++) {
-      form.append(`photo${i}`, new Blob([buffers[i]], { type: "image/jpeg" }), `product_${i + 1}.jpg`);
-      mediaArr.push({ type: "photo", media: `attach://photo${i}`, ...(i === 0 ? { caption: caption.slice(0, 1024) } : {}) });
-    }
-    form.append("media", JSON.stringify(mediaArr));
-    const response = await fetch(`${botUrl}/sendMediaGroup`, { method: "POST", body: form });
-    const payload = await response.json().catch(() => ({}));
-    if (response.ok && payload.ok) {
+  if (response.ok && payload.ok) {
+    if (offer) {
       const firstPhoto = payload.result?.[0]?.photo;
       if (firstPhoto) offer.telegramImageFileId = firstPhoto.slice(-1)[0]?.file_id;
-      return { ok: true, dryRun: false, providerMessageId: payload.result?.[0]?.message_id || null, detail: "ok" };
     }
-    console.log("telegram_pack_failed", JSON.stringify({ detail: payload.description }));
-    // Fallback: send first image only
-    const fallbackForm = new FormData();
-    fallbackForm.append("chat_id", chatId);
-    fallbackForm.append("caption", caption.slice(0, 1024));
-    fallbackForm.append("photo", new Blob([buffers[0]], { type: "image/jpeg" }), "product.jpg");
-    const fbRes = await fetch(`${botUrl}/sendPhoto`, { method: "POST", body: fallbackForm });
-    const fbPayload = await fbRes.json().catch(() => ({}));
-    if (fbPayload.result?.photo) {
-      const fileId = fbPayload.result.photo.slice(-1)[0]?.file_id;
-      if (fileId) offer.telegramImageFileId = fileId;
-    }
-    return { ok: fbRes.ok && fbPayload.ok, dryRun: false, providerMessageId: fbPayload.result?.message_id || null, detail: fbPayload.description || "ok" };
-  } catch (error) {
-    return telegramProviderFailure(error);
+    return { ok: true, dryRun: false, providerMessageId: payload.result?.[0]?.message_id || null, detail: "ok" };
   }
+  return { ok: false, dryRun: false, providerMessageId: null, detail: payload.description || "media_group_failed" };
 }
 
 function telegramProviderFailure(error) {

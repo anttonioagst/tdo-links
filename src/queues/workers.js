@@ -1,6 +1,4 @@
 import { Worker } from "bullmq";
-import { generateOfferImagePack } from "../imagegen.js";
-import { saveOfferImages } from "../pg-db.js";
 import { validateDeal } from "../agents/validation.js";
 import { createContent } from "../agents/creative.js";
 import { publishDeal } from "../agents/publisher.js";
@@ -16,40 +14,9 @@ export function startWorkers(db, config, connection) {
   }, opts);
 
   const imagegenWorker = new Worker("imagegen", async (job) => {
-    const { offerId } = job.data;
-    console.log("job_start", JSON.stringify({ queue: "imagegen", offerId }));
-    const offerIndex = db.state.offers.findIndex(o => o.id === offerId);
-    if (offerIndex === -1) throw new Error(`offer_not_found: ${offerId}`);
-
-    db.state.offers[offerIndex].imageStatus = "generating";
-    db.state.offers[offerIndex].imageStatusUpdatedAt = new Date().toISOString();
-    await db.save();
-
-    let paths, buffers;
-    try {
-      ({ paths, buffers } = await generateOfferImagePack(db.state.offers[offerIndex], config));
-    } catch (err) {
-      db.state.offers[offerIndex].imageStatus = "failed";
-      db.state.offers[offerIndex].imageStatusUpdatedAt = new Date().toISOString();
-      await db.save();
-      throw err;
-    }
-
-    // Save to Postgres — primary storage, survives container redeploys
-    if (db.pool) {
-      await saveOfferImages(db.pool, offerId, buffers);
-      console.log("imagegen_pg_saved", JSON.stringify({ offerId, count: buffers.length }));
-    }
-
-    db.state.offers[offerIndex].generatedImagePaths = paths;
-    db.state.offers[offerIndex].generatedImagePath = paths[0];
-    db.state.offers[offerIndex].generatedAt = new Date().toISOString();
-    db.state.offers[offerIndex].imageStatus = "done";
-    db.state.offers[offerIndex].imageStatusUpdatedAt = new Date().toISOString();
-    await db.save();
-    console.log("job_done", JSON.stringify({ queue: "imagegen", offerId, imagePath: paths[0] }));
-    return { imagePath: paths[0] };
-  }, { ...opts, concurrency: 2 });
+    console.log("job_done", JSON.stringify({ queue: "imagegen", result: "skipped_no_longer_used" }));
+    return { skipped: true };
+  }, opts);
 
   const publishWorker = new Worker("publish", async (job) => {
     // Agent pipeline publish (new): job has { offer, content }

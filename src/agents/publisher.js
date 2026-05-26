@@ -55,7 +55,7 @@ export async function publishDeal(offer, content, config, db) {
     channels.push(async () => {
       try {
         const draft = { text: resolveCopy(copy.telegram, affiliateUrl) };
-        const result = await publishTelegram(draft, config, offerWithImage, db.pool || null);
+        const result = await publishTelegram(draft, config, offerWithImage);
         results.telegram = result;
         savePublishResult(db, offer.id, "telegram", result);
         if (result.ok && offerWithImage.telegramImageFileId) {

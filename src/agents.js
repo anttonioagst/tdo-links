@@ -1,6 +1,5 @@
 import { validatePost, validateXAcquisitionPost } from "./compliance.js";
 import { createTelegramCopy, createXPostCopy } from "./copywriter.js";
-import { generateImagesForOffers } from "./imagegen.js";
 import { buildAffiliateUrl, createShortCode, hasAffiliateConfig } from "./links.js";
 import { dedupeOffers, scoreOfferDetailed, statusForScore } from "./scoring.js";
 import { getLastScrapeMeta, scrapeDeals, scrapeFeedDeals } from "./scrapers.js";
@@ -40,12 +39,6 @@ export async function runScrapePipeline(db, config) {
   }
   await maybeCreateXDraft(db, config);
   await db.save();
-
-  if (config.openaiApiKey && incoming.length > 0) {
-    generateImagesForOffers(incoming, config, db).catch((err) =>
-      console.error("imagegen_pipeline_error", JSON.stringify({ error: err.message }))
-    );
-  }
 
   return { found: rawOffers.length, inserted: incoming.length, scrape: getLastScrapeMeta() };
 }
@@ -256,7 +249,7 @@ export async function runPublishPipeline(db, config) {
     }
     const result = draft.channel === "discord"
       ? await publishDiscord(draft, config, offer)
-      : await publishTelegram(draft, config, offer, db.pool || null);
+      : await publishTelegram(draft, config, offer);
     console.log("telegram_publish_result", JSON.stringify({
       draftId: draft.id,
       ok: result.ok,
