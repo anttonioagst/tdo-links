@@ -9,12 +9,12 @@ export async function findOfficialProductImages(offer, config) {
   console.log("imagefinder_domain", JSON.stringify({ offerId: offer.id, domain }));
   if (!domain) return [];
 
-  // Bing Image Search — primary source
-  if (config.bingImageSearchApiKey) {
-    const bingImages = await bingImageSearch(offer.title, domain, config);
-    if (bingImages.length) {
-      console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: bingImages.length, source: "bing", domain }));
-      return bingImages;
+  // Brave Image Search — primary source
+  if (config.braveSearchApiKey) {
+    const braveImages = await braveImageSearch(offer.title, domain, config);
+    if (braveImages.length) {
+      console.log("imagefinder_found", JSON.stringify({ offerId: offer.id, count: braveImages.length, source: "brave", domain }));
+      return braveImages;
     }
   }
 
@@ -184,35 +184,39 @@ async function serpApiImageSearch(productTitle, domain, config) {
   }
 }
 
-async function bingImageSearch(productTitle, domain, config) {
+async function braveImageSearch(productTitle, domain, config) {
   try {
     const q = domain ? `${productTitle} site:${domain}` : productTitle;
-    const params = new URLSearchParams({ q, count: "4", imageType: "Photo", safeSearch: "Strict", mkt: "pt-BR" });
+    const params = new URLSearchParams({ q, count: "4", safesearch: "strict" });
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
-    const res = await fetch(`https://api.bing.microsoft.com/v7.0/images/search?${params}`, {
+    const res = await fetch(`https://api.search.brave.com/res/v1/images/search?${params}`, {
       signal: controller.signal,
-      headers: { "Ocp-Apim-Subscription-Key": config.bingImageSearchApiKey }
+      headers: {
+        "Accept": "application/json",
+        "Accept-Encoding": "gzip",
+        "X-Subscription-Token": config.braveSearchApiKey
+      }
     });
     clearTimeout(timeout);
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      console.log("imagefinder_bing_error", JSON.stringify({ status: res.status, message: err?.error?.message }));
+      console.log("imagefinder_brave_error", JSON.stringify({ status: res.status, message: err?.message }));
       return [];
     }
 
     const data = await res.json();
-    const urls = (data.value || [])
-      .map(item => item.contentUrl)
+    const urls = (data.results || [])
+      .map(item => item.properties?.url || item.url)
       .filter(u => u && u.startsWith("http"))
       .filter(u => !/favicon|logo|icon|sprite|banner|badge|avatar|placeholder/i.test(u));
 
-    console.log("imagefinder_bing_raw", JSON.stringify({ domain, count: urls.length }));
+    console.log("imagefinder_brave_raw", JSON.stringify({ domain, count: urls.length }));
     return urls.slice(0, 4);
   } catch (err) {
-    console.log("imagefinder_bing_error", JSON.stringify({ error: err.message }));
+    console.log("imagefinder_brave_error", JSON.stringify({ error: err.message }));
     return [];
   }
 }
