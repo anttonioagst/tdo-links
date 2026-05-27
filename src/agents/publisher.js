@@ -2,6 +2,7 @@ import { publishTelegram } from "../publishers/telegram.js";
 import { publishDiscord } from "../publishers/discord.js";
 import { publishXAcquisition } from "../publishers/x.js";
 import { buildAffiliateUrl } from "../links.js";
+import { storeLabel } from "../copywriter.js";
 
 const INTER_CHANNEL_DELAY_MS = 3000;
 
@@ -54,7 +55,8 @@ export async function publishDeal(offer, content, config, db) {
   if (!wasAlreadyPublished(db, offer.id, "telegram")) {
     channels.push(async () => {
       try {
-        const draft = { text: resolveCopy(copy.telegram, affiliateUrl) };
+        const telegramLink = `<a href="${affiliateUrl}">Ver oferta na ${storeLabel(offer.store)}</a>`;
+        const draft = { text: resolveCopy(copy.telegram, telegramLink) };
         const result = await publishTelegram(draft, config, offerWithImage);
         results.telegram = result;
         savePublishResult(db, offer.id, "telegram", result);

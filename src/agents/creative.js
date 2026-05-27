@@ -7,12 +7,17 @@ function buildCopyPrompt(offer, validationResult, config) {
   const isPremium = (offer.currentPrice ?? 0) >= 500;
   const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
   const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
+  const discountStr = offer.discountPercent ? ` (-${Math.round(offer.discountPercent)}%)` : "";
+  const priceBlock = previousFmt
+    ? `<s>R$${previousFmt}</s> por <b>R$${currentFmt}</b>${discountStr}`
+    : `<b>R$${currentFmt}</b>`;
 
   return `Você é o copywriter do canal TDO Links no estilo SDM Links — direto, sem enrolação, emojis variados por categoria.
 
 Produto: ${offer.title}
 Preço atual: R$ ${currentFmt}
 Preço anterior: ${previousFmt ? `R$ ${previousFmt}` : "indisponível"}
+Desconto: ${offer.discountPercent ? `${Math.round(offer.discountPercent)}%` : "indisponível"}
 Avaliação: ${offer.rating ?? "N/A"}/5 (${offer.reviewCount ?? 0} avaliações)
 Categoria: ${offer.category || "tech"}
 Premium (≥R$500): ${isPremium ? "sim" : "não"}
@@ -25,30 +30,30 @@ Crie copy para 3 canais. Retorne JSON válido exatamente neste formato:
   "x": "texto aqui"
 }
 
-FORMATO TELEGRAM:
+FORMATO TELEGRAM (use HTML do Telegram — <b> negrito, <s> riscado):
 🚨 [emoji da categoria] [Nome curto da categoria]:
-
-${isPremium ? "[1 frase curta explicando por que vale a pena — apenas para premium]\n\n" : ""}${offer.title}
-De R$${previousFmt ?? "?"} | Por R$${currentFmt}
+${isPremium ? "\n[1 frase curta explicando por que vale a pena — apenas para premium]\n" : ""}
+${offer.title}
+${priceBlock}
 {LINK}
 
 FORMATO DISCORD:
 **🚨 [emoji] [categoria]:**
-~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**
+~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**${discountStr}
 > [frase de valor em 1 linha]
 {LINK}
 
 FORMATO X (máximo 220 chars, sem link afiliado):
 🚨 [emoji] [categoria]:
 [título produto ~60 chars]
-De R$${previousFmt ?? "?"} | Por R$${currentFmt}
+De R$${previousFmt ?? "?"} | Por R$${currentFmt}${discountStr}
 Veja no nosso canal 👇
 
 REGRAS:
 - Emojis: 💻 notebook/laptop, 🖱️ mouse, ⌨️ teclado, 🎧 audio/headset/fone, 📱 celular/smartphone, 💾 ssd/storage, 🖥️ monitor, 🔌 hub/cabo/carregador, 📷 câmera, 🪑 cadeira, 🫧 outros
 - Telegram/Discord: escreva {LINK} literalmente (será substituído pelo link real)
 - X: sem link afiliado, sem hashtags, máximo 220 chars
-- Nunca escreva percentual de desconto (não escreva "30% off" ou similares)`;
+- Telegram: mantenha as tags HTML exatamente como no exemplo (<s>, <b>), não adicione outras tags`;
 }
 
 function safeParseJson(text) {
@@ -64,14 +69,16 @@ function safeParseJson(text) {
 function fallbackCopy(offer) {
   const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
   const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
-  const priceStr = previousFmt ? `De R$${previousFmt} | Por R$${currentFmt}` : `Por R$${currentFmt}`;
+  const discountStr = offer.discountPercent ? ` (-${Math.round(offer.discountPercent)}%)` : "";
+  const priceBlock = previousFmt
+    ? `<s>R$${previousFmt}</s> por <b>R$${currentFmt}</b>${discountStr}`
+    : `<b>R$${currentFmt}</b>`;
   const title = offer.title || "Oferta Tech";
-  const storeName = offer.store === "amazon" ? "Amazon" : offer.store === "mercado_livre" ? "Mercado Livre" : (offer.store || "Loja");
 
   return {
-    telegram: `🚨 💻 Tech:\n\n${title}\n${priceStr}\n{LINK}`,
-    discord: `**🚨 💻 Tech:**\n~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**\n> Oferta selecionada\n{LINK}`,
-    x: `🚨 💻 Tech:\n${title.slice(0, 60)}\n${priceStr}\nVeja no nosso canal 👇`.slice(0, 220)
+    telegram: `🚨 💻 Tech:\n\n${title}\n${priceBlock}\n{LINK}`,
+    discord: `**🚨 💻 Tech:**\n~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**${discountStr}\n> Oferta selecionada\n{LINK}`,
+    x: `🚨 💻 Tech:\n${title.slice(0, 60)}\nDe R$${previousFmt ?? "?"} | Por R$${currentFmt}${discountStr}\nVeja no nosso canal 👇`.slice(0, 220)
   };
 }
 

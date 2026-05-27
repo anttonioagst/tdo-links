@@ -86,7 +86,10 @@ export function telegramCopy(offer, url, disclosure) {
   const label = shortCategory(offer);
   const current = money(offer.currentPrice);
   const previous = offer.previousPrice ? money(offer.previousPrice) : null;
-  const priceStr = previous ? `De ${previous} | Por ${current}` : `Por ${current}`;
+  const discount = offer.discountPercent ? ` (-${Math.round(offer.discountPercent)}%)` : "";
+  const priceStr = previous
+    ? `<s>${previous}</s> por <b>${current}</b>${discount}`
+    : `<b>${current}</b>`;
   const store = storeLabel(offer.store);
   const isPremium = (offer.currentPrice ?? 0) >= 500;
 
@@ -95,8 +98,8 @@ export function telegramCopy(offer, url, disclosure) {
     isPremium ? premiumLine(offer) : null,
     offer.title,
     priceStr,
-    url,
-    disclosure
+    `<a href="${url}">Ver oferta na ${store}</a>`,
+    disclosure || null
   ].filter(Boolean).join("\n");
 }
 
