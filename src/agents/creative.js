@@ -4,23 +4,21 @@ import { findOfficialProductImages } from "../imagefinder.js";
 const MODEL = "claude-sonnet-4-6";
 
 function buildCopyPrompt(offer, validationResult, config) {
-  const isPremium = (offer.currentPrice ?? 0) >= 500;
   const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
   const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
-  const discountStr = offer.discountPercent ? ` (-${Math.round(offer.discountPercent)}%)` : "";
-  const priceBlock = previousFmt
-    ? `<s>R$${previousFmt}</s> por <b>R$${currentFmt}</b>${discountStr}`
-    : `<b>R$${currentFmt}</b>`;
+  const discountPct = offer.discountPercent ? Math.round(offer.discountPercent) : null;
+  const storeDisplay = offer.store === "amazon" ? "Amazon"
+    : offer.store === "mercado_livre" ? "Mercado Livre"
+    : (offer.store || "Loja");
 
-  return `Você é o copywriter do canal TDO Links no estilo SDM Links — direto, sem enrolação, emojis variados por categoria.
+  return `Você é o copywriter do canal TDO Links — direto, sem enrolação, estilo deal hunter brasileiro.
 
 Produto: ${offer.title}
 Preço atual: R$ ${currentFmt}
 Preço anterior: ${previousFmt ? `R$ ${previousFmt}` : "indisponível"}
-Desconto: ${offer.discountPercent ? `${Math.round(offer.discountPercent)}%` : "indisponível"}
+Desconto: ${discountPct ? `${discountPct}%` : "indisponível"}
 Avaliação: ${offer.rating ?? "N/A"}/5 (${offer.reviewCount ?? 0} avaliações)
-Categoria: ${offer.category || "tech"}
-Premium (≥R$500): ${isPremium ? "sim" : "não"}
+Loja: ${storeDisplay}
 Curador: "${validationResult.reason || "Bom deal de tecnologia"}"
 
 Crie copy para 3 canais. Retorne JSON válido exatamente neste formato:
@@ -30,30 +28,31 @@ Crie copy para 3 canais. Retorne JSON válido exatamente neste formato:
   "x": "texto aqui"
 }
 
-FORMATO TELEGRAM (use HTML do Telegram — <b> negrito, <s> riscado):
-🚨 [emoji da categoria] [Nome curto da categoria]:
-${isPremium ? "\n[1 frase curta explicando por que vale a pena — apenas para premium]\n" : ""}
-${offer.title}
-${priceBlock}
+FORMATO TELEGRAM (siga o modelo EXATO, incluindo linhas em branco):
+📌 ${offer.title}
+
+[1 frase chamativa sobre o deal — ex: "Aproveite esta oferta exclusiva na ${storeDisplay} antes que acabe!" ou algo específico do produto]
+
+🔥 ${previousFmt ? `De R$ ${previousFmt} por R$ ${currentFmt}${discountPct ? ` (${discountPct}% OFF)` : ""}` : `Por R$ ${currentFmt}`}
+
+🛒 Ver oferta na ${storeDisplay}:
 {LINK}
 
 FORMATO DISCORD:
-**🚨 [emoji] [categoria]:**
-~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**${discountStr}
+**📌 ${offer.title}**
+~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**${discountPct ? ` (${discountPct}% OFF)` : ""}
 > [frase de valor em 1 linha]
 {LINK}
 
 FORMATO X (máximo 220 chars, sem link afiliado):
-🚨 [emoji] [categoria]:
-[título produto ~60 chars]
-De R$${previousFmt ?? "?"} | Por R$${currentFmt}${discountStr}
+📌 [título ~60 chars]
+${previousFmt ? `De R$${previousFmt} por R$${currentFmt}` : `Por R$${currentFmt}`}${discountPct ? ` (${discountPct}% OFF)` : ""}
 Veja no nosso canal 👇
 
 REGRAS:
-- Emojis: 💻 notebook/laptop, 🖱️ mouse, ⌨️ teclado, 🎧 audio/headset/fone, 📱 celular/smartphone, 💾 ssd/storage, 🖥️ monitor, 🔌 hub/cabo/carregador, 📷 câmera, 🪑 cadeira, 🫧 outros
+- Telegram: siga o modelo exatamente, não troque os emojis 📌 🔥 🛒
 - Telegram/Discord: escreva {LINK} literalmente (será substituído pelo link real)
-- X: sem link afiliado, sem hashtags, máximo 220 chars
-- Telegram: mantenha as tags HTML exatamente como no exemplo (<s>, <b>), não adicione outras tags`;
+- X: sem link afiliado, sem hashtags, máximo 220 chars`;
 }
 
 function safeParseJson(text) {
@@ -69,16 +68,20 @@ function safeParseJson(text) {
 function fallbackCopy(offer) {
   const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
   const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
-  const discountStr = offer.discountPercent ? ` (-${Math.round(offer.discountPercent)}%)` : "";
-  const priceBlock = previousFmt
-    ? `<s>R$${previousFmt}</s> por <b>R$${currentFmt}</b>${discountStr}`
-    : `<b>R$${currentFmt}</b>`;
+  const discountPct = offer.discountPercent ? Math.round(offer.discountPercent) : null;
+  const discountStr = discountPct ? ` (${discountPct}% OFF)` : "";
+  const priceStr = previousFmt
+    ? `De R$ ${previousFmt} por R$ ${currentFmt}${discountStr}`
+    : `Por R$ ${currentFmt}`;
   const title = offer.title || "Oferta Tech";
+  const storeDisplay = offer.store === "amazon" ? "Amazon"
+    : offer.store === "mercado_livre" ? "Mercado Livre"
+    : (offer.store || "Loja");
 
   return {
-    telegram: `🚨 💻 Tech:\n\n${title}\n${priceBlock}\n{LINK}`,
-    discord: `**🚨 💻 Tech:**\n~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**${discountStr}\n> Oferta selecionada\n{LINK}`,
-    x: `🚨 💻 Tech:\n${title.slice(0, 60)}\nDe R$${previousFmt ?? "?"} | Por R$${currentFmt}${discountStr}\nVeja no nosso canal 👇`.slice(0, 220)
+    telegram: `📌 ${title}\n\nAproveite esta oferta exclusiva na ${storeDisplay} antes que acabe!\n\n🔥 ${priceStr}\n\n🛒 Ver oferta na ${storeDisplay}:\n{LINK}`,
+    discord: `**📌 ${title}**\n~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**${discountStr}\n> Oferta selecionada\n{LINK}`,
+    x: `📌 ${title.slice(0, 60)}\n${priceStr}\nVeja no nosso canal 👇`.slice(0, 220)
   };
 }
 

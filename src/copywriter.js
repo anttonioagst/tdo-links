@@ -82,25 +82,28 @@ export function createXPostCopy(offer, shortCode, config) {
 }
 
 export function telegramCopy(offer, url, disclosure) {
-  const emoji = categoryEmoji(offer);
-  const label = shortCategory(offer);
   const current = money(offer.currentPrice);
   const previous = offer.previousPrice ? money(offer.previousPrice) : null;
-  const discount = offer.discountPercent ? ` (-${Math.round(offer.discountPercent)}%)` : "";
+  const discountPct = offer.discountPercent ? Math.round(offer.discountPercent) : null;
+  const discountStr = discountPct ? ` (${discountPct}% OFF)` : "";
   const priceStr = previous
-    ? `<s>${previous}</s> por <b>${current}</b>${discount}`
-    : `<b>${current}</b>`;
+    ? `De ${previous} por ${current}${discountStr}`
+    : `Por ${current}`;
   const store = storeLabel(offer.store);
   const isPremium = (offer.currentPrice ?? 0) >= 500;
+  const hook = isPremium ? premiumLine(offer) : `Aproveite esta oferta exclusiva na ${store} antes que acabe!`;
 
   return [
-    `🚨 ${emoji} ${label}:`,
-    isPremium ? premiumLine(offer) : null,
-    offer.title,
-    priceStr,
-    `<a href="${url}">Ver oferta na ${store}</a>`,
-    disclosure || null
-  ].filter(Boolean).join("\n");
+    `📌 ${offer.title}`,
+    "",
+    hook,
+    "",
+    `🔥 ${priceStr}`,
+    "",
+    `🛒 Ver oferta na ${store}:`,
+    url,
+    disclosure ? `\n${disclosure}` : null
+  ].filter(v => v !== null).join("\n");
 }
 
 export function xCopy(offer, url) {
