@@ -200,14 +200,13 @@ async function handleApi(req, res, url, db, config) {
       return;
     }
     const ts = Date.now();
-    const uniqId = ts.toString(36).toUpperCase().slice(-6);
     const testOffer = {
       title: `Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth (test-${ts})`,
       currentPrice: 1499.00,
       previousPrice: 2199.00,
       discountPercent: 32,
-      originalUrl: `https://www.amazon.com.br/dp/B0TS${uniqId}`,
-      asin: `B0TS${uniqId}`,
+      originalUrl: "https://www.amazon.com.br/dp/B09XS7JWHH",
+      asin: "B09XS7JWHH",
       imageUrl: "https://m.media-amazon.com/images/I/61IcNpBaEEL._AC_SX679_.jpg",
       imageUrls: ["https://m.media-amazon.com/images/I/61IcNpBaEEL._AC_SX679_.jpg"],
       store: "amazon",

@@ -87,7 +87,7 @@ export function telegramCopy(offer, url, disclosure) {
   const discountPct = offer.discountPercent ? Math.round(offer.discountPercent) : null;
   const discountStr = discountPct ? ` (${discountPct}% OFF)` : "";
   const priceStr = previous
-    ? `De ${previous} por ${current}${discountStr}`
+    ? `De <s>${previous}</s> por ${current}${discountStr}`
     : `Por ${current}`;
   const store = storeLabel(offer.store);
   const isPremium = (offer.currentPrice ?? 0) >= 500;

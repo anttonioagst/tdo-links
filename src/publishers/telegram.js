@@ -67,7 +67,8 @@ export async function publishTelegram(draft, config, offer = null) {
     // Use cached Telegram file_id — no re-upload needed
     if (offer?.telegramImageFileId) {
       const result = await telegramRequest(`${botUrl}/sendPhoto`, {
-        chat_id: config.telegramChatId, photo: offer.telegramImageFileId, caption: text      });
+        chat_id: config.telegramChatId, photo: offer.telegramImageFileId, caption: text, parse_mode: "HTML"
+      });
       if (result.ok) return result;
     }
 
@@ -82,7 +83,8 @@ export async function publishTelegram(draft, config, offer = null) {
     const images = offerImages(offer);
     if (images.length >= 1) {
       const photoResult = await telegramRequest(`${botUrl}/sendPhoto`, {
-        chat_id: config.telegramChatId, photo: images[0], caption: text      });
+        chat_id: config.telegramChatId, photo: images[0], caption: text, parse_mode: "HTML"
+      });
       if (photoResult.ok) return photoResult;
       console.log("telegram_photo_failed", JSON.stringify({ detail: photoResult.detail }));
     }

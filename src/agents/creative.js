@@ -11,6 +11,10 @@ function buildCopyPrompt(offer, validationResult, config) {
     : offer.store === "mercado_livre" ? "Mercado Livre"
     : (offer.store || "Loja");
 
+  const priceLine = previousFmt
+    ? `🔥 De <s>R$ ${previousFmt}</s> por R$ ${currentFmt}${discountPct ? ` (${discountPct}% OFF)` : ""}`
+    : `🔥 Por R$ ${currentFmt}`;
+
   return `Você é o copywriter do canal TDO Links — direto, sem enrolação, estilo deal hunter brasileiro.
 
 Produto: ${offer.title}
@@ -28,12 +32,12 @@ Crie copy para 3 canais. Retorne JSON válido exatamente neste formato:
   "x": "texto aqui"
 }
 
-FORMATO TELEGRAM (siga o modelo EXATO, incluindo linhas em branco):
+FORMATO TELEGRAM — use HTML do Telegram (parse_mode HTML). Siga o modelo EXATO incluindo linhas em branco e tags:
 📌 ${offer.title}
 
 [1 frase chamativa sobre o deal — ex: "Aproveite esta oferta exclusiva na ${storeDisplay} antes que acabe!" ou algo específico do produto]
 
-🔥 ${previousFmt ? `De R$ ${previousFmt} por R$ ${currentFmt}${discountPct ? ` (${discountPct}% OFF)` : ""}` : `Por R$ ${currentFmt}`}
+${priceLine}
 
 🛒 Ver oferta na ${storeDisplay}:
 {LINK}
@@ -50,9 +54,10 @@ ${previousFmt ? `De R$${previousFmt} por R$${currentFmt}` : `Por R$${currentFmt}
 Veja no nosso canal 👇
 
 REGRAS:
-- Telegram: siga o modelo exatamente, não troque os emojis 📌 🔥 🛒
+- Telegram: siga o modelo exatamente — emojis 📌 🔥 🛒, tag <s> no preço antigo (é HTML do Telegram)
 - Telegram/Discord: escreva {LINK} literalmente (será substituído pelo link real)
-- X: sem link afiliado, sem hashtags, máximo 220 chars`;
+- X: sem link afiliado, sem hashtags, máximo 220 chars
+- Não adicione outras tags HTML além de <s>`;
 }
 
 function safeParseJson(text) {
@@ -79,7 +84,7 @@ function fallbackCopy(offer) {
     : (offer.store || "Loja");
 
   return {
-    telegram: `📌 ${title}\n\nAproveite esta oferta exclusiva na ${storeDisplay} antes que acabe!\n\n🔥 ${priceStr}\n\n🛒 Ver oferta na ${storeDisplay}:\n{LINK}`,
+    telegram: `📌 ${title}\n\nAproveite esta oferta exclusiva na ${storeDisplay} antes que acabe!\n\n🔥 ${previousFmt ? `De <s>R$ ${previousFmt}</s> por R$ ${currentFmt}${discountStr}` : `Por R$ ${currentFmt}`}\n\n🛒 Ver oferta na ${storeDisplay}:\n{LINK}`,
     discord: `**📌 ${title}**\n~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**${discountStr}\n> Oferta selecionada\n{LINK}`,
     x: `📌 ${title.slice(0, 60)}\n${priceStr}\nVeja no nosso canal 👇`.slice(0, 220)
   };
