@@ -11,10 +11,6 @@ function buildCopyPrompt(offer, validationResult, config) {
     : offer.store === "mercado_livre" ? "Mercado Livre"
     : (offer.store || "Loja");
 
-  const priceLine = previousFmt
-    ? `🔥 De <s>R$ ${previousFmt}</s> por R$ ${currentFmt}${discountPct ? ` (${discountPct}% OFF)` : ""}`
-    : `🔥 Por R$ ${currentFmt}`;
-
   return `Você é o copywriter do canal TDO Links — direto, sem enrolação, estilo deal hunter brasileiro.
 
 Produto: ${offer.title}
@@ -25,22 +21,14 @@ Avaliação: ${offer.rating ?? "N/A"}/5 (${offer.reviewCount ?? 0} avaliações)
 Loja: ${storeDisplay}
 Curador: "${validationResult.reason || "Bom deal de tecnologia"}"
 
-Crie copy para 3 canais. Retorne JSON válido exatamente neste formato:
+Retorne JSON válido exatamente neste formato:
 {
-  "telegram": "texto aqui",
-  "discord": "texto aqui",
-  "x": "texto aqui"
+  "hook": "1 frase chamativa sobre o deal para o Telegram",
+  "discord": "copy completa para Discord",
+  "x": "tweet"
 }
 
-FORMATO TELEGRAM — use HTML do Telegram (parse_mode HTML). Siga o modelo EXATO incluindo linhas em branco e tags:
-📌 ${offer.title}
-
-[1 frase chamativa sobre o deal — ex: "Aproveite esta oferta exclusiva na ${storeDisplay} antes que acabe!" ou algo específico do produto]
-
-${priceLine}
-
-🛒 Ver oferta na ${storeDisplay}:
-{LINK}
+CAMPO hook: 1 frase curta e chamativa sobre o produto/deal. Ex: "O melhor custo-benefício em headsets premium do mercado!" ou "Oferta exclusiva para gamers — enquanto durar o estoque!"
 
 FORMATO DISCORD:
 **📌 ${offer.title}**
@@ -54,10 +42,8 @@ ${previousFmt ? `De R$${previousFmt} por R$${currentFmt}` : `Por R$${currentFmt}
 Veja no nosso canal 👇
 
 REGRAS:
-- Telegram: siga o modelo exatamente — emojis 📌 🔥 🛒, tag <s> no preço antigo (é HTML do Telegram)
-- Telegram/Discord: escreva {LINK} literalmente (será substituído pelo link real)
-- X: sem link afiliado, sem hashtags, máximo 220 chars
-- Não adicione outras tags HTML além de <s>`;
+- Discord/X: escreva {LINK} literalmente onde couber o link
+- X: sem link afiliado, sem hashtags, máximo 220 chars`;
 }
 
 function safeParseJson(text) {
@@ -68,6 +54,30 @@ function safeParseJson(text) {
   } catch {
     return null;
   }
+}
+
+function buildTelegramCopy(offer, hook) {
+  const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
+  const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
+  const discountPct = offer.discountPercent ? Math.round(offer.discountPercent) : null;
+  const discountStr = discountPct ? ` (${discountPct}% OFF)` : "";
+  const priceLine = previousFmt
+    ? `🔥 De <s>R$ ${previousFmt}</s> por <b>R$ ${currentFmt}</b>${discountStr}`
+    : `🔥 Por <b>R$ ${currentFmt}</b>`;
+  const storeDisplay = offer.store === "amazon" ? "Amazon"
+    : offer.store === "mercado_livre" ? "Mercado Livre"
+    : (offer.store || "Loja");
+
+  return [
+    `📌 ${offer.title || "Oferta Tech"}`,
+    "",
+    hook,
+    "",
+    priceLine,
+    "",
+    `🛒 Ver oferta na ${storeDisplay}:`,
+    "{LINK}"
+  ].join("\n");
 }
 
 function fallbackCopy(offer) {
@@ -82,9 +92,10 @@ function fallbackCopy(offer) {
   const storeDisplay = offer.store === "amazon" ? "Amazon"
     : offer.store === "mercado_livre" ? "Mercado Livre"
     : (offer.store || "Loja");
+  const hook = `Aproveite esta oferta exclusiva na ${storeDisplay} antes que acabe!`;
 
   return {
-    telegram: `📌 ${title}\n\nAproveite esta oferta exclusiva na ${storeDisplay} antes que acabe!\n\n🔥 ${previousFmt ? `De <s>R$ ${previousFmt}</s> por R$ ${currentFmt}${discountStr}` : `Por R$ ${currentFmt}`}\n\n🛒 Ver oferta na ${storeDisplay}:\n{LINK}`,
+    telegram: buildTelegramCopy(offer, hook),
     discord: `**📌 ${title}**\n~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**${discountStr}\n> Oferta selecionada\n{LINK}`,
     x: `📌 ${title.slice(0, 60)}\n${priceStr}\nVeja no nosso canal 👇`.slice(0, 220)
   };
@@ -112,13 +123,17 @@ export async function createContent(offer, validationResult, config) {
       const rawText = message.content?.[0]?.text || "";
       const parsed = safeParseJson(rawText);
 
-      if (!parsed?.telegram || !parsed?.discord || !parsed?.x) {
+      if (!parsed?.hook || !parsed?.discord || !parsed?.x) {
         console.log("agent_event", JSON.stringify({ agent: "creative", event: "copy_parse_error", raw: rawText.slice(0, 100) }));
         return fallbackCopy(offer);
       }
 
       if (parsed.x.length > 220) parsed.x = parsed.x.slice(0, 220);
-      return parsed;
+      return {
+        telegram: buildTelegramCopy(offer, parsed.hook),
+        discord: parsed.discord,
+        x: parsed.x
+      };
     })()
   ]);
 
