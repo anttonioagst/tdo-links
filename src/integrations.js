@@ -33,7 +33,10 @@ export function buildDiagnostics({ config, state }) {
       autoPublishThreshold: config.autoPublishThreshold,
       reviewThreshold: config.reviewThreshold,
       scrapeIntervalMinutes: config.scrapeIntervalMinutes,
-      publishIntervalMinutes: config.publishIntervalMinutes
+      publishIntervalMinutes: config.publishIntervalMinutes,
+      maxPublicationsPerCycle: config.maxPublicationsPerCycle,
+      publicationWindowHours: config.publicationWindowHours,
+      minPublicationIntervalMinutes: config.minPublicationIntervalMinutes
     },
     scout: {
       scraperMode: config.scraperMode,

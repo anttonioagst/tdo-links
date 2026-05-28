@@ -34,9 +34,10 @@ CREATE TABLE IF NOT EXISTS clicks (
 );
 CREATE TABLE IF NOT EXISTS publish_log (
   id text PRIMARY KEY,
-  draft_id text, channel text, result jsonb,
+  draft_id text, offer_id text, channel text, result jsonb,
   created_at timestamptz DEFAULT now()
 );
+ALTER TABLE publish_log ADD COLUMN IF NOT EXISTS offer_id text;
 CREATE TABLE IF NOT EXISTS price_history (
   id serial PRIMARY KEY,
   offer_id text, price numeric, recorded_at timestamptz DEFAULT now()
@@ -75,7 +76,7 @@ const CLICK_COLS = [
   "timestamp", "user_agent", "referer", "country"
 ];
 
-const LOG_COLS = ["id", "draft_id", "channel", "result", "created_at"];
+const LOG_COLS = ["id", "draft_id", "offer_id", "channel", "result", "created_at"];
 
 function offerToRow(o) {
   return {
@@ -157,7 +158,7 @@ function clickToRow(c) {
 
 function logToRow(l) {
   return {
-    id: l.id, draft_id: l.draftId, channel: l.channel,
+    id: l.id, draft_id: l.draftId, offer_id: l.offerId || null, channel: l.channel,
     result: JSON.stringify(l.result || {}),
     created_at: l.createdAt || null
   };
@@ -256,7 +257,7 @@ export class PgDb {
       userAgent: r.user_agent, referer: r.referer, country: r.country
     }));
     this.state.publishLog = logRes.rows.map(r => ({
-      id: r.id, draftId: r.draft_id, channel: r.channel, result: r.result,
+      id: r.id, draftId: r.draft_id, offerId: r.offer_id, channel: r.channel, result: r.result,
       createdAt: r.created_at?.toISOString?.() ?? r.created_at
     }));
 

@@ -32,7 +32,7 @@ if (config.databaseUrl) {
   }, 15 * 1000);
 }
 
-cron.schedule("0 */2 * * *", async () => {
+cron.schedule("*/15 * * * *", async () => {
   console.log("cron_trigger discovery");
   runDiscovery(db, config).catch(err =>
     console.error("cron_discovery_failed", JSON.stringify({ error: err.message }))

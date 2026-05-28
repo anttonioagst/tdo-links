@@ -2,6 +2,7 @@ import { publishTelegram } from "../publishers/telegram.js";
 import { publishDiscord } from "../publishers/discord.js";
 import { publishXAcquisition } from "../publishers/x.js";
 import { buildAffiliateUrl } from "../links.js";
+import { telegramPublicationStatus } from "../publication-policy.js";
 
 const INTER_CHANNEL_DELAY_MS = 3000;
 
@@ -33,16 +34,6 @@ function savePublishResult(db, offerId, channel, result) {
   });
 }
 
-function recentTelegramPublishes(db, config) {
-  const maxPerCycle = config.maxPublicationsPerCycle ?? 2;
-  const windowHours = config.publicationWindowHours ?? 2;
-  const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
-  const count = (db.state.publishLog || [])
-    .filter((entry) => entry.result?.ok && entry.channel === "telegram" && entry.createdAt >= windowStart)
-    .length;
-  return { count, maxPerCycle, windowHours };
-}
-
 export async function publishDeal(offer, content, config, db) {
   console.log("agent_event", JSON.stringify({ agent: "publisher", event: "start", offerId: offer.id, title: offer.title }));
   if (db.load) await db.load();
@@ -62,16 +53,18 @@ export async function publishDeal(offer, content, config, db) {
   // Build ordered list of channels to publish (lazy functions, not promises)
   const channels = [];
 
-  const quota = recentTelegramPublishes(db, config);
-  if (quota.count >= quota.maxPerCycle) {
-    results.telegram = { ok: true, skipped: true, detail: "telegram_quota_reached" };
+  const publication = telegramPublicationStatus(db.state.publishLog || [], config);
+  if (!publication.allowed) {
+    results.telegram = { ok: true, skipped: true, detail: publication.reason, waitMinutes: publication.waitMinutes };
     console.log("agent_event", JSON.stringify({
       agent: "publisher",
-      event: "telegram_skipped_quota",
+      event: "telegram_skipped_policy",
       offerId: offer.id,
-      recentPublished: quota.count,
-      maxPerCycle: quota.maxPerCycle,
-      windowHours: quota.windowHours
+      reason: publication.reason,
+      recentPublished: publication.recentPublished,
+      maxPerCycle: publication.maxPerCycle,
+      windowHours: publication.windowHours,
+      waitMinutes: publication.waitMinutes
     }));
   } else if (!wasAlreadyPublished(db, offer.id, "telegram")) {
     channels.push(async () => {

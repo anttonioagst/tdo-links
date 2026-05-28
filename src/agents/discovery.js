@@ -1,6 +1,7 @@
 import Parser from "rss-parser";
 import { scrapeDeals } from "../scrapers.js";
 import { hasRealPromotion, promotionDiscountPercent } from "../deals.js";
+import { buildLearningProfile, learningScoreForOffer } from "../learning.js";
 
 const RSS_FEEDS = [
   { name: "pelando", url: "https://www.pelando.com.br/rss" },
@@ -108,7 +109,7 @@ export async function runDiscovery(db, config) {
   }
 
   const maxCandidates = discoveryCandidateLimit(config);
-  const candidates = selectDiscoveryCandidates(newOffers, maxCandidates);
+  const candidates = selectDiscoveryCandidates(newOffers, maxCandidates, db.state);
 
   console.log("agent_event", JSON.stringify({
     agent: "discovery",
@@ -160,15 +161,20 @@ export async function runDiscovery(db, config) {
   return { found: newOffers.length, enqueued };
 }
 
-export function selectDiscoveryCandidates(offers, maxCandidates) {
+export function selectDiscoveryCandidates(offers, maxCandidates, state = {}) {
+  const profile = buildLearningProfile(state);
   return offers
     .filter(hasRealPromotion)
-    .sort((a, b) => promotionDiscountPercent(b) - promotionDiscountPercent(a))
+    .sort((a, b) => candidateScore(b, profile) - candidateScore(a, profile))
     .slice(0, maxCandidates);
 }
 
 export function discoveryCandidateLimit(config) {
   const configured = config.maxCandidatesPerCycle ?? 6;
-  const publicationTarget = config.maxPublicationsPerCycle ?? 2;
+  const publicationTarget = config.maxPublicationsPerCycle ?? 4;
   return Math.min(Math.max(configured, publicationTarget * 4), 10);
+}
+
+function candidateScore(offer, profile) {
+  return promotionDiscountPercent(offer) + learningScoreForOffer(offer, profile);
 }

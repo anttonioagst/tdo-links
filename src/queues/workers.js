@@ -4,6 +4,7 @@ import { createContent } from "../agents/creative.js";
 import { publishDeal } from "../agents/publisher.js";
 import { creativeQueue, publishQueue } from "./index.js";
 import { hasRealPromotion } from "../deals.js";
+import { telegramPublicationStatus } from "../publication-policy.js";
 
 export function startWorkers(db, config, connection) {
   const opts = { connection, concurrency: 1 };
@@ -108,19 +109,17 @@ export function startWorkers(db, config, connection) {
     }
 
     // Quota check: max N publications per window before enqueuing creative
-    const maxPerCycle = config.maxPublicationsPerCycle ?? 2;
-    const windowHours = config.publicationWindowHours ?? 2;
-    const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
-    const recentPublished = (db.state.publishLog || [])
-      .filter(l => l.result?.ok && l.channel === "telegram" && l.createdAt >= windowStart)
-      .length;
+    const publication = telegramPublicationStatus(db.state.publishLog || [], config);
 
-    if (recentPublished >= maxPerCycle) {
+    if (!publication.allowed) {
       console.log("job_done", JSON.stringify({
-        queue: "validation", title: offer?.title, result: "quota_reached",
-        recentPublished, maxPerCycle, windowHours
+        queue: "validation", title: offer?.title, result: publication.reason,
+        recentPublished: publication.recentPublished,
+        maxPerCycle: publication.maxPerCycle,
+        windowHours: publication.windowHours,
+        waitMinutes: publication.waitMinutes
       }));
-      return { ...validationResult, passes: false, reason: "quota_reached" };
+      return { ...validationResult, passes: false, reason: publication.reason };
     }
 
     // Insert validated offer to DB so the UI shows image generation progress
@@ -150,7 +149,8 @@ export function startWorkers(db, config, connection) {
       console.log("job_done", JSON.stringify({
         queue: "validation", title: offer?.title, result: "enqueued_creative",
         offerId: offerWithId.id, confidence: validationResult.confidence,
-        recentPublished, maxPerCycle
+        recentPublished: publication.recentPublished,
+        maxPerCycle: publication.maxPerCycle
       }));
     }
 
@@ -163,15 +163,17 @@ export function startWorkers(db, config, connection) {
     console.log("job_start", JSON.stringify({ queue: "creative", title: offer?.title }));
 
     // Second quota gate — prevents backlogged creative jobs from all publishing at once
-    const maxPerCycle = config.maxPublicationsPerCycle ?? 2;
-    const windowHours = config.publicationWindowHours ?? 2;
-    const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
-    const recentPublished = (db.state.publishLog || [])
-      .filter(l => l.result?.ok && l.channel === "telegram" && l.createdAt >= windowStart)
-      .length;
-    if (recentPublished >= maxPerCycle) {
-      console.log("job_done", JSON.stringify({ queue: "creative", title: offer?.title, result: "quota_reached_at_creative", recentPublished, maxPerCycle }));
-      return { skipped: true, reason: "quota_reached" };
+    const publication = telegramPublicationStatus(db.state.publishLog || [], config);
+    if (!publication.allowed) {
+      console.log("job_done", JSON.stringify({
+        queue: "creative",
+        title: offer?.title,
+        result: publication.reason,
+        recentPublished: publication.recentPublished,
+        maxPerCycle: publication.maxPerCycle,
+        waitMinutes: publication.waitMinutes
+      }));
+      return { skipped: true, reason: publication.reason };
     }
 
     const content = await createContent(offer, validationResult, config);

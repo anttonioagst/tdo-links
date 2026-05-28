@@ -23,6 +23,8 @@ import { telegramCopy } from "../src/copywriter.js";
 import { createContent } from "../src/agents/creative.js";
 import { publishDeal } from "../src/agents/publisher.js";
 import { hasRealPromotion } from "../src/deals.js";
+import { buildLearningProfile, learningScoreForOffer } from "../src/learning.js";
+import { telegramPublicationStatus } from "../src/publication-policy.js";
 import { buildAmazonSearchUrl, normalizeDiscoverySettings, runAmazonDiscovery } from "../src/discovery.js";
 import { shouldRunAmazonDiscovery, runDiscoverySchedulerTick } from "../src/discovery-scheduler.js";
 import { discoveryCandidateLimit, selectDiscoveryCandidates } from "../src/agents/discovery.js";
@@ -264,6 +266,49 @@ test("discovery candidates exclude products without real promotion", () => {
     { title: "Mouse 40 off", currentPrice: 60, previousPrice: 100, discountPercent: 40 }
   ], 2);
   assert.deepEqual(candidates.map((offer) => offer.title), ["Mouse 40 off", "Headset 20 off"]);
+});
+
+test("learning profile boosts offers similar to clicked winners", () => {
+  const state = {
+    offers: [
+      { id: "winner", title: "Mouse Gamer Redragon Griffin", category: "tech", currentPrice: 89, discountPercent: 51 },
+      { id: "ignored", title: "Fone Bluetooth Generico", category: "tech", currentPrice: 29, discountPercent: 52 }
+    ],
+    publishLog: [
+      { offerId: "winner", channel: "telegram", result: { ok: true }, createdAt: "2026-05-28T10:00:00.000Z" },
+      { offerId: "ignored", channel: "telegram", result: { ok: true }, createdAt: "2026-05-28T10:10:00.000Z" }
+    ],
+    clicks: [
+      { offerId: "winner", timestamp: "2026-05-28T10:05:00.000Z" },
+      { offerId: "winner", timestamp: "2026-05-28T10:06:00.000Z" },
+      { offerId: "winner", timestamp: "2026-05-28T10:07:00.000Z" }
+    ]
+  };
+  const profile = buildLearningProfile(state);
+  const redragonScore = learningScoreForOffer({ title: "Mouse Gamer Redragon Predator", category: "tech", currentPrice: 82, discountPercent: 48 }, profile);
+  const genericScore = learningScoreForOffer({ title: "Fone Bluetooth Generico", category: "tech", currentPrice: 29, discountPercent: 52 }, profile);
+  assert.ok(redragonScore > genericScore);
+});
+
+test("discovery candidates use learning without allowing non-promotions", () => {
+  const state = {
+    offers: [
+      { id: "winner", title: "Mouse Gamer Redragon Griffin", category: "tech", currentPrice: 89, discountPercent: 51 }
+    ],
+    publishLog: [
+      { offerId: "winner", channel: "telegram", result: { ok: true }, createdAt: "2026-05-28T10:00:00.000Z" }
+    ],
+    clicks: [
+      { offerId: "winner", timestamp: "2026-05-28T10:05:00.000Z" },
+      { offerId: "winner", timestamp: "2026-05-28T10:06:00.000Z" }
+    ]
+  };
+  const candidates = selectDiscoveryCandidates([
+    { title: "Monitor sem promocao", currentPrice: 899, previousPrice: null, discountPercent: 0 },
+    { title: "Fone Generico 55 off", currentPrice: 45, previousPrice: 100, discountPercent: 55 },
+    { title: "Mouse Gamer Redragon 48 off", currentPrice: 82, previousPrice: 159, discountPercent: 48 }
+  ], 2, state);
+  assert.deepEqual(candidates.map((offer) => offer.title), ["Mouse Gamer Redragon 48 off", "Fone Generico 55 off"]);
 });
 
 test("discovery validates backup candidates while publication quota stays capped", () => {
@@ -794,6 +839,9 @@ test("diagnostics exposes Telegram dry-run and credential health", () => {
   assert.equal(diagnostics.telegram.dryRun, true);
   assert.equal(diagnostics.telegram.ready, false);
   assert.deepEqual(diagnostics.telegram.missing, ["bot_token", "chat_id"]);
+  assert.equal(diagnostics.automation.maxPublicationsPerCycle, 4);
+  assert.equal(diagnostics.automation.publicationWindowHours, 1);
+  assert.equal(diagnostics.automation.minPublicationIntervalMinutes, 15);
 });
 
 test("publish pipeline returns per-draft dry-run details", async () => {
@@ -1459,6 +1507,32 @@ test("publisher skips Telegram when publication quota is already reached", async
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("Telegram publication policy allows four per hour with fifteen minute spacing", () => {
+  const now = new Date("2026-05-28T12:30:00.000Z");
+  const config = {
+    maxPublicationsPerCycle: 4,
+    publicationWindowHours: 1,
+    minPublicationIntervalMinutes: 15
+  };
+  const publishLog = [
+    { channel: "telegram", result: { ok: true }, createdAt: "2026-05-28T11:35:00.000Z" },
+    { channel: "telegram", result: { ok: true }, createdAt: "2026-05-28T11:50:00.000Z" },
+    { channel: "telegram", result: { ok: true }, createdAt: "2026-05-28T12:05:00.000Z" },
+    { channel: "telegram", result: { ok: true }, createdAt: "2026-05-28T12:20:00.000Z" }
+  ];
+  assert.deepEqual(telegramPublicationStatus(publishLog, config, now), {
+    allowed: false,
+    reason: "telegram_quota_reached",
+    recentPublished: 4,
+    maxPerCycle: 4,
+    windowHours: 1,
+    minIntervalMinutes: 15,
+    waitMinutes: 5
+  });
+  assert.equal(telegramPublicationStatus(publishLog.slice(1), config, now).allowed, false);
+  assert.equal(telegramPublicationStatus(publishLog.slice(1), config, new Date("2026-05-28T12:35:00.000Z")).allowed, true);
 });
 
 test("ui tokens define the command-center navigation", () => {

@@ -226,7 +226,7 @@ async function handleApi(req, res, url, db, config) {
   }
   if (req.method === "GET" && url.pathname === "/api/debug/publish-log") {
     const rows = db.pool
-      ? (await db.pool.query("SELECT id, channel, result, created_at FROM publish_log ORDER BY created_at DESC LIMIT 20")).rows
+      ? (await db.pool.query("SELECT id, offer_id, channel, result, created_at FROM publish_log ORDER BY created_at DESC LIMIT 20")).rows
       : (db.state.publishLog || []).slice(0, 20);
     sendJson(res, 200, { source: db.pool ? "postgres" : "json", count: rows.length, rows });
     return;
@@ -246,7 +246,7 @@ async function handleApi(req, res, url, db, config) {
 
   if (req.method === "POST" && url.pathname === "/api/debug/clear-quota") {
     const { creativeQueue, publishQueue, validationQueue, scrapeQueue, imagegenQueue } = await import("./queues/index.js");
-    const windowHours = config.publicationWindowHours ?? 2;
+    const windowHours = config.publicationWindowHours ?? 1;
     const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
     // Delete directly from PostgreSQL — batchInsertIgnore never deletes rows
     let removed = 0;
