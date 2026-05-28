@@ -51,6 +51,15 @@ const sampleOffers = [
 
 let lastScrapeMeta = { source: "unknown", found: 0, errors: [] };
 
+const CURATED_PROMOTION_SEARCH_URLS = [
+  "https://www.amazon.com.br/s?k=mouse+logitech+sem+fio&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=mouse+redragon&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=headset+havit&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=fone+anker+soundcore&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=roteador+tp+link&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=teclado+logitech&s=review-rank&deals-promo-filter=1"
+];
+
 export async function scrapeDeals(config = {}) {
   if (config.scraperMode === "amazon") {
     const offers = await scrapeAmazonDeals(config);
@@ -72,7 +81,7 @@ export async function scrapeDeals(config = {}) {
 
 export async function scrapeAmazonDeals(config) {
   const all = [];
-  for (const url of config.amazonSearchUrls || []) {
+  for (const url of buildAmazonScrapeUrls(config)) {
     try {
       const html = await fetchText(url, config);
       const parsed = parseAmazonSearch(html, url);
@@ -84,6 +93,10 @@ export async function scrapeAmazonDeals(config) {
     await sleep(1200);
   }
   return selectScrapedAmazonOffers(all, 20);
+}
+
+export function buildAmazonScrapeUrls(config = {}) {
+  return [...new Set([...(config.amazonSearchUrls || []), ...CURATED_PROMOTION_SEARCH_URLS])];
 }
 
 export function selectScrapedAmazonOffers(offers, limit) {

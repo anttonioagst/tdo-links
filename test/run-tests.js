@@ -17,7 +17,7 @@ import { normalizeTelegramImageUrl, publishTelegram, selectBestTelegramPhoto, sq
 import { buildRecommendations } from "../src/recommendations.js";
 import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, scoreOfferDetailed, statusForScore } from "../src/scoring.js";
-import { parseAmazonSearch, selectScrapedAmazonOffers } from "../src/scrapers.js";
+import { buildAmazonScrapeUrls, parseAmazonSearch, selectScrapedAmazonOffers } from "../src/scrapers.js";
 import { validateOffer } from "../src/validation.js";
 import { telegramCopy } from "../src/copywriter.js";
 import { createContent } from "../src/agents/creative.js";
@@ -293,6 +293,15 @@ test("Amazon scrape selection keeps later real promotions before applying limit"
   const selected = selectScrapedAmazonOffers(offers, 2);
   assert.equal(selected[0].title, "Oferta real depois do limite antigo");
   assert.equal(selected[0].discountPercent, 50);
+});
+
+test("Amazon scrape includes curated promotion searches after configured URLs", () => {
+  const urls = buildAmazonScrapeUrls({
+    amazonSearchUrls: ["https://www.amazon.com.br/s?k=ssd+nvme"]
+  });
+  assert.equal(urls[0], "https://www.amazon.com.br/s?k=ssd+nvme");
+  assert.ok(urls.some((url) => url.includes("mouse+logitech+sem+fio")));
+  assert.ok(urls.some((url) => url.includes("deals-promo-filter=1")));
 });
 
 test("saves manual Amazon affiliate links and prioritizes them", async () => {
