@@ -231,32 +231,6 @@ async function handleApi(req, res, url, db, config) {
     sendJson(res, 200, { source: db.pool ? "postgres" : "json", count: rows.length, rows });
     return;
   }
-  if (req.method === "POST" && url.pathname === "/api/debug/delete-telegram-messages") {
-    const body = await readJson(req);
-    const messageIds = Array.isArray(body.messageIds)
-      ? body.messageIds.map((id) => Number(id)).filter(Number.isInteger)
-      : [];
-    if (!config.telegramBotToken || !config.telegramChatId) {
-      sendJson(res, 400, { error: "telegram_not_configured" });
-      return;
-    }
-    if (!messageIds.length) {
-      sendJson(res, 400, { error: "message_ids_required" });
-      return;
-    }
-    const results = [];
-    for (const messageId of messageIds) {
-      const response = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/deleteMessage`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chat_id: config.telegramChatId, message_id: messageId })
-      });
-      const payload = await response.json().catch(() => ({}));
-      results.push({ messageId, ok: response.ok && payload.ok === true, detail: payload.description || "ok" });
-    }
-    sendJson(res, 200, { deleted: results.filter((item) => item.ok).length, results });
-    return;
-  }
   if (req.method === "POST" && url.pathname === "/api/debug/clear-rejected") {
     let removed = 0;
     if (db.pool) {
