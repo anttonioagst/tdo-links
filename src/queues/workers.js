@@ -70,7 +70,7 @@ export function startWorkers(db, config, connection) {
 
     const validationResult = await validateDeal(offer, config);
     const threshold = config.aiConfidenceThreshold ?? 70;
-    const passes = validationResult.valid === true && validationResult.confidence > threshold;
+    const passes = validationResult.valid === true && validationResult.confidence >= threshold;
     const promotionReady = hasRealPromotion(offer);
 
     if (!passes || !promotionReady) {
