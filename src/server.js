@@ -272,59 +272,6 @@ async function handleApi(req, res, url, db, config) {
     sendJson(res, 200, { ok: true, removed, remaining: (db.state.publishLog || []).length, drained });
     return;
   }
-  if (req.method === "POST" && url.pathname === "/api/debug/reset-test-state") {
-    const body = await readJson(req);
-    const messageIds = Array.isArray(body.messageIds) ? body.messageIds : [];
-    const deletedMessages = [];
-    if (config.telegramBotToken && config.telegramChatId) {
-      for (const messageId of messageIds) {
-        const response = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/deleteMessage`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ chat_id: config.telegramChatId, message_id: messageId })
-        });
-        const result = await response.json().catch(() => ({}));
-        deletedMessages.push({ messageId, ok: response.ok && result.ok === true, result });
-      }
-    }
-    const { creativeQueue, publishQueue, validationQueue, scrapeQueue, imagegenQueue } = await import("./queues/index.js");
-    const drained = {};
-    if (scrapeQueue) { await scrapeQueue.drain(); drained.scrape = true; }
-    if (imagegenQueue) { await imagegenQueue.drain(); drained.imagegen = true; }
-    if (validationQueue) { await validationQueue.drain(); drained.validation = true; }
-    if (creativeQueue) { await creativeQueue.drain(); drained.creative = true; }
-    if (publishQueue) { await publishQueue.drain(); drained.publish = true; }
-    if (db.pool) {
-      const client = await db.pool.connect();
-      try {
-        await client.query("BEGIN");
-        await client.query("DELETE FROM offer_images");
-        await client.query("DELETE FROM price_history");
-        await client.query("DELETE FROM clicks");
-        await client.query("DELETE FROM publish_log");
-        await client.query("DELETE FROM drafts");
-        await client.query("DELETE FROM offers");
-        await client.query("COMMIT");
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      } finally {
-        client.release();
-      }
-      await db.load();
-    } else {
-      db.state.offers = [];
-      db.state.drafts = [];
-      db.state.clicks = [];
-      db.state.publishLog = [];
-      db.state.priceHistory = {};
-      db.state.reports = [];
-      db.state.recommendations = [];
-      await db.save();
-    }
-    sendJson(res, 200, { ok: true, deletedMessages, drained, remaining: { offers: db.state.offers.length, drafts: db.state.drafts.length, publishLog: (db.state.publishLog || []).length } });
-    return;
-  }
   if (req.method === "POST" && url.pathname === "/api/run/publish") {
     const result = await enqueuePublish(db, config, null, ["telegram", "twitter"]);
     if (!result.queued) {
