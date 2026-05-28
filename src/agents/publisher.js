@@ -33,8 +33,19 @@ function savePublishResult(db, offerId, channel, result) {
   });
 }
 
+function recentTelegramPublishes(db, config) {
+  const maxPerCycle = config.maxPublicationsPerCycle ?? 2;
+  const windowHours = config.publicationWindowHours ?? 2;
+  const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
+  const count = (db.state.publishLog || [])
+    .filter((entry) => entry.result?.ok && entry.channel === "telegram" && entry.createdAt >= windowStart)
+    .length;
+  return { count, maxPerCycle, windowHours };
+}
+
 export async function publishDeal(offer, content, config, db) {
   console.log("agent_event", JSON.stringify({ agent: "publisher", event: "start", offerId: offer.id, title: offer.title }));
+  if (db.load) await db.load();
 
   let affiliateUrl;
   try {
@@ -51,7 +62,18 @@ export async function publishDeal(offer, content, config, db) {
   // Build ordered list of channels to publish (lazy functions, not promises)
   const channels = [];
 
-  if (!wasAlreadyPublished(db, offer.id, "telegram")) {
+  const quota = recentTelegramPublishes(db, config);
+  if (quota.count >= quota.maxPerCycle) {
+    results.telegram = { ok: true, skipped: true, detail: "telegram_quota_reached" };
+    console.log("agent_event", JSON.stringify({
+      agent: "publisher",
+      event: "telegram_skipped_quota",
+      offerId: offer.id,
+      recentPublished: quota.count,
+      maxPerCycle: quota.maxPerCycle,
+      windowHours: quota.windowHours
+    }));
+  } else if (!wasAlreadyPublished(db, offer.id, "telegram")) {
     channels.push(async () => {
       try {
         const draft = { text: resolveCopy(copy.telegram, affiliateUrl) };

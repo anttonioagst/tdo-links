@@ -21,6 +21,7 @@ import { buildAmazonScrapeUrls, parseAmazonSearch, selectScrapedAmazonOffers } f
 import { validateOffer } from "../src/validation.js";
 import { telegramCopy } from "../src/copywriter.js";
 import { createContent } from "../src/agents/creative.js";
+import { publishDeal } from "../src/agents/publisher.js";
 import { hasRealPromotion } from "../src/deals.js";
 import { buildAmazonSearchUrl, normalizeDiscoverySettings, runAmazonDiscovery } from "../src/discovery.js";
 import { shouldRunAmazonDiscovery, runDiscoverySchedulerTick } from "../src/discovery-scheduler.js";
@@ -1413,6 +1414,49 @@ test("publish pipeline records failed details when Telegram fetch throws", async
     assert.match(publish.results[0].detail, /connection reset/);
   } finally {
     globalThis.fetch = originalFetch;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("publisher skips Telegram when publication quota is already reached", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.publishLog = [
+      { id: "pub_1", channel: "telegram", result: { ok: true }, createdAt: new Date().toISOString() },
+      { id: "pub_2", channel: "telegram", result: { ok: true }, createdAt: new Date().toISOString() }
+    ];
+    await db.save();
+    const offer = {
+      id: "offer_quota",
+      title: "Mouse Gamer Redragon",
+      currentPrice: 89,
+      previousPrice: 180,
+      discountPercent: 51,
+      originalUrl: "https://www.amazon.com.br/dp/B07GTTRBLV",
+      store: "amazon"
+    };
+    const content = {
+      imageUrls: [],
+      copy: {
+        telegram: "Oferta {LINK}",
+        discord: "Oferta {LINK}",
+        x: "Oferta"
+      }
+    };
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      MAX_PUBLICATIONS_PER_CYCLE: "2",
+      PUBLICATION_WINDOW_HOURS: "2"
+    });
+
+    const result = await publishDeal(offer, content, config, db);
+
+    assert.equal(result.telegram.skipped, true);
+    assert.equal(result.telegram.detail, "telegram_quota_reached");
+    assert.equal(db.state.publishLog.filter((entry) => entry.channel === "telegram").length, 2);
+  } finally {
     await rm(dir, { recursive: true, force: true });
   }
 });
