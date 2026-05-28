@@ -119,16 +119,36 @@ export async function runDiscovery(db, config) {
     maxCandidates
   }));
 
-  // Enqueue one validation job per selected candidate
+  // Enqueue one validation job per selected candidate.
+  // Also persist each candidate immediately so isAlreadyKnown blocks re-discovery
+  // before the worker has a chance to process and save the rejected/validated status.
   let enqueued = 0;
   for (const offer of candidates) {
     try {
       const { validationQueue } = await import("../queues/index.js");
       if (validationQueue) {
-        await validationQueue.add("validate", { offer }, {
-          attempts: 2,
-          backoff: { type: "exponential", delay: 30000 }
-        });
+        // Persist with status "queued" so future discovery runs skip this offer
+        const alreadyInDb = isAlreadyKnown(offer, db.state.offers || []);
+        if (!alreadyInDb) {
+          const id = db.nextId ? db.nextId("offer") : `offer_${Date.now()}`;
+          const queued = {
+            id, ...offer,
+            status: "queued",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          db.state.offers.unshift(queued);
+          await db.save();
+          await validationQueue.add("validate", { offer: queued }, {
+            attempts: 2,
+            backoff: { type: "exponential", delay: 30000 }
+          });
+        } else {
+          await validationQueue.add("validate", { offer }, {
+            attempts: 2,
+            backoff: { type: "exponential", delay: 30000 }
+          });
+        }
         enqueued++;
       }
     } catch (err) {

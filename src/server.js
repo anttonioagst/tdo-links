@@ -233,30 +233,14 @@ async function handleApi(req, res, url, db, config) {
   }
   if (req.method === "POST" && url.pathname === "/api/debug/clear-rejected") {
     let removed = 0;
-    let dbError = null;
     if (db.pool) {
-      try {
-        const statusCountRes = await db.pool.query("SELECT status, COUNT(*) FROM offers GROUP BY status");
-        const statusCounts = Object.fromEntries(statusCountRes.rows.map(r => [r.status, parseInt(r.count, 10)]));
-        const totalCountRes = await db.pool.query("SELECT COUNT(*) FROM offers");
-        const totalInDb = parseInt(totalCountRes.rows[0].count, 10);
-        const countBefore = statusCounts["rejected"] || 0;
-        const delRes = await db.pool.query("DELETE FROM offers WHERE status = $1", ["rejected"]);
-        removed = delRes.rowCount ?? countBefore;
-        console.log("debug_clear_rejected_pg", JSON.stringify({ totalInDb, statusCounts, rowCount: delRes.rowCount, removed }));
-      } catch (err) {
-        dbError = err.message;
-        console.error("debug_clear_rejected_error", err.message);
-      }
-    } else {
-      const before = db.state.offers.filter(o => o.status === "rejected").length;
-      db.state.offers = db.state.offers.filter(o => o.status !== "rejected");
-      await db.save();
-      removed = before;
+      const delRes = await db.pool.query("DELETE FROM offers WHERE status IN ('rejected', 'queued')");
+      removed = delRes.rowCount ?? 0;
     }
-    await db.load();
-    console.log("debug_clear_rejected", JSON.stringify({ removed, remaining: db.state.offers.length, dbError }));
-    sendJson(res, 200, { ok: true, removed, remaining: db.state.offers.length, dbError });
+    db.state.offers = db.state.offers.filter(o => o.status !== "rejected" && o.status !== "queued");
+    if (!db.pool) await db.save();
+    console.log("debug_clear_rejected", JSON.stringify({ removed, remaining: db.state.offers.length }));
+    sendJson(res, 200, { ok: true, removed, remaining: db.state.offers.length });
     return;
   }
 
