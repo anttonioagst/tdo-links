@@ -3,6 +3,7 @@ import { validateDeal } from "../agents/validation.js";
 import { createContent } from "../agents/creative.js";
 import { publishDeal } from "../agents/publisher.js";
 import { creativeQueue, publishQueue } from "./index.js";
+import { hasRealPromotion } from "../deals.js";
 
 export function startWorkers(db, config, connection) {
   const opts = { connection, concurrency: 1 };
@@ -70,29 +71,40 @@ export function startWorkers(db, config, connection) {
     const validationResult = await validateDeal(offer, config);
     const threshold = config.aiConfidenceThreshold ?? 70;
     const passes = validationResult.valid === true && validationResult.confidence > threshold;
+    const promotionReady = hasRealPromotion(offer);
 
-    if (!passes) {
+    if (!passes || !promotionReady) {
       // Save rejected offer to DB so it appears in the Rejected view
       const canonicalUrl = (offer.originalUrl || offer.url || "").split("?")[0];
-      const alreadyInDb = db.state.offers.some(o =>
+      const existingIndex = db.state.offers.findIndex(o =>
         (offer.asin && o.asin === offer.asin) ||
         ((o.originalUrl || o.url || "").split("?")[0] === canonicalUrl && canonicalUrl)
       );
-      if (!alreadyInDb) {
+      const rejectionReason = promotionReady ? validationResult.reason : "missing_real_promotion";
+      if (existingIndex === -1) {
         const id = db.nextId("offer");
         db.state.offers.unshift({
           id, ...offer, status: "rejected",
-          validationSummary: validationResult.reason,
+          validationSummary: rejectionReason,
           validationConfidence: validationResult.confidence,
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
         });
-        await db.save();
+      } else {
+        db.state.offers[existingIndex] = {
+          ...db.state.offers[existingIndex],
+          ...offer,
+          status: "rejected",
+          validationSummary: rejectionReason,
+          validationConfidence: validationResult.confidence,
+          updatedAt: new Date().toISOString()
+        };
       }
+      await db.save();
       console.log("job_done", JSON.stringify({
         queue: "validation", title: offer?.title, result: "rejected",
-        confidence: validationResult.confidence, reason: validationResult.reason
+        confidence: validationResult.confidence, reason: rejectionReason
       }));
-      return { ...validationResult, passes };
+      return { ...validationResult, passes: false, reason: rejectionReason };
     }
 
     // Quota check: max N publications per window before enqueuing creative

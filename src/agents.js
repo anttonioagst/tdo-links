@@ -8,6 +8,7 @@ import { publishTelegram } from "./publishers/telegram.js";
 import { publishXAcquisition } from "./publishers/x.js";
 import { buildRecommendations } from "./recommendations.js";
 import { applyValidation } from "./validation.js";
+import { hasRealPromotion } from "./deals.js";
 
 export async function runScrapePipeline(db, config) {
   const [amazonOffers, feedOffers] = await Promise.all([
@@ -223,11 +224,12 @@ export async function runPublishPipeline(db, config) {
     if (offerIndex !== -1) db.state.offers[offerIndex] = offer;
     const isBlocked = !offer || offer.validationStatus === "blocked";
     const isStale = (offer?.validationReasons || []).includes("price_stale");
+    const missingRealPromotion = !hasRealPromotion(offer);
     const isAutoNotReady = draft.status === "auto_ready" && offer?.validationStatus === "blocked";
     // Human approval overrides staleness — only skip if offer is missing or truly blocked
     const shouldSkip = draft.status === "approved"
-      ? !offer
-      : (isBlocked || isAutoNotReady);
+      ? (!offer || missingRealPromotion)
+      : (isBlocked || isAutoNotReady || missingRealPromotion);
     if (shouldSkip) {
       const detail = {
         draftId: draft.id,
@@ -237,7 +239,9 @@ export async function runPublishPipeline(db, config) {
         dryRun: false,
         providerMessageId: null,
         reason: "offer_not_publishable",
-        detail: isStale ? "price_stale: update price before publishing." : "offer_not_publishable: validate affiliate and price before publishing.",
+        detail: missingRealPromotion
+          ? "missing_real_promotion: requires original price above current price before publishing."
+          : isStale ? "price_stale: update price before publishing." : "offer_not_publishable: validate affiliate and price before publishing.",
         outcome: "skipped"
       };
       results.push(detail);

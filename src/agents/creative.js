@@ -1,12 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { findOfficialProductImages } from "../imagefinder.js";
+import { hasRealPromotion, promotionDiscountPercent } from "../deals.js";
 
 const MODEL = "claude-sonnet-4-6";
 
 function buildCopyPrompt(offer, validationResult, config) {
   const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
   const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
-  const discountPct = offer.discountPercent ? Math.round(offer.discountPercent) : null;
+  const discountPct = promotionDiscountPercent(offer);
   const storeDisplay = offer.store === "amazon" ? "Amazon"
     : offer.store === "mercado_livre" ? "Mercado Livre"
     : (offer.store || "Loja");
@@ -57,13 +58,14 @@ function safeParseJson(text) {
 }
 
 function buildTelegramCopy(offer, hook) {
+  if (!hasRealPromotion(offer)) {
+    throw new Error("missing_real_promotion");
+  }
   const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
-  const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
-  const discountPct = offer.discountPercent ? Math.round(offer.discountPercent) : null;
-  const discountStr = discountPct ? ` (${discountPct}% OFF)` : "";
-  const priceLine = previousFmt
-    ? `🔥 De <s>R$ ${previousFmt}</s> por <b>R$ ${currentFmt}</b>${discountStr}`
-    : `🔥 Por <b>R$ ${currentFmt}</b>`;
+  const previousFmt = Number(offer.previousPrice).toFixed(2).replace(".", ",");
+  const discountPct = hasRealPromotion(offer) ? promotionDiscountPercent(offer) : null;
+  const discountStr = ` (${discountPct}% OFF)`;
+  const priceLine = `🔥 De <s>R$ ${previousFmt}</s> por <b>R$ ${currentFmt}</b>${discountStr}`;
   const storeDisplay = offer.store === "amazon" ? "Amazon"
     : offer.store === "mercado_livre" ? "Mercado Livre"
     : (offer.store || "Loja");
@@ -82,7 +84,7 @@ function buildTelegramCopy(offer, hook) {
 
 function fallbackCopy(offer) {
   const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
-  const previousFmt = offer.previousPrice ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
+  const previousFmt = hasRealPromotion(offer) ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
   const discountPct = offer.discountPercent ? Math.round(offer.discountPercent) : null;
   const discountStr = discountPct ? ` (${discountPct}% OFF)` : "";
   const priceStr = previousFmt

@@ -1,4 +1,5 @@
 import { trackedUrl } from "./links.js";
+import { hasRealPromotion, promotionDiscountPercent } from "./deals.js";
 
 const CATEGORY_EMOJI = {
   ssd: "💾", hd: "💾", pendrive: "💾",
@@ -82,13 +83,13 @@ export function createXPostCopy(offer, shortCode, config) {
 }
 
 export function telegramCopy(offer, url, disclosure) {
+  if (!hasRealPromotion(offer)) {
+    throw new Error("missing_real_promotion");
+  }
   const current = money(offer.currentPrice);
-  const previous = offer.previousPrice ? money(offer.previousPrice) : null;
-  const discountPct = offer.discountPercent ? Math.round(offer.discountPercent) : null;
-  const discountStr = discountPct ? ` (${discountPct}% OFF)` : "";
-  const priceStr = previous
-    ? `De <s>${previous}</s> por ${current}${discountStr}`
-    : `Por ${current}`;
+  const previous = money(offer.previousPrice);
+  const discountPct = promotionDiscountPercent(offer);
+  const discountStr = ` (${discountPct}% OFF)`;
   const store = storeLabel(offer.store);
   const isPremium = (offer.currentPrice ?? 0) >= 500;
   const hook = isPremium ? premiumLine(offer) : `Aproveite esta oferta exclusiva na ${store} antes que acabe!`;
@@ -98,7 +99,7 @@ export function telegramCopy(offer, url, disclosure) {
     "",
     hook,
     "",
-    `🔥 ${priceStr}`,
+    `🔥 De <s>${previous}</s> por <b>${current}</b>${discountStr}`,
     "",
     `🛒 Ver oferta na ${store}:`,
     url,

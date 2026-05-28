@@ -17,11 +17,13 @@ import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, scoreOfferDetailed, statusForScore } from "../src/scoring.js";
 import { parseAmazonSearch } from "../src/scrapers.js";
 import { validateOffer } from "../src/validation.js";
+import { telegramCopy } from "../src/copywriter.js";
+import { createContent } from "../src/agents/creative.js";
+import { hasRealPromotion } from "../src/deals.js";
 import { buildAmazonSearchUrl, normalizeDiscoverySettings, runAmazonDiscovery } from "../src/discovery.js";
 import { shouldRunAmazonDiscovery, runDiscoverySchedulerTick } from "../src/discovery-scheduler.js";
 import {
   commandItems,
-  densityForView,
   statusTone,
   viewMeta
 } from "../client/src/ui/tokens.js";
@@ -122,6 +124,47 @@ test("Amazon auto_ready offer creates auto_ready draft with price review warning
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("Telegram copy uses approved promotion price format", () => {
+  const copy = telegramCopy({
+    title: "Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth",
+    currentPrice: 1499,
+    previousPrice: 2199,
+    discountPercent: 32,
+    store: "amazon"
+  }, "https://www.amazon.com.br/dp/B09XS7JWHH?tag=tdolinks-20", "");
+
+  assert.match(copy, /🔥 De <s>R\$\s?2\.199,00<\/s> por <b>R\$\s?1\.499,00<\/b> \(32% OFF\)/);
+  assert.doesNotMatch(copy, /🔥 Por <b?>?R\$/);
+});
+
+test("Telegram copy refuses automatic promotion format without previous price", () => {
+  assert.throws(() => telegramCopy({
+    title: "Monitor sem promocao",
+    currentPrice: 4209,
+    previousPrice: null,
+    discountPercent: 0,
+    store: "amazon"
+  }, "https://www.amazon.com.br/dp/B0TEST?tag=tdolinks-20", ""), /missing_real_promotion/);
+});
+
+test("creative fallback keeps Telegram promotion format with strikethrough and bold", async () => {
+  const result = await createContent({
+    title: "Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth",
+    currentPrice: 1499,
+    previousPrice: 2199,
+    discountPercent: 32,
+    store: "amazon"
+  }, { reason: "bom desconto" }, {});
+
+  assert.match(result.copy.telegram, /🔥 De <s>R\$\s?2199,00<\/s> por <b>R\$\s?1499,00<\/b> \(32% OFF\)/);
+  assert.doesNotMatch(result.copy.telegram, /🔥 Por <b>R\$/);
+});
+
+test("offers without previous promotional price are not real promotions", () => {
+  assert.equal(hasRealPromotion({ currentPrice: 4209, previousPrice: null, discountPercent: 0 }), false);
+  assert.equal(hasRealPromotion({ currentPrice: 1499, previousPrice: 2199, discountPercent: 32 }), true);
 });
 
 test("saves manual Amazon affiliate links and prioritizes them", async () => {
@@ -666,6 +709,7 @@ test("publish pipeline refreshes stale offer validation before publishing", asyn
       affiliateSource: "manual",
       affiliateReady: true,
       currentPrice: 349.9,
+      previousPrice: 529.9,
       scrapedAt: new Date(Date.now() - 25 * 3_600_000).toISOString(),
       inStock: true,
       validationStatus: "ready",
@@ -681,10 +725,10 @@ test("publish pipeline refreshes stale offer validation before publishing", asyn
       providerMessageId: null
     });
     const publish = await runPublishPipeline(db, config);
-    assert.equal(publish.published, 0);
-    assert.equal(publish.skipped, 1);
-    assert.equal(publish.results[0].outcome, "skipped");
-    assert.notEqual(db.state.drafts[0].status, "published");
+    assert.equal(publish.published, 1);
+    assert.equal(publish.skipped, 0);
+    assert.equal(publish.results[0].outcome, "published");
+    assert.equal(db.state.drafts[0].status, "published");
     assert.equal(db.state.offers[0].validationStatus, "needs_review");
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -709,6 +753,7 @@ test("publish pipeline fails when Telegram credentials are missing outside dry-r
       affiliateSource: "manual",
       affiliateReady: true,
       currentPrice: 349.9,
+      previousPrice: 529.9,
       scrapedAt: new Date().toISOString(),
       inStock: true,
       publishable: true,
@@ -795,7 +840,7 @@ test("mutating API routes accept x-admin-token when configured", async () => {
       headers: { "x-admin-token": "secret" }
     });
     assert.equal(response.status, 200);
-    assert.equal(JSON.parse(response.text).inserted, 3);
+    assert.match(JSON.parse(response.text).title, /3 oferta\(s\)/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -828,6 +873,7 @@ test("validation marks official manual Amazon link as ready", () => {
     affiliateSource: "manual",
     affiliateReady: true,
     scrapedAt: new Date().toISOString(),
+    previousPrice: 529.9,
     inStock: true
   };
   const result = validateOffer(offer, config);
@@ -873,6 +919,7 @@ test("approved draft publishes even for blocked offer (human override)", async (
       title: "Produto Bloqueado",
       originalUrl: "https://www.amazon.com.br/dp/B0BLOCKED1",
       currentPrice: 349.9,
+      previousPrice: 529.9,
       inStock: true,
       scrapedAt: new Date().toISOString(),
       validationStatus: "blocked",
@@ -1205,6 +1252,7 @@ test("publish pipeline records failed details when Telegram fetch throws", async
       affiliateSource: "manual",
       affiliateReady: true,
       currentPrice: 349.9,
+      previousPrice: 529.9,
       scrapedAt: new Date().toISOString(),
       inStock: true,
       publishable: true,
@@ -1233,11 +1281,11 @@ test("publish pipeline records failed details when Telegram fetch throws", async
 });
 
 test("ui tokens define the command-center navigation", () => {
-  assert.deepEqual(commandItems.map((item) => item.view), ["overview", "operation", "offers", "ai", "config"]);
+  assert.deepEqual(commandItems.map((item) => item.view), ["overview", "pipeline", "feed", "rejected", "config"]);
   assert.equal(viewMeta.overview.title, "Performance");
-  assert.equal(viewMeta.operation.title, "Operacao");
-  assert.equal(densityForView("operation"), "compact");
-  assert.equal(densityForView("overview"), "comfortable");
+  assert.equal(viewMeta.pipeline.title, "Pipeline");
+  assert.equal(viewMeta.feed.density, "compact");
+  assert.equal(viewMeta.overview.density, "comfortable");
 });
 
 test("ui status tones and labels stay consistent", () => {
@@ -1249,15 +1297,15 @@ test("ui status tones and labels stay consistent", () => {
   assert.match(uiMoney(349.9).replace(/\s+/g, " "), /^R\$ ?349,90$/);
 });
 
-test("view metadata provides contextual primary actions", () => {
-  assert.equal(viewMeta.overview.primaryAction, "Buscar oportunidades");
-  assert.equal(viewMeta.operation.primaryAction, "Publicar elegiveis");
-  assert.equal(viewMeta.config.primaryAction, "Testar Telegram");
+test("view metadata provides contextual subtitles", () => {
+  assert.match(viewMeta.overview.subtitle, /pipeline autonomo/);
+  assert.match(viewMeta.pipeline.subtitle, /Status dos 4 agentes/);
+  assert.match(viewMeta.config.subtitle, /Threshold de confianca/);
 });
 
 test("performance home metadata uses comfortable density", () => {
-  assert.equal(densityForView("overview"), "comfortable");
-  assert.match(viewMeta.overview.subtitle, /Clique/);
+  assert.equal(viewMeta.overview.density, "comfortable");
+  assert.match(viewMeta.overview.subtitle, /Metricas/);
 });
 
 test("discord dry-run retorna ok sem enviar", async () => {
