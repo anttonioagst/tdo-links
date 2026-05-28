@@ -11,6 +11,9 @@ const CATEGORY_EMOJI = {
   default: "🏷️"
 };
 
+const DEFAULT_MIN_TELEGRAM_PHOTO_BYTES = 25_000;
+const MAX_TELEGRAM_PHOTO_BYTES = 9_500_000;
+
 function categoryEmoji(offer) {
   return CATEGORY_EMOJI[offer?.category] ?? CATEGORY_EMOJI.default;
 }
@@ -74,17 +77,15 @@ export async function publishTelegram(draft, config, offer = null) {
 
     // Official product images fetched by the creative agent
     if (offer?.officialImageUrls?.length) {
-      const result = await sendOfficialImages(botUrl, config.telegramChatId, offer.officialImageUrls, text, offer);
+      const result = await sendBestImage(botUrl, config.telegramChatId, offer.officialImageUrls, text, offer);
       if (result.ok) return result;
       console.log("telegram_official_images_fallback", JSON.stringify({ detail: result.detail }));
     }
 
-    // Legacy imageUrl/imageUrls fields (scrape pipeline) — best single image
+    // Legacy imageUrl/imageUrls fields (scrape pipeline) — normalize and upload best candidate
     const images = offerImages(offer);
     if (images.length >= 1) {
-      const photoResult = await telegramRequest(`${botUrl}/sendPhoto`, {
-        chat_id: config.telegramChatId, photo: images[0], caption: text, parse_mode: "HTML"
-      });
+      const photoResult = await sendBestImage(botUrl, config.telegramChatId, images, text, offer);
       if (photoResult.ok) return photoResult;
       console.log("telegram_photo_failed", JSON.stringify({ detail: photoResult.detail }));
     }
@@ -114,30 +115,80 @@ async function telegramRequest(url, body, retries = 2) {
   return { ok: response.ok && payload.ok === true, dryRun: false, providerMessageId: payload.result?.message_id || null, detail: payload.description || "ok" };
 }
 
-// Downloads the best product image and uploads it directly to bypass CDN blocks.
-// Mutates offer.telegramImageFileId on success so future sends skip the upload.
-async function sendOfficialImages(botUrl, chatId, urls, caption, offer = null) {
-  const url = urls[0];
-  if (!url) return { ok: false, dryRun: false, providerMessageId: null, detail: "no_images_provided" };
+export function normalizeTelegramImageUrl(url) {
+  const value = String(url || "");
+  if (!/^https?:\/\//.test(value)) return value;
+  try {
+    const parsed = new URL(value);
+    if (!/amazon\./i.test(parsed.hostname) && parsed.hostname !== "m.media-amazon.com") return value;
+    parsed.pathname = parsed.pathname.replace(
+      /(\._)[^.\/]+(\.(?:jpe?g|png|webp))$/i,
+      "$1AC_SL1500_$2"
+    );
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return value;
+  }
+}
 
+function telegramImageCandidates(urls) {
+  const candidates = [];
+  for (const url of urls || []) {
+    if (!/^https?:\/\//.test(url || "")) continue;
+    const normalized = normalizeTelegramImageUrl(url);
+    candidates.push(normalized, url);
+  }
+  return [...new Set(candidates)].slice(0, 8);
+}
+
+export async function selectBestTelegramPhoto(urls, options = {}) {
+  const fetchImpl = options.fetchImpl || fetch;
+  const minBytes = options.minBytes ?? DEFAULT_MIN_TELEGRAM_PHOTO_BYTES;
+  const candidates = telegramImageCandidates(urls);
+  const downloaded = await Promise.all(candidates.map((url) => downloadTelegramPhoto(url, fetchImpl)));
+  const valid = downloaded
+    .filter(Boolean)
+    .filter((item) => item.buffer.length >= minBytes)
+    .filter((item) => item.buffer.length <= MAX_TELEGRAM_PHOTO_BYTES)
+    .sort((a, b) => b.buffer.length - a.buffer.length);
+  return valid[0] || null;
+}
+
+async function downloadTelegramPhoto(url, fetchImpl) {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    const res = await fetch(url, {
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    const res = await fetchImpl(url, {
       signal: controller.signal,
       headers: { "User-Agent": "Mozilla/5.0 (compatible; TDOLinks/1.0)" }
     });
     clearTimeout(timeout);
-    if (!res.ok) return { ok: false, dryRun: false, providerMessageId: null, detail: `image_fetch_failed: ${res.status}` };
-
-    const buffer = Buffer.from(await res.arrayBuffer());
+    if (!res.ok) return null;
     const contentType = (res.headers.get("content-type") || "image/jpeg").split(";")[0];
+    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(contentType)) return null;
+    const buffer = Buffer.from(await res.arrayBuffer());
+    return { url, buffer, contentType: contentType === "image/jpg" ? "image/jpeg" : contentType };
+  } catch {
+    return null;
+  }
+}
+
+// Downloads the best product image and uploads it directly to bypass CDN blocks.
+// Mutates offer.telegramImageFileId on success so future sends skip the upload.
+async function sendBestImage(botUrl, chatId, urls, caption, offer = null) {
+  if (!urls?.length) return { ok: false, dryRun: false, providerMessageId: null, detail: "no_images_provided" };
+
+  try {
+    const selected = await selectBestTelegramPhoto(urls);
+    if (!selected) return { ok: false, dryRun: false, providerMessageId: null, detail: "no_high_quality_image" };
 
     const form = new FormData();
     form.append("chat_id", chatId);
     form.append("caption", caption.slice(0, 1024));
     form.append("parse_mode", "HTML");
-    form.append("photo", new Blob([buffer], { type: contentType }), "product.jpg");
+    form.append("photo", new Blob([selected.buffer], { type: selected.contentType }), imageFilename(selected.contentType));
     const response = await fetch(`${botUrl}/sendPhoto`, { method: "POST", body: form });
     const payload = await response.json().catch(() => ({}));
     if (offer && payload.result?.photo) {
@@ -148,6 +199,12 @@ async function sendOfficialImages(botUrl, chatId, urls, caption, offer = null) {
   } catch (error) {
     return { ok: false, dryRun: false, providerMessageId: null, detail: `image_download_failed: ${error?.message}` };
   }
+}
+
+function imageFilename(contentType) {
+  if (contentType === "image/png") return "product.png";
+  if (contentType === "image/webp") return "product.webp";
+  return "product.jpg";
 }
 
 function telegramProviderFailure(error) {

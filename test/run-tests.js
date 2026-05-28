@@ -11,7 +11,7 @@ import { loadConfig } from "../src/config.js";
 import { JsonDb } from "../src/db.js";
 import { buildDiagnostics } from "../src/integrations.js";
 import { buildAffiliateUrl } from "../src/links.js";
-import { testTelegram } from "../src/publishers/telegram.js";
+import { normalizeTelegramImageUrl, publishTelegram, selectBestTelegramPhoto, testTelegram } from "../src/publishers/telegram.js";
 import { buildRecommendations } from "../src/recommendations.js";
 import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, scoreOfferDetailed, statusForScore } from "../src/scoring.js";
@@ -147,6 +147,68 @@ test("Telegram copy refuses automatic promotion format without previous price", 
     discountPercent: 0,
     store: "amazon"
   }, "https://www.amazon.com.br/dp/B0TEST?tag=tdolinks-20", ""), /missing_real_promotion/);
+});
+
+test("normalizes Amazon thumbnail URLs to high-resolution image URLs for Telegram", () => {
+  assert.equal(
+    normalizeTelegramImageUrl("https://m.media-amazon.com/images/I/513GKEr73fL._AC_SR160,134_CB1169409_QL70_.jpg"),
+    "https://m.media-amazon.com/images/I/513GKEr73fL._AC_SL1500_.jpg"
+  );
+  assert.equal(
+    normalizeTelegramImageUrl("https://m.media-amazon.com/images/I/51gRCCmBDtL._AC_UL320_.jpg"),
+    "https://m.media-amazon.com/images/I/51gRCCmBDtL._AC_SL1500_.jpg"
+  );
+});
+
+test("selects the largest downloaded image candidate for Telegram upload", async () => {
+  const calls = [];
+  const selected = await selectBestTelegramPhoto([
+    "https://m.media-amazon.com/images/I/product._AC_UL320_.jpg",
+    "https://cdn.example.com/product-large.jpg"
+  ], {
+    minBytes: 10,
+    fetchImpl: async (url) => {
+      calls.push(url);
+      const size = url.includes("SL1500") ? 300 : url.includes("large") ? 200 : 20;
+      return new Response(new Uint8Array(size), { headers: { "content-type": "image/jpeg" } });
+    }
+  });
+
+  assert.equal(selected.url, "https://m.media-amazon.com/images/I/product._AC_SL1500_.jpg");
+  assert.equal(selected.buffer.length, 300);
+  assert.ok(calls.includes("https://m.media-amazon.com/images/I/product._AC_SL1500_.jpg"));
+});
+
+test("publishTelegram uploads downloaded image bytes instead of sending image URL", async () => {
+  const originalFetch = globalThis.fetch;
+  let sentBody = null;
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url).includes("/sendPhoto")) {
+      sentBody = init.body;
+      return new Response(JSON.stringify({ ok: true, result: { message_id: 42, photo: [{ file_id: "file_small" }, { file_id: "file_large" }] } }), {
+        headers: { "content-type": "application/json" }
+      });
+    }
+    return new Response(new Uint8Array(50_000), { headers: { "content-type": "image/jpeg" } });
+  };
+
+  try {
+    const offer = {
+      imageUrls: ["https://m.media-amazon.com/images/I/product._AC_UL320_.jpg"]
+    };
+    const result = await publishTelegram(
+      { text: "Oferta teste" },
+      { telegramDryRun: false, telegramBotToken: "token", telegramChatId: "chat" },
+      offer
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.providerMessageId, 42);
+    assert.equal(offer.telegramImageFileId, "file_large");
+    assert.ok(sentBody instanceof FormData);
+    assert.equal(sentBody.get("photo").size, 50_000);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("creative fallback keeps Telegram promotion format with strikethrough and bold", async () => {
