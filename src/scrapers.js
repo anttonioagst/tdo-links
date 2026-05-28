@@ -96,24 +96,45 @@ export function getLastScrapeMeta() {
   return lastScrapeMeta;
 }
 
-export async function verifyAmazonProductPrice(asin, config = {}) {
+export async function verifyAmazonProduct(asin, config = {}) {
   const url = `https://www.amazon.com.br/dp/${asin}`;
   try {
     const html = await fetchText(url, config);
-    // a-offscreen is the screen-reader price — most reliable buybox price
+
+    // Price: a-offscreen is most reliable buybox price
     const offscreen = parseBrazilPrice(
       matchFirst(html, [/class="a-offscreen">R\$\s?([\d.]+,\d{2})<\/span>/i])
     );
-    if (offscreen && offscreen > 0) return offscreen;
-    // fallback: a-price-whole + fraction (same pattern as search)
     const whole = parseBrazilPrice(matchFirst(html, [
       /<span class="a-price-whole">([\d.]+)<\/span><span class="a-price-decimal">,<\/span><span class="a-price-fraction">(\d{2})<\/span>/i
     ]));
-    return whole && whole > 0 ? whole : null;
+    const currentPrice = (offscreen && offscreen > 0) ? offscreen : (whole && whole > 0 ? whole : null);
+
+    // Rating from product page
+    const ratingRaw = matchFirst(html, [/(\d,\d) de 5 estrelas/i]);
+    const rating = ratingRaw ? parseFloat(ratingRaw.replace(",", ".")) : null;
+
+    // Review count from product page — static HTML includes it here
+    const reviewRaw = matchFirst(html, [
+      /id="acrCustomerReviewText"[^>]*>([\d\.]+)\s+avalia/i,
+      /([\d\.]+)\s+avalia[çc][oõ]es globais/i,
+      /(\d[\d\.]*)\s+avalia[çc][oõ]es/i
+    ]);
+    const reviewCount = reviewRaw
+      ? parseInt(reviewRaw.replace(/\./g, ""), 10) || null
+      : null;
+
+    return { currentPrice, rating, reviewCount };
   } catch (err) {
-    console.error("amazon_product_price_verify_failed", asin, err.message);
-    return null;
+    console.error("amazon_product_verify_failed", asin, err.message);
+    return { currentPrice: null, rating: null, reviewCount: null };
   }
+}
+
+// Keep old name as alias for backward compat
+export async function verifyAmazonProductPrice(asin, config = {}) {
+  const result = await verifyAmazonProduct(asin, config);
+  return result.currentPrice;
 }
 
 export function parseAmazonSearch(html, sourceUrl = "https://www.amazon.com.br") {

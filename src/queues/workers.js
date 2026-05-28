@@ -40,23 +40,28 @@ export function startWorkers(db, config, connection) {
     let { offer } = job.data;
     console.log("job_start", JSON.stringify({ queue: "validation", title: offer?.title }));
 
-    // Verify real product page price for Amazon offers — search listings often show
-    // the cheapest variant or a promotional price that doesn't match the dp/ page.
+    // Verify price, rating, and review count from the actual product page.
+    // Search listings show cheapest variant price and no review counts in static HTML.
     if (offer?.asin) {
       try {
-        const { verifyAmazonProductPrice } = await import("../scrapers.js");
-        const verifiedPrice = await verifyAmazonProductPrice(offer.asin, config);
-        if (verifiedPrice && verifiedPrice > 0) {
+        const { verifyAmazonProduct } = await import("../scrapers.js");
+        const verified = await verifyAmazonProduct(offer.asin, config);
+        const updates = { priceVerifiedAt: new Date().toISOString() };
+        if (verified.currentPrice && verified.currentPrice > 0) {
           const scrapedPrice = offer.currentPrice;
-          offer = { ...offer, currentPrice: verifiedPrice, priceVerifiedAt: new Date().toISOString() };
-          if (verifiedPrice !== scrapedPrice) {
-            const pctDiff = scrapedPrice ? Math.round(((verifiedPrice - scrapedPrice) / scrapedPrice) * 100) : null;
+          updates.currentPrice = verified.currentPrice;
+          if (verified.currentPrice !== scrapedPrice) {
+            const pctDiff = scrapedPrice ? Math.round(((verified.currentPrice - scrapedPrice) / scrapedPrice) * 100) : null;
             console.log("job_event", JSON.stringify({
               queue: "validation", event: "price_corrected", asin: offer.asin,
-              scrapedPrice, verifiedPrice, pctDiff
+              scrapedPrice, verifiedPrice: verified.currentPrice, pctDiff
             }));
           }
         }
+        // Enrich with product page rating/reviews when search HTML doesn't have them
+        if (verified.rating && (!offer.rating || offer.rating === 0)) updates.rating = verified.rating;
+        if (verified.reviewCount && (!offer.reviewCount || offer.reviewCount === 0)) updates.reviewCount = verified.reviewCount;
+        offer = { ...offer, ...updates };
       } catch (err) {
         console.log("job_event", JSON.stringify({ queue: "validation", event: "price_verify_error", asin: offer.asin, error: err.message }));
       }
