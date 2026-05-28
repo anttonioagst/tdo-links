@@ -37,8 +37,30 @@ export function startWorkers(db, config, connection) {
 
   // New: Validation worker
   const validationWorker = new Worker("validation", async (job) => {
-    const { offer } = job.data;
+    let { offer } = job.data;
     console.log("job_start", JSON.stringify({ queue: "validation", title: offer?.title }));
+
+    // Verify real product page price for Amazon offers — search listings often show
+    // the cheapest variant or a promotional price that doesn't match the dp/ page.
+    if (offer?.asin) {
+      try {
+        const { verifyAmazonProductPrice } = await import("../scrapers.js");
+        const verifiedPrice = await verifyAmazonProductPrice(offer.asin, config);
+        if (verifiedPrice && verifiedPrice > 0) {
+          const scrapedPrice = offer.currentPrice;
+          offer = { ...offer, currentPrice: verifiedPrice, priceVerifiedAt: new Date().toISOString() };
+          if (verifiedPrice !== scrapedPrice) {
+            const pctDiff = scrapedPrice ? Math.round(((verifiedPrice - scrapedPrice) / scrapedPrice) * 100) : null;
+            console.log("job_event", JSON.stringify({
+              queue: "validation", event: "price_corrected", asin: offer.asin,
+              scrapedPrice, verifiedPrice, pctDiff
+            }));
+          }
+        }
+      } catch (err) {
+        console.log("job_event", JSON.stringify({ queue: "validation", event: "price_verify_error", asin: offer.asin, error: err.message }));
+      }
+    }
 
     const validationResult = await validateDeal(offer, config);
     const threshold = config.aiConfidenceThreshold ?? 70;

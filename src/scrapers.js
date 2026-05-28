@@ -96,6 +96,26 @@ export function getLastScrapeMeta() {
   return lastScrapeMeta;
 }
 
+export async function verifyAmazonProductPrice(asin, config = {}) {
+  const url = `https://www.amazon.com.br/dp/${asin}`;
+  try {
+    const html = await fetchText(url, config);
+    // a-offscreen is the screen-reader price — most reliable buybox price
+    const offscreen = parseBrazilPrice(
+      matchFirst(html, [/class="a-offscreen">R\$\s?([\d.]+,\d{2})<\/span>/i])
+    );
+    if (offscreen && offscreen > 0) return offscreen;
+    // fallback: a-price-whole + fraction (same pattern as search)
+    const whole = parseBrazilPrice(matchFirst(html, [
+      /<span class="a-price-whole">([\d.]+)<\/span><span class="a-price-decimal">,<\/span><span class="a-price-fraction">(\d{2})<\/span>/i
+    ]));
+    return whole && whole > 0 ? whole : null;
+  } catch (err) {
+    console.error("amazon_product_price_verify_failed", asin, err.message);
+    return null;
+  }
+}
+
 export function parseAmazonSearch(html, sourceUrl = "https://www.amazon.com.br") {
   const chunks = html.split(/data-asin="/g).slice(1);
   const offers = [];
