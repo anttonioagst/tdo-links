@@ -211,6 +211,62 @@ test("publishTelegram uploads downloaded image bytes instead of sending image UR
   }
 });
 
+test("debug republish Telegram route republishes an existing promoted offer", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  const originalFetch = globalThis.fetch;
+  let sentPhoto = false;
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url).startsWith("http://127.0.0.1") || String(url).startsWith("http://localhost")) {
+      return originalFetch(url, init);
+    }
+    if (String(url).includes("/sendPhoto")) {
+      sentPhoto = init.body instanceof FormData;
+      return new Response(JSON.stringify({ ok: true, result: { message_id: 77, photo: [{ file_id: "republished_file" }] } }), {
+        headers: { "content-type": "application/json" }
+      });
+    }
+    return new Response(new Uint8Array(50_000), { headers: { "content-type": "image/jpeg" } });
+  };
+
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "offer_republish",
+      store: "amazon",
+      title: "Mouse Gamer Promocao",
+      currentPrice: 75.9,
+      previousPrice: 153,
+      discountPercent: 50,
+      originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+      imageUrls: ["https://m.media-amazon.com/images/I/product._AC_UL320_.jpg"],
+      inStock: true
+    });
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      TELEGRAM_DRY_RUN: "false",
+      TELEGRAM_BOT_TOKEN: "token",
+      TELEGRAM_CHAT_ID: "chat",
+      AMAZON_AFFILIATE_TAG_TELEGRAM: "tdolinks-20"
+    });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/debug/republish-telegram",
+      body: { offerId: "offer_republish" }
+    });
+    const payload = JSON.parse(response.text);
+    assert.equal(response.status, 200);
+    assert.equal(payload.result.providerMessageId, 77);
+    assert.equal(db.state.publishLog[0].offerId, "offer_republish");
+    assert.equal(db.state.offers[0].telegramImageFileId, "republished_file");
+    assert.equal(sentPhoto, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("creative fallback keeps Telegram promotion format with strikethrough and bold", async () => {
   const result = await createContent({
     title: "Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth",

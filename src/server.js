@@ -7,9 +7,10 @@ import { runDiscovery } from "./agents/discovery.js";
 import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
 import { testDiscord } from "./publishers/discord.js";
-import { testTelegram } from "./publishers/telegram.js";
+import { publishTelegram, testTelegram } from "./publishers/telegram.js";
 import { enqueueScrape, enqueuePublish, enqueueImagegen } from "./queues/producers.js";
 import { buildRecommendations } from "./recommendations.js";
+import { telegramCopy } from "./copywriter.js";
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -229,6 +230,36 @@ async function handleApi(req, res, url, db, config) {
       ? (await db.pool.query("SELECT id, channel, result, created_at FROM publish_log ORDER BY created_at DESC LIMIT 20")).rows
       : (db.state.publishLog || []).slice(0, 20);
     sendJson(res, 200, { source: db.pool ? "postgres" : "json", count: rows.length, rows });
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/debug/republish-telegram") {
+    const body = await readJson(req);
+    const offerId = String(body.offerId || "");
+    const offer = offerId
+      ? db.state.offers.find((item) => item.id === offerId)
+      : db.state.offers.find((item) => Number(item.previousPrice || 0) > Number(item.currentPrice || 0));
+    if (!offer) {
+      sendJson(res, 404, { error: "offer_not_found" });
+      return;
+    }
+    const affiliateUrl = buildAffiliateUrl(offer, config, "telegram");
+    const text = telegramCopy(offer, affiliateUrl, config.disclosure);
+    const publishOffer = { ...offer, telegramImageFileId: null };
+    const result = await publishTelegram({ text }, config, publishOffer);
+    db.state.publishLog.unshift({
+      id: db.nextId("pub"),
+      offerId: offer.id,
+      draftId: null,
+      channel: "telegram",
+      result,
+      createdAt: new Date().toISOString()
+    });
+    const offerIndex = db.state.offers.findIndex((item) => item.id === offer.id);
+    if (offerIndex !== -1 && result.ok && publishOffer.telegramImageFileId) {
+      db.state.offers[offerIndex].telegramImageFileId = publishOffer.telegramImageFileId;
+    }
+    await db.save();
+    sendJson(res, result.ok ? 200 : 502, { offerId: offer.id, title: offer.title, result });
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/debug/clear-rejected") {
