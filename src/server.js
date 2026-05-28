@@ -231,6 +231,15 @@ async function handleApi(req, res, url, db, config) {
     sendJson(res, 200, { source: db.pool ? "postgres" : "json", count: rows.length, rows });
     return;
   }
+  if (req.method === "POST" && url.pathname === "/api/debug/clear-rejected") {
+    const before = db.state.offers.filter(o => o.status === "rejected").length;
+    db.state.offers = db.state.offers.filter(o => o.status !== "rejected");
+    await db.save();
+    console.log("debug_clear_rejected", JSON.stringify({ removed: before, remaining: db.state.offers.length }));
+    sendJson(res, 200, { ok: true, removed: before, remaining: db.state.offers.length });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/debug/clear-quota") {
     const { creativeQueue, publishQueue, validationQueue, scrapeQueue, imagegenQueue } = await import("./queues/index.js");
     const windowHours = config.publicationWindowHours ?? 2;
