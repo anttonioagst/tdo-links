@@ -1,5 +1,6 @@
 import Parser from "rss-parser";
 import { scrapeDeals } from "../scrapers.js";
+import { hasRealPromotion, promotionDiscountPercent } from "../deals.js";
 
 const RSS_FEEDS = [
   { name: "pelando", url: "https://www.pelando.com.br/rss" },
@@ -106,15 +107,14 @@ export async function runDiscovery(db, config) {
     }
   }
 
-  // Rank by discount % (best deals first), then limit candidates per cycle
   const maxCandidates = config.maxCandidatesPerCycle ?? 6;
-  const ranked = [...newOffers].sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
-  const candidates = ranked.slice(0, maxCandidates);
+  const candidates = selectDiscoveryCandidates(newOffers, maxCandidates);
 
   console.log("agent_event", JSON.stringify({
     agent: "discovery",
     event: "ranked",
     total: newOffers.length,
+    promotionEligible: candidates.length,
     selected: candidates.length,
     maxCandidates
   }));
@@ -158,4 +158,11 @@ export async function runDiscovery(db, config) {
 
   console.log("agent_event", JSON.stringify({ agent: "discovery", event: "done", found: newOffers.length, enqueued }));
   return { found: newOffers.length, enqueued };
+}
+
+export function selectDiscoveryCandidates(offers, maxCandidates) {
+  return offers
+    .filter(hasRealPromotion)
+    .sort((a, b) => promotionDiscountPercent(b) - promotionDiscountPercent(a))
+    .slice(0, maxCandidates);
 }

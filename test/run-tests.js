@@ -17,13 +17,14 @@ import { normalizeTelegramImageUrl, publishTelegram, selectBestTelegramPhoto, sq
 import { buildRecommendations } from "../src/recommendations.js";
 import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, scoreOfferDetailed, statusForScore } from "../src/scoring.js";
-import { parseAmazonSearch } from "../src/scrapers.js";
+import { parseAmazonSearch, selectScrapedAmazonOffers } from "../src/scrapers.js";
 import { validateOffer } from "../src/validation.js";
 import { telegramCopy } from "../src/copywriter.js";
 import { createContent } from "../src/agents/creative.js";
 import { hasRealPromotion } from "../src/deals.js";
 import { buildAmazonSearchUrl, normalizeDiscoverySettings, runAmazonDiscovery } from "../src/discovery.js";
 import { shouldRunAmazonDiscovery, runDiscoverySchedulerTick } from "../src/discovery-scheduler.js";
+import { selectDiscoveryCandidates } from "../src/agents/discovery.js";
 import {
   commandItems,
   statusTone,
@@ -253,6 +254,40 @@ test("creative fallback keeps Telegram promotion format with strikethrough and b
 test("offers without previous promotional price are not real promotions", () => {
   assert.equal(hasRealPromotion({ currentPrice: 4209, previousPrice: null, discountPercent: 0 }), false);
   assert.equal(hasRealPromotion({ currentPrice: 1499, previousPrice: 2199, discountPercent: 32 }), true);
+});
+
+test("discovery candidates exclude products without real promotion", () => {
+  const candidates = selectDiscoveryCandidates([
+    { title: "Monitor sem promocao", currentPrice: 899, previousPrice: null, discountPercent: 0 },
+    { title: "Headset 20 off", currentPrice: 160, previousPrice: 200, discountPercent: 20 },
+    { title: "Mouse 40 off", currentPrice: 60, previousPrice: 100, discountPercent: 40 }
+  ], 2);
+  assert.deepEqual(candidates.map((offer) => offer.title), ["Mouse 40 off", "Headset 20 off"]);
+});
+
+test("Amazon scrape selection keeps later real promotions before applying limit", () => {
+  const offers = Array.from({ length: 20 }, (_, index) => ({
+    store: "amazon",
+    title: `Produto sem promocao ${index}`,
+    currentPrice: 100 + index,
+    previousPrice: null,
+    originalUrl: `https://www.amazon.com.br/dp/B0NOPR${String(index).padStart(4, "0")}`,
+    imageUrl: "",
+    imageUrls: []
+  }));
+  offers.push({
+    store: "amazon",
+    title: "Oferta real depois do limite antigo",
+    currentPrice: 149,
+    previousPrice: 299,
+    originalUrl: "https://www.amazon.com.br/dp/B0PROMO001",
+    imageUrl: "",
+    imageUrls: []
+  });
+
+  const selected = selectScrapedAmazonOffers(offers, 2);
+  assert.equal(selected[0].title, "Oferta real depois do limite antigo");
+  assert.equal(selected[0].discountPercent, 50);
 });
 
 test("saves manual Amazon affiliate links and prioritizes them", async () => {

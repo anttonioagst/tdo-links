@@ -83,7 +83,19 @@ export async function scrapeAmazonDeals(config) {
     }
     await sleep(1200);
   }
-  return normalizeOffers(limitByUrl(all, 20));
+  return selectScrapedAmazonOffers(all, 20);
+}
+
+export function selectScrapedAmazonOffers(offers, limit) {
+  const normalized = normalizeOffers(uniqueByUrl(offers));
+  return normalized
+    .sort((a, b) => {
+      const aPromo = a.previousPrice && a.previousPrice > a.currentPrice;
+      const bPromo = b.previousPrice && b.previousPrice > b.currentPrice;
+      if (aPromo !== bPromo) return bPromo ? 1 : -1;
+      return (b.discountPercent || 0) - (a.discountPercent || 0);
+    })
+    .slice(0, limit);
 }
 
 export async function scrapeAmazonSource(source, config = {}) {
@@ -269,13 +281,16 @@ function decodeHtml(value) {
 }
 
 function limitByUrl(offers, limit) {
+  return uniqueByUrl(offers).slice(0, limit);
+}
+
+function uniqueByUrl(offers) {
   const seen = new Set();
   const result = [];
   for (const offer of offers) {
     if (seen.has(offer.originalUrl)) continue;
     seen.add(offer.originalUrl);
     result.push(offer);
-    if (result.length >= limit) break;
   }
   return result;
 }
