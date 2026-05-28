@@ -93,10 +93,7 @@ export async function publishTelegram(draft, config, offer = null) {
       console.log("telegram_photo_failed", JSON.stringify({ detail: photoResult.detail }));
     }
 
-    // Fallback: text only (Amazon CDN often blocked by Telegram servers)
-    return await telegramRequest(`${botUrl}/sendMessage`, {
-      chat_id: config.telegramChatId, text, parse_mode: "HTML", disable_web_page_preview: false
-    });
+    return { ok: false, dryRun: false, providerMessageId: null, detail: "telegram_photo_required" };
   } catch (error) {
     return telegramProviderFailure(error);
   }

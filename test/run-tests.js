@@ -241,6 +241,28 @@ test("publishTelegram uploads downloaded image bytes instead of sending image UR
   }
 });
 
+test("publishTelegram refuses text-only posts when product photo is unavailable", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return new Response("not found", { status: 404 });
+  };
+
+  try {
+    const result = await publishTelegram(
+      { text: "Oferta teste https://www.amazon.com.br/dp/B0TEST1234" },
+      { telegramDryRun: false, telegramBotToken: "token", telegramChatId: "chat" },
+      { imageUrls: ["https://m.media-amazon.com/images/I/missing._AC_UL320_.jpg"] }
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.detail, "telegram_photo_required");
+    assert.equal(calls.some((url) => url.includes("/sendMessage")), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("creative fallback keeps Telegram promotion format with strikethrough and bold", async () => {
   const result = await createContent({
     title: "Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth",
@@ -940,6 +962,8 @@ test("publish pipeline fails when Telegram credentials are missing outside dry-r
       affiliateReady: true,
       currentPrice: 349.9,
       previousPrice: 529.9,
+      imageUrl: "https://m.media-amazon.com/images/I/product._AC_UL320_.jpg",
+      imageUrls: ["https://m.media-amazon.com/images/I/product._AC_UL320_.jpg"],
       scrapedAt: new Date().toISOString(),
       inStock: true,
       publishable: true,
@@ -1439,6 +1463,8 @@ test("publish pipeline records failed details when Telegram fetch throws", async
       affiliateReady: true,
       currentPrice: 349.9,
       previousPrice: 529.9,
+      imageUrl: "https://m.media-amazon.com/images/I/product._AC_UL320_.jpg",
+      imageUrls: ["https://m.media-amazon.com/images/I/product._AC_UL320_.jpg"],
       scrapedAt: new Date().toISOString(),
       inStock: true,
       publishable: true,
@@ -1459,7 +1485,7 @@ test("publish pipeline records failed details when Telegram fetch throws", async
     assert.equal(publish.results.length, 1);
     assert.equal(publish.results[0].outcome, "failed");
     assert.equal(publish.results[0].dryRun, false);
-    assert.match(publish.results[0].detail, /connection reset/);
+    assert.match(publish.results[0].detail, /telegram_photo_required/);
   } finally {
     globalThis.fetch = originalFetch;
     await rm(dir, { recursive: true, force: true });
@@ -1533,6 +1559,21 @@ test("Telegram publication policy allows four per hour with fifteen minute spaci
   });
   assert.equal(telegramPublicationStatus(publishLog.slice(1), config, now).allowed, false);
   assert.equal(telegramPublicationStatus(publishLog.slice(1), config, new Date("2026-05-28T12:35:00.000Z")).allowed, true);
+});
+
+test("Telegram publication policy distinguishes interval wait from hourly quota", () => {
+  const config = {
+    maxPublicationsPerCycle: 4,
+    publicationWindowHours: 1,
+    minPublicationIntervalMinutes: 15
+  };
+  const publishLog = [
+    { channel: "telegram", result: { ok: true }, createdAt: "2026-05-28T12:20:00.000Z" }
+  ];
+  const status = telegramPublicationStatus(publishLog, config, new Date("2026-05-28T12:30:00.000Z"));
+  assert.equal(status.allowed, false);
+  assert.equal(status.reason, "telegram_interval_wait");
+  assert.equal(status.waitMinutes, 5);
 });
 
 test("ui tokens define the command-center navigation", () => {

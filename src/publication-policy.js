@@ -7,20 +7,24 @@ export function telegramPublicationStatus(publishLog = [], config = {}, now = ne
     .filter((entry) => entry.result?.ok && entry.channel === "telegram" && new Date(entry.createdAt) >= windowStart)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const lastPublishedAt = successful[0]?.createdAt ? new Date(successful[0].createdAt) : null;
-  const waitMinutes = lastPublishedAt
+  const intervalWaitMinutes = lastPublishedAt
     ? Math.max(0, Math.ceil((lastPublishedAt.getTime() + minIntervalMinutes * 60 * 1000 - now.getTime()) / 60000))
+    : 0;
+  const oldestPublishedAt = successful.at(-1)?.createdAt ? new Date(successful.at(-1).createdAt) : null;
+  const quotaWaitMinutes = oldestPublishedAt
+    ? Math.max(0, Math.ceil((oldestPublishedAt.getTime() + windowHours * 60 * 60 * 1000 - now.getTime()) / 60000))
     : 0;
   const base = {
     recentPublished: successful.length,
     maxPerCycle,
     windowHours,
     minIntervalMinutes,
-    waitMinutes
+    waitMinutes: intervalWaitMinutes
   };
   if (successful.length >= maxPerCycle) {
-    return { allowed: false, reason: "telegram_quota_reached", ...base };
+    return { allowed: false, reason: "telegram_quota_reached", ...base, waitMinutes: Math.max(intervalWaitMinutes, quotaWaitMinutes) };
   }
-  if (waitMinutes > 0) {
+  if (intervalWaitMinutes > 0) {
     return { allowed: false, reason: "telegram_interval_wait", ...base };
   }
   return { allowed: true, reason: "allowed", ...base };

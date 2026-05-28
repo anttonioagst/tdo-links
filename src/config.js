@@ -46,6 +46,7 @@ export function loadConfig(env = process.env) {
     maxPublicationsPerCycle: Number(env.MAX_PUBLICATIONS_PER_CYCLE || 4),
     publicationWindowHours: Number(env.PUBLICATION_WINDOW_HOURS || 1),
     minPublicationIntervalMinutes: Number(env.MIN_PUBLICATION_INTERVAL_MINUTES || 15),
+    allowExternalProductImages: env.ALLOW_EXTERNAL_PRODUCT_IMAGES === "true",
     maxCandidatesPerCycle: Number(env.MAX_CANDIDATES_PER_CYCLE || 2),
     databaseUrl: env.DATABASE_URL || "",
     redisUrl: env.REDIS_URL || "",

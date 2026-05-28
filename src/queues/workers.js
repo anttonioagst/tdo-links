@@ -25,6 +25,25 @@ export function startWorkers(db, config, connection) {
     if (job.data.offer && job.data.content) {
       const { offer, content } = job.data;
       console.log("job_start", JSON.stringify({ queue: "publish", offerId: offer.id, mode: "agent" }));
+      if (db.load) await db.load();
+      const publication = telegramPublicationStatus(db.state.publishLog || [], config);
+      if (!publication.allowed) {
+        const delay = Math.max(1, publication.waitMinutes) * 60 * 1000;
+        await publishQueue.add("publish", job.data, {
+          delay,
+          attempts: 2,
+          backoff: { type: "exponential", delay: 10000 }
+        });
+        console.log("job_done", JSON.stringify({
+          queue: "publish",
+          offerId: offer.id,
+          mode: "agent",
+          result: "rescheduled",
+          reason: publication.reason,
+          waitMinutes: publication.waitMinutes
+        }));
+        return { skipped: true, rescheduled: true, reason: publication.reason, waitMinutes: publication.waitMinutes };
+      }
       const result = await publishDeal(offer, content, config, db);
       console.log("job_done", JSON.stringify({ queue: "publish", offerId: offer.id, mode: "agent" }));
       return result;
@@ -111,7 +130,7 @@ export function startWorkers(db, config, connection) {
     // Quota check: max N publications per window before enqueuing creative
     const publication = telegramPublicationStatus(db.state.publishLog || [], config);
 
-    if (!publication.allowed) {
+    if (!publication.allowed && publication.reason === "telegram_quota_reached") {
       console.log("job_done", JSON.stringify({
         queue: "validation", title: offer?.title, result: publication.reason,
         recentPublished: publication.recentPublished,
@@ -164,7 +183,7 @@ export function startWorkers(db, config, connection) {
 
     // Second quota gate — prevents backlogged creative jobs from all publishing at once
     const publication = telegramPublicationStatus(db.state.publishLog || [], config);
-    if (!publication.allowed) {
+    if (!publication.allowed && publication.reason === "telegram_quota_reached") {
       console.log("job_done", JSON.stringify({
         queue: "creative",
         title: offer?.title,

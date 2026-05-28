@@ -108,6 +108,7 @@ export async function createContent(offer, validationResult, config) {
 
   const [imageResult, copyResult] = await Promise.allSettled([
     (async () => {
+      if (!config.allowExternalProductImages) throw new Error("external_product_images_disabled");
       if (!config.openaiApiKey) throw new Error("openai_not_configured");
       return await findOfficialProductImages(offer, config);
     })(),
