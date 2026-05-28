@@ -107,7 +107,7 @@ export async function runDiscovery(db, config) {
     }
   }
 
-  const maxCandidates = config.maxCandidatesPerCycle ?? 6;
+  const maxCandidates = discoveryCandidateLimit(config);
   const candidates = selectDiscoveryCandidates(newOffers, maxCandidates);
 
   console.log("agent_event", JSON.stringify({
@@ -165,4 +165,10 @@ export function selectDiscoveryCandidates(offers, maxCandidates) {
     .filter(hasRealPromotion)
     .sort((a, b) => promotionDiscountPercent(b) - promotionDiscountPercent(a))
     .slice(0, maxCandidates);
+}
+
+export function discoveryCandidateLimit(config) {
+  const configured = config.maxCandidatesPerCycle ?? 6;
+  const publicationTarget = config.maxPublicationsPerCycle ?? 2;
+  return Math.min(Math.max(configured, publicationTarget * 4), 10);
 }

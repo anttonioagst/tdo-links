@@ -24,7 +24,7 @@ import { createContent } from "../src/agents/creative.js";
 import { hasRealPromotion } from "../src/deals.js";
 import { buildAmazonSearchUrl, normalizeDiscoverySettings, runAmazonDiscovery } from "../src/discovery.js";
 import { shouldRunAmazonDiscovery, runDiscoverySchedulerTick } from "../src/discovery-scheduler.js";
-import { selectDiscoveryCandidates } from "../src/agents/discovery.js";
+import { discoveryCandidateLimit, selectDiscoveryCandidates } from "../src/agents/discovery.js";
 import {
   commandItems,
   statusTone,
@@ -263,6 +263,11 @@ test("discovery candidates exclude products without real promotion", () => {
     { title: "Mouse 40 off", currentPrice: 60, previousPrice: 100, discountPercent: 40 }
   ], 2);
   assert.deepEqual(candidates.map((offer) => offer.title), ["Mouse 40 off", "Headset 20 off"]);
+});
+
+test("discovery validates backup candidates while publication quota stays capped", () => {
+  assert.equal(discoveryCandidateLimit({ maxCandidatesPerCycle: 2, maxPublicationsPerCycle: 2 }), 8);
+  assert.equal(discoveryCandidateLimit({ maxCandidatesPerCycle: 12, maxPublicationsPerCycle: 2 }), 10);
 });
 
 test("Amazon scrape selection keeps later real promotions before applying limit", () => {
