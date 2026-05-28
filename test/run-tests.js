@@ -746,6 +746,45 @@ test("diagnostics exposes Telegram dry-run and credential health", () => {
   assert.deepEqual(diagnostics.telegram.missing, ["bot_token", "chat_id"]);
 });
 
+test("debug delete Telegram messages route deletes requested message ids", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  const originalFetch = globalThis.fetch;
+  const deleted = [];
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url).startsWith("http://127.0.0.1") || String(url).startsWith("http://localhost")) {
+      return originalFetch(url, init);
+    }
+    const body = JSON.parse(init.body);
+    deleted.push(body.message_id);
+    return new Response(JSON.stringify({ ok: true, result: true }), {
+      headers: { "content-type": "application/json" }
+    });
+  };
+
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      TELEGRAM_BOT_TOKEN: "token",
+      TELEGRAM_CHAT_ID: "chat"
+    });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/debug/delete-telegram-messages",
+      body: { messageIds: [3689, 3690] }
+    });
+    const payload = JSON.parse(response.text);
+    assert.equal(response.status, 200);
+    assert.equal(payload.deleted, 2);
+    assert.deepEqual(deleted, [3689, 3690]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("publish pipeline returns per-draft dry-run details", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   try {
