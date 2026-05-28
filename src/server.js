@@ -232,11 +232,19 @@ async function handleApi(req, res, url, db, config) {
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/debug/clear-rejected") {
-    const before = db.state.offers.filter(o => o.status === "rejected").length;
-    db.state.offers = db.state.offers.filter(o => o.status !== "rejected");
-    await db.save();
-    console.log("debug_clear_rejected", JSON.stringify({ removed: before, remaining: db.state.offers.length }));
-    sendJson(res, 200, { ok: true, removed: before, remaining: db.state.offers.length });
+    let removed = 0;
+    if (db.pool) {
+      const result = await db.pool.query("DELETE FROM offers WHERE status = 'rejected'");
+      removed = result.rowCount ?? 0;
+    } else {
+      const before = db.state.offers.filter(o => o.status === "rejected").length;
+      db.state.offers = db.state.offers.filter(o => o.status !== "rejected");
+      await db.save();
+      removed = before;
+    }
+    await db.load();
+    console.log("debug_clear_rejected", JSON.stringify({ removed, remaining: db.state.offers.length }));
+    sendJson(res, 200, { ok: true, removed, remaining: db.state.offers.length });
     return;
   }
 
