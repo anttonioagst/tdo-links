@@ -272,64 +272,6 @@ async function handleApi(req, res, url, db, config) {
     sendJson(res, 200, { ok: true, removed, remaining: (db.state.publishLog || []).length, drained });
     return;
   }
-  if (req.method === "POST" && url.pathname === "/api/debug/reset-products") {
-    const { creativeQueue, publishQueue, validationQueue, scrapeQueue, imagegenQueue } = await import("./queues/index.js");
-    const before = {
-      offers: db.state.offers.length,
-      drafts: db.state.drafts.length,
-      clicks: db.state.clicks.length,
-      publishLog: (db.state.publishLog || []).length,
-      priceHistory: Object.keys(db.state.priceHistory || {}).length,
-      reports: (db.state.reports || []).length,
-      recommendations: (db.state.recommendations || []).length
-    };
-    const drained = {};
-    if (scrapeQueue) { await scrapeQueue.drain(); drained.scrape = true; }
-    if (imagegenQueue) { await imagegenQueue.drain(); drained.imagegen = true; }
-    if (validationQueue) { await validationQueue.drain(); drained.validation = true; }
-    if (creativeQueue) { await creativeQueue.drain(); drained.creative = true; }
-    if (publishQueue) { await publishQueue.drain(); drained.publish = true; }
-    if (db.pool) {
-      const client = await db.pool.connect();
-      try {
-        await client.query("BEGIN");
-        await client.query("DELETE FROM offer_images");
-        await client.query("DELETE FROM price_history");
-        await client.query("DELETE FROM clicks");
-        await client.query("DELETE FROM publish_log");
-        await client.query("DELETE FROM drafts");
-        await client.query("DELETE FROM offers");
-        await client.query("COMMIT");
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      } finally {
-        client.release();
-      }
-      await db.load();
-    } else {
-      db.state.offers = [];
-      db.state.drafts = [];
-      db.state.clicks = [];
-      db.state.publishLog = [];
-      db.state.priceHistory = {};
-      db.state.reports = [];
-      db.state.recommendations = [];
-      await db.save();
-    }
-    const after = {
-      offers: db.state.offers.length,
-      drafts: db.state.drafts.length,
-      clicks: db.state.clicks.length,
-      publishLog: (db.state.publishLog || []).length,
-      priceHistory: Object.keys(db.state.priceHistory || {}).length,
-      reports: (db.state.reports || []).length,
-      recommendations: (db.state.recommendations || []).length
-    };
-    console.log("debug_reset_products", JSON.stringify({ before, after, drained }));
-    sendJson(res, 200, { ok: true, before, after, drained });
-    return;
-  }
   if (req.method === "POST" && url.pathname === "/api/run/publish") {
     const result = await enqueuePublish(db, config, null, ["telegram", "twitter"]);
     if (!result.queued) {
