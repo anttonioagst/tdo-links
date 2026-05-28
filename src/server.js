@@ -236,11 +236,14 @@ async function handleApi(req, res, url, db, config) {
     let dbError = null;
     if (db.pool) {
       try {
-        const countRes = await db.pool.query("SELECT COUNT(*) FROM offers WHERE status = $1", ["rejected"]);
-        const countBefore = parseInt(countRes.rows[0].count, 10);
+        const statusCountRes = await db.pool.query("SELECT status, COUNT(*) FROM offers GROUP BY status");
+        const statusCounts = Object.fromEntries(statusCountRes.rows.map(r => [r.status, parseInt(r.count, 10)]));
+        const totalCountRes = await db.pool.query("SELECT COUNT(*) FROM offers");
+        const totalInDb = parseInt(totalCountRes.rows[0].count, 10);
+        const countBefore = statusCounts["rejected"] || 0;
         const delRes = await db.pool.query("DELETE FROM offers WHERE status = $1", ["rejected"]);
         removed = delRes.rowCount ?? countBefore;
-        console.log("debug_clear_rejected_pg", JSON.stringify({ countBefore, rowCount: delRes.rowCount }));
+        console.log("debug_clear_rejected_pg", JSON.stringify({ totalInDb, statusCounts, rowCount: delRes.rowCount, removed }));
       } catch (err) {
         dbError = err.message;
         console.error("debug_clear_rejected_error", err.message);
