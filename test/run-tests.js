@@ -934,6 +934,60 @@ test("mutating API routes accept x-admin-token when configured", async () => {
   }
 });
 
+test("debug product reset clears registered product state", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers = [{ id: "offer_reset", title: "Produto" }];
+    db.state.drafts = [{ id: "draft_reset", offerId: "offer_reset", status: "published" }];
+    db.state.clicks = [{ id: "click_reset", offerId: "offer_reset" }];
+    db.state.publishLog = [{ id: "pub_reset", draftId: "draft_reset" }];
+    db.state.priceHistory = { offer_reset: [{ price: 100 }] };
+    db.state.reports = [{ id: "report_reset" }];
+    db.state.recommendations = [{ id: "recommendation_reset" }];
+    await db.save();
+
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+    const app = createApp({ db, config, publicDir: dir });
+    const response = await request(app, {
+      method: "POST",
+      path: "/api/debug/reset-products"
+    });
+    const payload = JSON.parse(response.text);
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.deepEqual(payload.before, {
+      offers: 1,
+      drafts: 1,
+      clicks: 1,
+      publishLog: 1,
+      priceHistory: 1,
+      reports: 1,
+      recommendations: 1
+    });
+    assert.deepEqual(payload.after, {
+      offers: 0,
+      drafts: 0,
+      clicks: 0,
+      publishLog: 0,
+      priceHistory: 0,
+      reports: 0,
+      recommendations: 0
+    });
+    assert.deepEqual(db.state.offers, []);
+    assert.deepEqual(db.state.drafts, []);
+    assert.deepEqual(db.state.clicks, []);
+    assert.deepEqual(db.state.publishLog, []);
+    assert.deepEqual(db.state.priceHistory, {});
+    assert.deepEqual(db.state.reports, []);
+    assert.deepEqual(db.state.recommendations, []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("validation blocks Amazon offer without affiliate configuration", () => {
   const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
   const offer = {
