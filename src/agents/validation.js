@@ -3,18 +3,25 @@ import Anthropic from "@anthropic-ai/sdk";
 const MODEL = "claude-haiku-4-5-20251001";
 
 function buildValidationPrompt(offer) {
+  const hasDiscount = offer.previousPrice && offer.previousPrice > offer.currentPrice;
+  const discountLine = hasDiscount
+    ? `Preço atual: R$ ${offer.currentPrice} | Era: R$ ${offer.previousPrice} (${offer.discountPercent}% off)`
+    : `Preço atual: R$ ${offer.currentPrice ?? "N/A"} | Sem histórico de preço anterior`;
+
   return `Você é curador especialista em deals de tecnologia para o mercado brasileiro.
 
 Produto: ${offer.title || "Desconhecido"}
-Preço atual: R$ ${offer.currentPrice ?? "N/A"} | Preço anterior: R$ ${offer.previousPrice ?? "N/A"} (${offer.discountPercent ?? "N/A"}% off)
+${discountLine}
 Avaliação: ${offer.rating ?? "N/A"}/5 (${offer.reviewCount ?? "N/A"} reviews)
 Loja: ${offer.store || "Desconhecida"}
 
-Avalie:
-1. O desconto é real? (preço anterior parece legítimo, não inflado)
-2. É tech/periférico? (mouse, teclado, SSD, monitor, headset, placa de vídeo, etc.)
-3. O preço está competitivo para o Brasil?
-4. A avaliação justifica recomendar?
+Avalie SE vale divulgar para seguidores de tecnologia:
+1. É produto tech relevante? (SSD, mouse, teclado, monitor, headset, placa de vídeo, hub, cabo, etc.)
+2. ${hasDiscount ? "O desconto é real? (preço anterior parece legítimo, não inflado)" : "O preço está competitivo para o Brasil? (compare com o mercado atual)"}
+3. A avaliação/qualidade justifica recomendar? (4.0+ preferível)
+4. É produto de marca reconhecida ou com reviews suficientes?
+
+Critério: aprove se for tech genuíno com preço competitivo OU desconto real. Rejeite apenas se preço claramente acima do mercado, produto não-tech, ou marca/qualidade duvidosa.
 
 Responda SOMENTE em JSON válido:
 {"valid": true|false, "confidence": 0-100, "reason": "frase curta"}`;

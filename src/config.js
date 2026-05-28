@@ -12,9 +12,11 @@ export function loadConfig(env = process.env) {
     scraperMode: env.SCRAPER_MODE || "mock",
     scraperFallbackMock: env.SCRAPER_FALLBACK_MOCK !== "false",
     amazonSearchUrls: parseList(env.AMAZON_SEARCH_URLS || [
-      "https://www.amazon.com.br/s?k=ssd+nvme",
-      "https://www.amazon.com.br/s?k=mouse+gamer+sem+fio",
-      "https://www.amazon.com.br/s?k=hub+usb+c"
+      "https://www.amazon.com.br/s?k=ssd+nvme&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=mouse+gamer&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=headset+gamer&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=monitor+gamer&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=placa+de+video&deals-promo-filter=1"
     ].join(",")),
     disclosure: env.AFFILIATE_DISCLOSURE || "Link de afiliado: posso receber comissao pela compra.",
     amazonAffiliateTag: env.AMAZON_AFFILIATE_TAG || "",
