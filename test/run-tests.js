@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import sharp from "sharp";
 import { createDraftsForOffer, createAnalyticsReport, runPublishPipeline, runScrapePipeline } from "../src/agents.js";
 import { publishDiscord, testDiscord } from "../src/publishers/discord.js";
 import { publishXAcquisition } from "../src/publishers/x.js";
@@ -11,7 +13,7 @@ import { loadConfig } from "../src/config.js";
 import { JsonDb } from "../src/db.js";
 import { buildDiagnostics } from "../src/integrations.js";
 import { buildAffiliateUrl } from "../src/links.js";
-import { normalizeTelegramImageUrl, publishTelegram, selectBestTelegramPhoto, testTelegram } from "../src/publishers/telegram.js";
+import { normalizeTelegramImageUrl, publishTelegram, selectBestTelegramPhoto, squareTelegramPhoto, testTelegram } from "../src/publishers/telegram.js";
 import { buildRecommendations } from "../src/recommendations.js";
 import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, scoreOfferDetailed, statusForScore } from "../src/scoring.js";
@@ -179,9 +181,30 @@ test("selects the largest downloaded image candidate for Telegram upload", async
   assert.ok(calls.includes("https://m.media-amazon.com/images/I/product._AC_SL1500_.jpg"));
 });
 
+test("squares Telegram photos without cropping the product image", async () => {
+  const input = await sharp({
+    create: {
+      width: 1600,
+      height: 900,
+      channels: 3,
+      background: "#dcdcdc"
+    }
+  }).jpeg().toBuffer();
+
+  const squared = await squareTelegramPhoto({ buffer: input, contentType: "image/jpeg" });
+  const metadata = await sharp(squared.buffer).metadata();
+
+  assert.equal(metadata.width, 1200);
+  assert.equal(metadata.height, 1200);
+  assert.equal(squared.contentType, "image/jpeg");
+});
+
 test("publishTelegram uploads downloaded image bytes instead of sending image URL", async () => {
   const originalFetch = globalThis.fetch;
   let sentBody = null;
+  const rectangularImage = await sharp(randomBytes(1600 * 900 * 3), {
+    raw: { width: 1600, height: 900, channels: 3 }
+  }).jpeg({ quality: 90 }).toBuffer();
   globalThis.fetch = async (url, init = {}) => {
     if (String(url).includes("/sendPhoto")) {
       sentBody = init.body;
@@ -189,7 +212,7 @@ test("publishTelegram uploads downloaded image bytes instead of sending image UR
         headers: { "content-type": "application/json" }
       });
     }
-    return new Response(new Uint8Array(50_000), { headers: { "content-type": "image/jpeg" } });
+    return new Response(rectangularImage, { headers: { "content-type": "image/jpeg" } });
   };
 
   try {
@@ -205,7 +228,10 @@ test("publishTelegram uploads downloaded image bytes instead of sending image UR
     assert.equal(result.providerMessageId, 42);
     assert.equal(offer.telegramImageFileId, "file_large");
     assert.ok(sentBody instanceof FormData);
-    assert.equal(sentBody.get("photo").size, 50_000);
+    const photo = sentBody.get("photo");
+    const metadata = await sharp(Buffer.from(await photo.arrayBuffer())).metadata();
+    assert.equal(metadata.width, 1200);
+    assert.equal(metadata.height, 1200);
   } finally {
     globalThis.fetch = originalFetch;
   }

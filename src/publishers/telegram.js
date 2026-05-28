@@ -1,3 +1,5 @@
+import sharp from "sharp";
+
 const CATEGORY_EMOJI = {
   SSD: "💾",
   notebook: "💻",
@@ -13,6 +15,7 @@ const CATEGORY_EMOJI = {
 
 const DEFAULT_MIN_TELEGRAM_PHOTO_BYTES = 25_000;
 const MAX_TELEGRAM_PHOTO_BYTES = 9_500_000;
+const TELEGRAM_SQUARE_PHOTO_SIZE = 1200;
 
 function categoryEmoji(offer) {
   return CATEGORY_EMOJI[offer?.category] ?? CATEGORY_EMOJI.default;
@@ -156,6 +159,25 @@ export async function selectBestTelegramPhoto(urls, options = {}) {
   return valid[0] || null;
 }
 
+export async function squareTelegramPhoto(photo, size = TELEGRAM_SQUARE_PHOTO_SIZE) {
+  const buffer = Buffer.isBuffer(photo) ? photo : photo?.buffer;
+  if (!buffer?.length) throw new Error("missing_photo_buffer");
+  const squared = await sharp(buffer)
+    .rotate()
+    .resize(size, size, {
+      fit: "contain",
+      background: { r: 255, g: 255, b: 255, alpha: 1 }
+    })
+    .flatten({ background: { r: 255, g: 255, b: 255 } })
+    .jpeg({ quality: 92, mozjpeg: true })
+    .toBuffer();
+  return {
+    ...photo,
+    buffer: squared,
+    contentType: "image/jpeg"
+  };
+}
+
 async function downloadTelegramPhoto(url, fetchImpl) {
   try {
     const controller = new AbortController();
@@ -183,12 +205,13 @@ async function sendBestImage(botUrl, chatId, urls, caption, offer = null) {
   try {
     const selected = await selectBestTelegramPhoto(urls);
     if (!selected) return { ok: false, dryRun: false, providerMessageId: null, detail: "no_high_quality_image" };
+    const square = await squareTelegramPhoto(selected);
 
     const form = new FormData();
     form.append("chat_id", chatId);
     form.append("caption", caption.slice(0, 1024));
     form.append("parse_mode", "HTML");
-    form.append("photo", new Blob([selected.buffer], { type: selected.contentType }), imageFilename(selected.contentType));
+    form.append("photo", new Blob([square.buffer], { type: square.contentType }), imageFilename(square.contentType));
     const response = await fetch(`${botUrl}/sendPhoto`, { method: "POST", body: form });
     const payload = await response.json().catch(() => ({}));
     if (offer && payload.result?.photo) {
