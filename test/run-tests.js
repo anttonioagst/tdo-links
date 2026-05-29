@@ -28,6 +28,7 @@ import { telegramPublicationStatus } from "../src/publication-policy.js";
 import { buildAmazonSearchUrl, normalizeDiscoverySettings, runAmazonDiscovery } from "../src/discovery.js";
 import { shouldRunAmazonDiscovery, runDiscoverySchedulerTick } from "../src/discovery-scheduler.js";
 import { discoveryCandidateLimit, selectDiscoveryCandidates } from "../src/agents/discovery.js";
+import { premiumCurationScore, selectPremiumCandidates } from "../src/premium-curation.js";
 import {
   commandItems,
   statusTone,
@@ -284,10 +285,51 @@ test("offers without previous promotional price are not real promotions", () => 
 test("discovery candidates exclude products without real promotion", () => {
   const candidates = selectDiscoveryCandidates([
     { title: "Monitor sem promocao", currentPrice: 899, previousPrice: null, discountPercent: 0 },
-    { title: "Headset 20 off", currentPrice: 160, previousPrice: 200, discountPercent: 20 },
-    { title: "Mouse 40 off", currentPrice: 60, previousPrice: 100, discountPercent: 40 }
+    { title: "Headset HyperX Cloud 20 off", currentPrice: 260, previousPrice: 325, discountPercent: 20, rating: 4.7, reviewCount: 1200 },
+    { title: "Mouse Generico 40 off", currentPrice: 60, previousPrice: 100, discountPercent: 40 }
   ], 2);
-  assert.deepEqual(candidates.map((offer) => offer.title), ["Mouse 40 off", "Headset 20 off"]);
+  assert.deepEqual(candidates.map((offer) => offer.title), ["Headset HyperX Cloud 20 off"]);
+});
+
+test("premium curation prefers trusted premium brands over generic high discounts", () => {
+  const candidates = selectPremiumCandidates([
+    { title: "Mouse Gamer Generico RGB 70 off", currentPrice: 89, previousPrice: 299, discountPercent: 70, category: "mouse" },
+    { title: "Headset HyperX Cloud Alpha", currentPrice: 349, previousPrice: 549, discountPercent: 36, category: "headset", rating: 4.7, reviewCount: 1200 },
+    { title: "SSD Kingston NV2 1TB", currentPrice: 349, previousPrice: 499, discountPercent: 30, category: "ssd", rating: 4.8, reviewCount: 4000 },
+    { title: "Fone Sony WH-1000XM5", currentPrice: 1499, previousPrice: 2199, discountPercent: 32, category: "fone", rating: 4.8, reviewCount: 3000 }
+  ], 2, {});
+
+  assert.deepEqual(candidates.map((offer) => offer.title), [
+    "Fone Sony WH-1000XM5",
+    "SSD Kingston NV2 1TB"
+  ]);
+});
+
+test("premium curation limits repeated mouse category in one publication window", () => {
+  const candidates = selectPremiumCandidates([
+    { title: "Mouse Logitech MX Master 3S", currentPrice: 499, previousPrice: 699, discountPercent: 29, category: "mouse", rating: 4.8, reviewCount: 5000 },
+    { title: "Mouse Razer Basilisk V3", currentPrice: 319, previousPrice: 499, discountPercent: 36, category: "mouse", rating: 4.7, reviewCount: 900 },
+    { title: "SSD Kingston NV2 1TB", currentPrice: 349, previousPrice: 499, discountPercent: 30, category: "ssd", rating: 4.8, reviewCount: 4000 },
+    { title: "Headset HyperX Cloud II", currentPrice: 449, previousPrice: 699, discountPercent: 36, category: "headset", rating: 4.7, reviewCount: 1800 }
+  ], 4, {});
+
+  assert.equal(candidates.filter((offer) => offer.title.toLowerCase().includes("mouse")).length, 1);
+  assert.ok(candidates.some((offer) => offer.title.includes("SSD Kingston")));
+  assert.ok(candidates.some((offer) => offer.title.includes("Headset HyperX")));
+});
+
+test("premium curation treats price as quality signal, not a hard minimum", () => {
+  const score = premiumCurationScore({
+    title: "SSD Kingston 480GB",
+    currentPrice: 89,
+    previousPrice: 139,
+    discountPercent: 36,
+    category: "ssd",
+    rating: 4.8,
+    reviewCount: 6000
+  }, {});
+
+  assert.ok(score > 0);
 });
 
 test("learning profile boosts offers similar to clicked winners", () => {
@@ -328,9 +370,10 @@ test("discovery candidates use learning without allowing non-promotions", () => 
   const candidates = selectDiscoveryCandidates([
     { title: "Monitor sem promocao", currentPrice: 899, previousPrice: null, discountPercent: 0 },
     { title: "Fone Generico 55 off", currentPrice: 45, previousPrice: 100, discountPercent: 55 },
-    { title: "Mouse Gamer Redragon 48 off", currentPrice: 82, previousPrice: 159, discountPercent: 48 }
+    { title: "Mouse Gamer Redragon 48 off", currentPrice: 82, previousPrice: 159, discountPercent: 48 },
+    { title: "SSD Kingston NV2 1TB", currentPrice: 349, previousPrice: 499, discountPercent: 30, rating: 4.8, reviewCount: 4000 }
   ], 2, state);
-  assert.deepEqual(candidates.map((offer) => offer.title), ["Mouse Gamer Redragon 48 off", "Fone Generico 55 off"]);
+  assert.deepEqual(candidates.map((offer) => offer.title), ["SSD Kingston NV2 1TB"]);
 });
 
 test("discovery validates backup candidates while publication quota stays capped", () => {

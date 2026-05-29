@@ -13,10 +13,11 @@ export function loadConfig(env = process.env) {
     scraperFallbackMock: env.SCRAPER_FALLBACK_MOCK !== "false",
     amazonSearchUrls: parseList(env.AMAZON_SEARCH_URLS || [
       "https://www.amazon.com.br/s?k=ssd+nvme&deals-promo-filter=1",
-      "https://www.amazon.com.br/s?k=mouse+gamer&deals-promo-filter=1",
-      "https://www.amazon.com.br/s?k=headset+gamer&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=fone+sony&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=headset+hyperx&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=teclado+logitech&deals-promo-filter=1",
       "https://www.amazon.com.br/s?k=monitor+gamer&deals-promo-filter=1",
-      "https://www.amazon.com.br/s?k=placa+de+video&deals-promo-filter=1"
+      "https://www.amazon.com.br/s?k=roteador+tp+link&deals-promo-filter=1"
     ].join(",")),
     disclosure: env.AFFILIATE_DISCLOSURE || "Link de afiliado: posso receber comissao pela compra.",
     amazonAffiliateTag: env.AMAZON_AFFILIATE_TAG || "",
@@ -46,6 +47,10 @@ export function loadConfig(env = process.env) {
     maxPublicationsPerCycle: Number(env.MAX_PUBLICATIONS_PER_CYCLE || 4),
     publicationWindowHours: Number(env.PUBLICATION_WINDOW_HOURS || 1),
     minPublicationIntervalMinutes: Number(env.MIN_PUBLICATION_INTERVAL_MINUTES || 15),
+    premiumBrands: env.PREMIUM_BRANDS || "",
+    secondaryBrands: env.SECONDARY_BRANDS || "",
+    premiumCurationMinScore: Number(env.PREMIUM_CURATION_MIN_SCORE || 30),
+    maxPremiumCategoryPerWindow: Number(env.MAX_PREMIUM_CATEGORY_PER_WINDOW || 1),
     allowExternalProductImages: env.ALLOW_EXTERNAL_PRODUCT_IMAGES === "true",
     maxCandidatesPerCycle: Number(env.MAX_CANDIDATES_PER_CYCLE || 2),
     databaseUrl: env.DATABASE_URL || "",

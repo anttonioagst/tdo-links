@@ -1,3 +1,5 @@
+import { premiumCurationScore } from "./premium-curation.js";
+
 export function scoreOffer(offer) {
   let score = 30;
 
@@ -20,7 +22,7 @@ export function scoreOffer(offer) {
 
   if (offer.storeReputation === "high") score += 8;
   if (offer.category === "tech") score += 5;
-  if (offer.currentPrice <= 150) score += 3;
+  score += Math.max(-12, Math.min(18, Math.round(premiumCurationScore(offer) / 6)));
   if (offer.previousPrice && offer.currentPrice > offer.previousPrice) score -= 30;
 
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -38,7 +40,7 @@ export function scoreOfferDetailed(offer, performance = {}) {
     discountPoints(offer.discountPercent) +
     ratingPoints(offer.rating) +
     reviewPoints(offer.reviewCount) +
-    (offer.currentPrice <= 150 ? 4 : offer.currentPrice <= 500 ? 7 : 3)
+    premiumSignalPoints(offer)
   );
 
   const potential = clampScore(
@@ -65,6 +67,15 @@ export function scoreOfferDetailed(offer, performance = {}) {
       performance: performanceScore
     }
   };
+}
+
+function premiumSignalPoints(offer) {
+  const signal = premiumCurationScore(offer);
+  if (signal >= 80) return 14;
+  if (signal >= 60) return 10;
+  if (signal >= 30) return 6;
+  if (signal >= 0) return 2;
+  return -8;
 }
 
 function discountPoints(discountPercent = 0) {

@@ -1,6 +1,8 @@
 const KNOWN_BRANDS = [
   "redragon", "logitech", "havit", "hyperx", "anker", "soundcore", "tp-link",
-  "samsung", "lg", "sony", "jbl", "kingston", "sandisk", "dell", "razer"
+  "samsung", "lg", "sony", "jbl", "kingston", "sandisk", "dell", "razer",
+  "corsair", "steelseries", "crucial", "wd", "western digital", "aoc", "asus",
+  "lenovo", "apple", "xiaomi", "philips", "benq", "gigabyte", "msi", "seagate"
 ];
 
 export function buildLearningProfile(state = {}) {

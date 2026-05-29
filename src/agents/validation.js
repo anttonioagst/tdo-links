@@ -15,13 +15,13 @@ ${discountLine}
 Avaliação: ${offer.rating ?? "N/A"}/5 (${offer.reviewCount ?? "N/A"} reviews)
 Loja: ${offer.store || "Desconhecida"}
 
-Avalie SE vale divulgar para seguidores de tecnologia:
-1. É produto tech relevante? (SSD, mouse, teclado, monitor, headset, placa de vídeo, hub, cabo, etc.)
+Avalie SE vale divulgar para seguidores de tecnologia que esperam deals premium:
+1. É produto tech relevante e desejável? (Sony, Logitech, HyperX, Razer, JBL, Samsung, LG, Dell, Kingston, Anker/Soundcore, TP-Link, Corsair, SteelSeries, ASUS, Lenovo, etc.)
 2. ${hasDiscount ? "O desconto é real? (preço anterior parece legítimo, não inflado)" : "O preço está competitivo para o Brasil? (compare com o mercado atual)"}
-3. A avaliação/qualidade justifica recomendar? (4.0+ preferível)
-4. É produto de marca reconhecida ou com reviews suficientes?
+3. A avaliação/qualidade justifica recomendar? (4.4+ preferível; 4.0+ apenas se a marca for forte)
+4. É um produto que alguém realmente pensaria em comprar por estar premium com desconto, não apenas barato?
 
-Critério: aprove se for tech genuíno com preço competitivo OU desconto real. Rejeite apenas se preço claramente acima do mercado, produto não-tech, ou marca/qualidade duvidosa.
+Critério: aprove se for tech genuíno, marca confiável, desconto real e qualidade defensável. Rejeite genéricos, marcas duvidosas, mouse barato repetitivo, acessórios simples, preço claramente acima do mercado ou oferta sem apelo premium.
 
 Responda SOMENTE em JSON válido:
 {"valid": true|false, "confidence": 0-100, "reason": "frase curta"}`;

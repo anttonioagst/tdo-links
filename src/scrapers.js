@@ -53,11 +53,14 @@ let lastScrapeMeta = { source: "unknown", found: 0, errors: [] };
 
 const CURATED_PROMOTION_SEARCH_URLS = [
   "https://www.amazon.com.br/s?k=mouse+logitech+sem+fio&s=review-rank&deals-promo-filter=1",
-  "https://www.amazon.com.br/s?k=mouse+redragon&s=review-rank&deals-promo-filter=1",
-  "https://www.amazon.com.br/s?k=headset+havit&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=headset+hyperx&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=fone+sony&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=teclado+razer&s=review-rank&deals-promo-filter=1",
   "https://www.amazon.com.br/s?k=fone+anker+soundcore&s=review-rank&deals-promo-filter=1",
   "https://www.amazon.com.br/s?k=roteador+tp+link&s=review-rank&deals-promo-filter=1",
-  "https://www.amazon.com.br/s?k=teclado+logitech&s=review-rank&deals-promo-filter=1"
+  "https://www.amazon.com.br/s?k=teclado+logitech&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=ssd+kingston+nvme&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=monitor+lg+ultragear&s=review-rank&deals-promo-filter=1"
 ];
 
 export async function scrapeDeals(config = {}) {

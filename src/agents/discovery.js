@@ -1,7 +1,8 @@
 import Parser from "rss-parser";
 import { scrapeDeals } from "../scrapers.js";
-import { hasRealPromotion, promotionDiscountPercent } from "../deals.js";
+import { hasRealPromotion } from "../deals.js";
 import { buildLearningProfile, learningScoreForOffer } from "../learning.js";
+import { premiumCurationScore, selectPremiumCandidates } from "../premium-curation.js";
 
 const RSS_FEEDS = [
   { name: "pelando", url: "https://www.pelando.com.br/rss" },
@@ -109,7 +110,7 @@ export async function runDiscovery(db, config) {
   }
 
   const maxCandidates = discoveryCandidateLimit(config);
-  const candidates = selectDiscoveryCandidates(newOffers, maxCandidates, db.state);
+  const candidates = selectDiscoveryCandidates(newOffers, maxCandidates, db.state, config);
 
   console.log("agent_event", JSON.stringify({
     agent: "discovery",
@@ -161,12 +162,12 @@ export async function runDiscovery(db, config) {
   return { found: newOffers.length, enqueued };
 }
 
-export function selectDiscoveryCandidates(offers, maxCandidates, state = {}) {
+export function selectDiscoveryCandidates(offers, maxCandidates, state = {}, config = {}) {
   const profile = buildLearningProfile(state);
-  return offers
+  const ranked = offers
     .filter(hasRealPromotion)
-    .sort((a, b) => candidateScore(b, profile) - candidateScore(a, profile))
-    .slice(0, maxCandidates);
+    .sort((a, b) => candidateScore(b, profile, state, config) - candidateScore(a, profile, state, config));
+  return selectPremiumCandidates(ranked, maxCandidates, state, config);
 }
 
 export function discoveryCandidateLimit(config) {
@@ -175,6 +176,6 @@ export function discoveryCandidateLimit(config) {
   return Math.min(Math.max(configured, publicationTarget * 4), 10);
 }
 
-function candidateScore(offer, profile) {
-  return promotionDiscountPercent(offer) + learningScoreForOffer(offer, profile);
+function candidateScore(offer, profile, state, config) {
+  return premiumCurationScore(offer, config, state) + learningScoreForOffer(offer, profile);
 }
