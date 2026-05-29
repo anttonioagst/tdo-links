@@ -1,9 +1,9 @@
 import React from "react";
-import { Loader2, Menu, Search } from "lucide-react";
+import { Loader2, Menu } from "lucide-react";
 import { commandItems, statusTone, viewMeta } from "./tokens.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "../components/ui/button.jsx";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../components/ui/card.jsx";
+import { Card, CardContent } from "../components/ui/card.jsx";
 import { Badge } from "../components/ui/badge.jsx";
 
 export function AppShell({
@@ -16,11 +16,11 @@ export function AppShell({
   topBar
 }) {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen bg-[#050505] text-slate-100">
       <CommandRail view={view} setView={setView} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       {mobileOpen ? (
         <button
-          className="fixed inset-0 z-40 bg-slate-950/80 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/80 lg:hidden"
           onClick={() => setMobileOpen(false)}
           aria-label="Fechar menu"
           type="button"
@@ -43,9 +43,9 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
   const railState = mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0";
 
   return (
-    <aside className={`fixed inset-y-0 left-0 z-50 w-[86px] border-r border-slate-800 bg-slate-950 px-3 py-4 text-white transition ${railState}`}>
+    <aside className={`fixed inset-y-0 left-0 z-50 w-[86px] border-r border-slate-800 bg-[#050505] px-3 py-4 text-white transition ${railState}`}>
       <button
-        className="mb-6 grid size-12 place-items-center rounded-xl bg-violet-600 text-sm font-bold shadow-lg shadow-violet-900/40 hover:bg-violet-500 transition"
+        className="mb-6 grid size-12 place-items-center rounded-lg border border-cyan-400/20 bg-cyan-500 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-950/30 transition hover:bg-cyan-400"
         onClick={() => {
           setView("overview");
           setMobileOpen(false);
@@ -62,9 +62,9 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
             <button
               aria-label={label}
               className={cn(
-                "group relative grid size-12 place-items-center rounded-xl transition",
+                "group relative grid size-12 place-items-center rounded-lg transition",
                 isActive
-                  ? "bg-violet-600/20 text-violet-400 ring-1 ring-violet-500/30"
+                  ? "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/30"
                   : "text-slate-500 hover:bg-slate-800 hover:text-slate-200"
               )}
               key={itemView}
@@ -76,7 +76,7 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
               type="button"
             >
               <Icon className="size-5" />
-              <span className="pointer-events-none absolute left-14 top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-xs text-slate-200 shadow-lg group-hover:block">
+              <span className="pointer-events-none absolute left-14 top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-lg border border-slate-700 bg-[#0a0a0a] px-2 py-1 text-xs text-slate-200 shadow-lg group-hover:block">
                 {label}
               </span>
             </button>
@@ -91,11 +91,11 @@ export function TopContextBar({ actions, inputRef, setMobileOpen, view }) {
   const meta = viewMeta[view] || viewMeta.overview;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#050505]/95 backdrop-blur">
       <div className="mx-auto flex min-h-[72px] max-w-[1540px] flex-col gap-3 px-4 py-3 md:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <button
-            className="grid size-10 place-items-center rounded-xl border border-slate-700 bg-slate-900 text-slate-300 transition hover:bg-slate-800 lg:hidden"
+            className="grid size-10 place-items-center rounded-lg border border-slate-700 bg-[#0a0a0a] text-slate-300 transition hover:bg-slate-800 lg:hidden"
             onClick={() => setMobileOpen(true)}
             type="button"
             aria-label="Abrir menu"
@@ -121,7 +121,7 @@ export function Panel({ title, count, children, density = "comfortable", action 
 
   return (
     <section className={cn(
-      "rounded-2xl border border-slate-800 bg-slate-900 shadow-sm",
+      "rounded-lg border border-slate-800 bg-[#0a0a0a] shadow-sm shadow-black/30",
       densityClass
     )}>
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -138,13 +138,13 @@ export function Panel({ title, count, children, density = "comfortable", action 
 
 export function QueueColumn({ title, count, children, tone = "brand" }) {
   const accentClass = {
-    brand: "bg-violet-500",
+    brand: "bg-cyan-500",
     success: "bg-emerald-500",
     warning: "bg-amber-500",
     danger: "bg-rose-500",
     cyan: "bg-cyan-500",
     muted: "bg-slate-500"
-  }[tone] || "bg-violet-500";
+  }[tone] || "bg-cyan-500";
 
   return (
     <Panel
@@ -217,12 +217,12 @@ export function ActionButton({
 
 export function MetricTile({ icon: Icon, label, value, tone = "brand", detail }) {
   const iconTone = {
-    brand: "bg-violet-500/15 text-violet-400",
+    brand: "bg-cyan-500/15 text-cyan-400",
     success: "bg-emerald-500/15 text-emerald-400",
     warning: "bg-amber-500/15 text-amber-400",
     danger: "bg-rose-500/15 text-rose-400",
     cyan: "bg-cyan-500/15 text-cyan-400"
-  }[tone] || "bg-violet-500/15 text-violet-400";
+  }[tone] || "bg-cyan-500/15 text-cyan-400";
 
   return (
     <Card>
@@ -234,7 +234,7 @@ export function MetricTile({ icon: Icon, label, value, tone = "brand", detail })
             {detail ? <p className="mt-1 truncate text-xs text-slate-500">{detail}</p> : null}
           </div>
           {Icon ? (
-            <div className={cn("grid size-11 place-items-center rounded-xl", iconTone)}>
+            <div className={cn("grid size-11 place-items-center rounded-lg", iconTone)}>
               <Icon className="size-5" />
             </div>
           ) : null}
@@ -259,7 +259,7 @@ export function InsightPanel({ title, detail, action, tone = "brand", toneLabel 
 
 export function EmptyState({ title, text, action }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 p-6 text-center">
+    <div className="rounded-lg border border-dashed border-slate-700 bg-[#0a0a0a]/70 p-6 text-center">
       <h3 className="text-sm font-semibold text-slate-300">{title}</h3>
       <p className="mt-1 text-sm text-slate-500">{text}</p>
       {action ? <div className="mt-4">{action}</div> : null}
@@ -297,9 +297,9 @@ export function FormField({ label, help, error, children }) {
 export function DataTable({ columns, rows, getKey, renderMobileCard }) {
   return (
     <>
-      <div className="hidden overflow-x-auto rounded-xl border border-slate-800 lg:block">
+      <div className="hidden overflow-x-auto rounded-lg border border-slate-800 lg:block">
         <table className="min-w-full divide-y divide-slate-800 text-sm">
-          <thead className="sticky top-0 bg-slate-900/90 backdrop-blur">
+          <thead className="sticky top-0 bg-[#0a0a0a]/95 backdrop-blur">
             <tr>
               {columns.map((column) => (
                 <th
@@ -312,7 +312,7 @@ export function DataTable({ columns, rows, getKey, renderMobileCard }) {
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60 bg-slate-950/30">
+          <tbody className="divide-y divide-slate-800/60 bg-black/20">
             {rows.map((row) => (
               <tr key={getKey(row)} className="transition hover:bg-slate-800/30">
                 {columns.map((column) => (

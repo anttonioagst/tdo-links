@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
-  BarChart3,
+  Bot,
+  Brain,
   CheckCircle2,
   ExternalLink,
   ImageIcon,
@@ -12,11 +13,26 @@ import {
   Search,
   Send,
   Sparkles,
+  TimerReset,
   X,
   Zap
 } from "lucide-react";
-import { AppShell, ActionButton, EmptyState, FormField, InsightPanel, MetricTile, Panel, StatusBadge } from "./ui/components.jsx";
-import { viewMeta } from "./ui/tokens.js";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
+import { AppShell, ActionButton, EmptyState, FormField, MetricTile, Panel, StatusBadge } from "./ui/components.jsx";
+import { statusTone, viewMeta } from "./ui/tokens.js";
 
 const periods = [
   { id: "7", label: "7 dias", days: 7 },
@@ -110,8 +126,8 @@ export default function App() {
 
   if (!state || !data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
-        <Loader2 className="mr-3 size-5 animate-spin text-violet-400" />
+      <div className="flex min-h-screen items-center justify-center bg-[#050505] text-slate-400">
+        <Loader2 className="mr-3 size-5 animate-spin text-cyan-400" />
         Carregando TDO Links...
       </div>
     );
@@ -153,91 +169,293 @@ export default function App() {
 
 function Overview({ state, data, setPeriod, period, loading, action, api }) {
   return (
-    <div className="space-y-5 md:space-y-6">
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricTile
-          icon={MousePointerClick}
-          label="Cliques no periodo"
-          value={data.clicksInPeriod}
-          tone="brand"
-          detail={`${data.clickRate}% por publicacao`}
-        />
-        <MetricTile
-          icon={Send}
-          label="Publicados"
-          value={data.publishedInPeriod}
-          tone="success"
-          detail={`${state.metrics.published} no total`}
-        />
-        <MetricTile
-          icon={CheckCircle2}
-          label="Deals validados"
-          value={data.validatedTotal}
-          tone="cyan"
-          detail={`${data.approvalRate}% taxa de aprovacao AI`}
-        />
-        <MetricTile
-          icon={AlertTriangle}
-          label="Rejeitados"
-          value={data.rejectedTotal}
-          tone={data.rejectedTotal > 0 ? "warning" : "success"}
-          detail="pela validacao Claude"
-        />
+    <div className="space-y-4 md:space-y-5">
+      <CommandHero state={state} data={data} loading={loading} action={action} api={api} />
+
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricTile icon={Send} label="Posts no periodo" value={data.publishedInPeriod} tone="success" detail={data.lastPublish ? `Ultimo: ${formatDate(data.lastPublish.createdAt)}` : "Aguardando primeiro post"} />
+        <MetricTile icon={CheckCircle2} label="Aprovacao AI" value={`${data.approvalRate}%`} tone="cyan" detail={`${data.validatedTotal} ofertas passaram`} />
+        <MetricTile icon={AlertTriangle} label="Rejeitados" value={data.rejectedTotal} tone={data.rejectedTotal > 0 ? "warning" : "success"} detail="qualidade protegida" />
+        <MetricTile icon={MousePointerClick} label="Cliques" value={data.clicksInPeriod} tone="brand" detail={`${data.clickRate}% por publicacao`} />
       </section>
 
-      <div className="grid grid-cols-12 gap-4 md:gap-6">
+      <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12 xl:col-span-8">
           <Panel
-            title="Atividade por horario"
-            count="Cliques e publicacoes no periodo selecionado"
-            action={
-              <select
-                value={period}
-                onChange={(e) => setPeriod(e.target.value)}
-                className="h-10 rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm text-slate-200 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition"
-              >
-                {periods.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
-            }
+            title="Pulso do canal"
+            count="Publicacoes e cliques no periodo selecionado"
+            action={<PeriodSelect period={period} setPeriod={setPeriod} />}
           >
-            <Heatmap heatmap={data.heatmap} />
+            <ActivityChart data={data.timeline} />
+          </Panel>
+        </div>
+        <div className="col-span-12 xl:col-span-4">
+          <Panel title="Funil autonomo" count="Discovery → Validacao → Publicacao">
+            <FunnelChart data={data.funnel} />
           </Panel>
         </div>
 
-        <div className="col-span-12 xl:col-span-4 space-y-4">
-          <InsightPanel
-            tone={data.healthTone === "critical" ? "danger" : data.healthTone === "warning" ? "warning" : "success"}
-            toneLabel={`${data.healthScore}/100 saude`}
-            title="Pipeline autonomo"
-            detail={`Proxima busca automatica em ate 2h. ${data.publishedInPeriod} publicacoes no periodo selecionado.`}
-          />
-          <Panel title="Forcar busca" count="Dispara o discovery manualmente">
-            <p className="mb-4 text-sm text-slate-500">Usa o mesmo fluxo autonomo: Discovery → Validation → Creative → Publisher.</p>
-            <ActionButton
-              loading={loading.scrape}
-              onClick={() => action("scrape", () => api("/api/run/scrape", { method: "POST" }), "Busca iniciada")}
-            >
-              <Search className="size-4" />
-              Forcar busca agora
-            </ActionButton>
+        <div className="col-span-12 xl:col-span-4">
+          <Panel title="Mix de categorias" count="O que o radar esta encontrando">
+            <CategoryBarChart data={data.categoryChart} />
           </Panel>
         </div>
-
-        <div className="col-span-12 xl:col-span-5">
-          <Panel title="Categorias e canais" count="Distribuicao do inventario">
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-1">
-              <Bars title="Categorias" items={data.categoryBars} />
-              <Bars title="Canais" items={data.channelBars} />
-            </div>
+        <div className="col-span-12 md:col-span-6 xl:col-span-4">
+          <Panel title="Canais" count="Distribuicao por destino">
+            <ChannelDonut data={data.channelChart} />
+          </Panel>
+        </div>
+        <div className="col-span-12 md:col-span-6 xl:col-span-4">
+          <Panel title="Fila inteligente" count="Motivo do silencio ou proximo envio">
+            <DecisionSummary data={data} state={state} />
           </Panel>
         </div>
 
         <div className="col-span-12 xl:col-span-7">
-          <Panel title="Publicacoes recentes" count="Ultimos deals publicados pelo pipeline">
-            <RecentPublications publishLog={state.publishLog || []} offers={state.offers || []} limit={8} />
+          <Panel title="Decisoes recentes" count="Produtos aceitos, rejeitados e publicados">
+            <DecisionTable rows={data.decisionRows} />
+          </Panel>
+        </div>
+        <div className="col-span-12 xl:col-span-5">
+          <Panel title="Publicacoes recentes" count="Ultimos envios por canal">
+            <RecentPublications publishLog={state.publishLog || []} offers={state.offers || []} limit={7} />
           </Panel>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CommandHero({ state, data, loading, action, api }) {
+  const telegram = state.diagnostics?.telegram;
+  const automation = state.diagnostics?.automation || {};
+  const statusTone = telegram?.ready ? "success" : "warning";
+  const statusText = telegram?.ready ? "Autopilot online" : "Revisar Telegram";
+
+  return (
+    <section className="overflow-hidden rounded-lg border border-slate-800 bg-[linear-gradient(135deg,#050505_0%,#0a0a0a_52%,#111827_100%)] p-4 shadow-2xl shadow-black/30 md:p-5">
+      <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+        <div className="min-w-0">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <StatusBadge tone={statusTone}>{statusText}</StatusBadge>
+            <span className="rounded-md border border-slate-800 bg-black/40 px-2.5 py-1 text-xs text-slate-400">
+              {automation.maxPublicationsPerCycle || 4} posts / {automation.publicationWindowHours || 1}h
+            </span>
+            <span className="rounded-md border border-slate-800 bg-black/40 px-2.5 py-1 text-xs text-slate-400">
+              intervalo {automation.minPublicationIntervalMinutes || 15} min
+            </span>
+          </div>
+          <h2 className="max-w-3xl text-2xl font-semibold tracking-normal text-white md:text-3xl">
+            TDO Command Center
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+            Controle operacional do bot: encontra oportunidades premium, filtra baixa qualidade, prepara copy/imagem e publica quando o deal merece entrar no canal.
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <CommandStat icon={Bot} label="Telegram" value={telegram?.ready ? "Pronto" : "Atenção"} tone={statusTone} />
+            <CommandStat icon={TimerReset} label="Proximo slot" value={data.nextPostLabel} tone={data.nextPostTone} />
+            <CommandStat icon={Brain} label="Filtro premium" value={`${data.approvalRate}% passa`} tone="cyan" />
+          </div>
+        </div>
+        <div className="grid content-between gap-3 rounded-lg border border-slate-800 bg-black/30 p-4">
+          <div>
+            <p className="text-xs font-medium uppercase text-slate-500">Acao rapida</p>
+            <p className="mt-2 text-sm text-slate-300">Dispara uma busca manual sem burlar validacao, imagem ou regras de postagem.</p>
+          </div>
+          <ActionButton
+            loading={loading.scrape}
+            onClick={() => action("scrape", () => api("/api/run/scrape", { method: "POST" }), "Busca iniciada")}
+          >
+            <Search className="size-4" />
+            Forcar busca premium
+          </ActionButton>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CommandStat({ icon: Icon, label, value, tone = "brand" }) {
+  const color = {
+    success: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
+    warning: "text-amber-300 bg-amber-500/10 border-amber-500/20",
+    danger: "text-rose-300 bg-rose-500/10 border-rose-500/20",
+    cyan: "text-cyan-300 bg-cyan-500/10 border-cyan-500/20",
+    brand: "text-blue-300 bg-blue-500/10 border-blue-500/20"
+  }[tone] || "text-blue-300 bg-blue-500/10 border-blue-500/20";
+
+  return (
+    <div className={`rounded-lg border p-3 ${color}`}>
+      <div className="flex items-center gap-2">
+        <Icon className="size-4" />
+        <span className="text-xs opacity-80">{label}</span>
+      </div>
+      <p className="mt-2 text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function PeriodSelect({ period, setPeriod }) {
+  return (
+    <select
+      value={period}
+      onChange={(e) => setPeriod(e.target.value)}
+      className="h-9 rounded-md border border-slate-700 bg-black px-3 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+    >
+      {periods.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+    </select>
+  );
+}
+
+function ActivityChart({ data }) {
+  return (
+    <div className="h-[310px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ left: -18, right: 8, top: 12, bottom: 0 }}>
+          <defs>
+            <linearGradient id="postsFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#22c55e" stopOpacity={0.32} />
+              <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="clicksFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.28} />
+              <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 12 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: "#64748b", fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
+          <Tooltip content={<ChartTooltip />} />
+          <Area type="monotone" dataKey="posts" name="Posts" stroke="#22c55e" fill="url(#postsFill)" strokeWidth={2} />
+          <Area type="monotone" dataKey="clicks" name="Cliques" stroke="#38bdf8" fill="url(#clicksFill)" strokeWidth={2} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function FunnelChart({ data }) {
+  return (
+    <div className="h-[310px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} layout="vertical" margin={{ left: 8, right: 12, top: 12, bottom: 0 }}>
+          <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" horizontal={false} />
+          <XAxis type="number" hide />
+          <YAxis dataKey="label" type="category" width={86} tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
+          <Tooltip content={<ChartTooltip />} />
+          <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+            {data.map((entry) => <Cell key={entry.label} fill={entry.color} />)}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function CategoryBarChart({ data }) {
+  if (!data.length) return <EmptyState title="Sem categorias" text="As categorias aparecem quando ofertas entram no inventario." />;
+  return (
+    <div className="h-[270px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ left: -18, right: 8, top: 12, bottom: 0 }}>
+          <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: "#64748b", fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
+          <Tooltip content={<ChartTooltip />} />
+          <Bar dataKey="value" fill="#38bdf8" radius={[6, 6, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function ChannelDonut({ data }) {
+  if (!data.length) return <EmptyState title="Sem canais" text="Os canais aparecem apos publicacoes." />;
+  return (
+    <div className="grid gap-3 md:grid-cols-[1fr_0.9fr] xl:grid-cols-1 2xl:grid-cols-[1fr_0.9fr]">
+      <div className="h-[210px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={data} dataKey="value" nameKey="label" innerRadius={54} outerRadius={82} paddingAngle={3}>
+              {data.map((entry) => <Cell key={entry.label} fill={entry.color} />)}
+            </Pie>
+            <Tooltip content={<ChartTooltip />} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="space-y-2 self-center">
+        {data.map((entry) => (
+          <div key={entry.label} className="flex items-center justify-between rounded-md border border-slate-800 bg-black/30 px-3 py-2 text-sm">
+            <span className="flex items-center gap-2 text-slate-300"><span className="size-2 rounded-full" style={{ background: entry.color }} />{entry.label}</span>
+            <span className="font-medium text-slate-100">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DecisionSummary({ data, state }) {
+  const lastRejected = data.recentRejected[0];
+  return (
+    <div className="space-y-3">
+      <StatusLine label="Status de postagem" value={data.nextPostLabel} tone={data.nextPostTone} />
+      <StatusLine label="Produtos no inventario" value={`${(state.offers || []).length} monitorados`} tone="cyan" />
+      <StatusLine label="Ultima rejeicao" value={lastRejected ? statusShortReason(lastRejected.reason) : "Sem rejeicao recente"} tone={lastRejected ? "warning" : "success"} />
+      <p className="pt-1 text-xs leading-5 text-slate-500">
+        Se o canal fica quieto, normalmente e porque o filtro premium nao encontrou desconto real ou item com apelo suficiente.
+      </p>
+    </div>
+  );
+}
+
+function DecisionTable({ rows }) {
+  if (!rows.length) return <EmptyState title="Sem decisoes recentes" text="As decisoes aparecem quando o pipeline processa ofertas." />;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[720px] text-left text-sm">
+        <thead className="text-xs uppercase text-slate-500">
+          <tr className="border-b border-slate-800">
+            <th className="py-3 pr-4 font-medium">Produto</th>
+            <th className="py-3 pr-4 font-medium">Preco</th>
+            <th className="py-3 pr-4 font-medium">Status</th>
+            <th className="py-3 pr-4 font-medium">Motivo</th>
+            <th className="py-3 font-medium">Hora</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className="border-b border-slate-900/80">
+              <td className="max-w-[340px] py-3 pr-4">
+                <p className="truncate font-medium text-slate-200">{row.title}</p>
+                <p className="text-xs text-slate-600">{row.store || "Amazon"} · {row.category}</p>
+              </td>
+              <td className="py-3 pr-4 text-slate-300">
+                {money(row.currentPrice)}
+                {row.discountPercent ? <span className="ml-2 text-xs text-emerald-400">{Math.round(row.discountPercent)}%</span> : null}
+              </td>
+              <td className="py-3 pr-4"><StatusBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge></td>
+              <td className="max-w-[260px] py-3 pr-4 text-xs text-slate-500">{row.reason}</td>
+              <td className="py-3 text-xs text-slate-500">{row.at ? formatDate(row.at) : ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-md border border-slate-700 bg-black/95 px-3 py-2 shadow-xl">
+      {label ? <p className="mb-1 text-xs text-slate-500">{label}</p> : null}
+      {payload.map((item) => (
+        <p key={item.name || item.dataKey} className="text-xs text-slate-200">
+          <span className="mr-2 inline-block size-2 rounded-full" style={{ background: item.color || item.payload?.color }} />
+          {item.name || item.dataKey}: <span className="font-semibold">{item.value}</span>
+        </p>
+      ))}
     </div>
   );
 }
@@ -250,7 +468,7 @@ const AGENTS = [
     name: "Discovery",
     description: "Amazon scraper + RSS Pelando/Zoom",
     icon: Search,
-    schedule: "A cada 2h via cron"
+    schedule: "A cada 1h via cron"
   },
   {
     key: "validation",
@@ -310,9 +528,9 @@ function PipelineView({ state, action, api, loading }) {
           {AGENTS.map((agent) => {
             const Icon = agent.icon;
             return (
-              <div key={agent.key} className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+              <div key={agent.key} className="rounded-lg border border-slate-800 bg-black/30 p-4">
                 <div className="mb-3 flex items-center gap-3">
-                  <div className="grid size-9 place-items-center rounded-lg bg-violet-600/20 text-violet-400">
+                  <div className="grid size-9 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">
                     <Icon className="size-4" />
                   </div>
                   <div>
@@ -341,7 +559,7 @@ function PipelineView({ state, action, api, loading }) {
                 {publishLog.slice(0, 15).map((entry, i) => {
                   const offer = offers.find(o => o.id === entry.offerId);
                   return (
-                    <div key={entry.id || i} className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-950/30 px-3 py-2">
+                    <div key={entry.id || i} className="flex items-center gap-3 rounded-lg border border-slate-800 bg-black/30 px-3 py-2">
                       <div className={`size-2 rounded-full ${entry.result?.ok ? "bg-emerald-500" : "bg-rose-500"}`} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm text-slate-200">{offer?.title || entry.offerId || "Deal"}</p>
@@ -375,7 +593,7 @@ function PipelineView({ state, action, api, loading }) {
 
       <Panel
         title="Imagens AI"
-        count={`${offers.filter(o => o.generatedImagePath).length} geradas · ${offers.filter(o => o.imageStatus === "pending" || o.imageStatus === "generating").length} em processamento · pipeline: max 2 deals/ciclo`}
+        count={`${offers.filter(o => o.generatedImagePath).length} geradas · ${offers.filter(o => o.imageStatus === "pending" || o.imageStatus === "generating").length} em processamento · pipeline: max 4 deals/ciclo`}
       >
         <ImageGenPanel offers={offers} action={action} api={api} loading={loading} />
       </Panel>
@@ -438,17 +656,17 @@ function ImageGenPanel({ offers, action, api, loading }) {
           {active.map(offer => {
             const pct = progressFor(offer);
             return (
-              <div key={offer.id} className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
+              <div key={offer.id} className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
                 <div className="flex items-center gap-3">
-                  <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-violet-600/20 text-violet-400">
+                  <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">
                     <Loader2 className="size-4 animate-spin" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-100">{offer.title}</p>
-                    <p className="text-xs text-violet-400">{stageLabel(offer)}</p>
+                    <p className="text-xs text-cyan-300">{stageLabel(offer)}</p>
                     <div className="mt-2 h-1.5 rounded-full bg-slate-800">
                       <div
-                        className="h-1.5 rounded-full bg-violet-500 transition-all duration-1000"
+                        className="h-1.5 rounded-full bg-cyan-500 transition-all duration-1000"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -468,7 +686,7 @@ function ImageGenPanel({ offers, action, api, loading }) {
             Geracao manual ({needsManual.length} ofertas legadas)
           </p>
           {needsManual.map(offer => (
-            <div key={offer.id} className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/30 p-3">
+            <div key={offer.id} className="flex items-center gap-3 rounded-lg border border-slate-800 bg-black/30 p-3">
               {offer.imageUrl ? (
                 <img src={offer.imageUrl} alt="" className="size-10 shrink-0 rounded-lg object-cover ring-1 ring-slate-700" />
               ) : (
@@ -497,7 +715,7 @@ function ImageGenPanel({ offers, action, api, loading }) {
       )}
 
       {active.length === 0 && needsManual.length === 0 && (
-        <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+        <div className="flex items-center gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
           <CheckCircle2 className="size-5 shrink-0 text-emerald-400" />
           <div>
             <p className="text-sm font-medium text-emerald-300">Todas as imagens geradas</p>
@@ -512,7 +730,7 @@ function ImageGenPanel({ offers, action, api, loading }) {
 function FunnelStep({ label, value, max, tone }) {
   const percent = max > 0 ? Math.round((value / max) * 100) : 0;
   const barColors = {
-    brand: "bg-violet-500",
+    brand: "bg-cyan-500",
     cyan: "bg-cyan-500",
     success: "bg-emerald-500",
     danger: "bg-rose-500",
@@ -525,7 +743,7 @@ function FunnelStep({ label, value, max, tone }) {
         <span className="font-medium text-slate-300">{value} <span className="text-slate-600">({percent}%)</span></span>
       </div>
       <div className="h-2 rounded-full bg-slate-800">
-        <div className={`h-2 rounded-full transition-all ${barColors[tone] || "bg-violet-500"}`} style={{ width: `${percent}%` }} />
+        <div className={`h-2 rounded-full transition-all ${barColors[tone] || "bg-cyan-500"}`} style={{ width: `${percent}%` }} />
       </div>
     </div>
   );
@@ -555,8 +773,8 @@ function FeedView({ state }) {
             onClick={() => setChannelFilter(ch)}
             className={`rounded-lg border px-3 py-1.5 text-sm transition ${
               channelFilter === ch
-                ? "border-violet-500/50 bg-violet-600/20 text-violet-300"
-                : "border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300"
+                : "border-slate-700 bg-[#0a0a0a] text-slate-400 hover:bg-slate-800 hover:text-slate-200"
             }`}
           >
             {ch === "all" ? "Todos" : channelLabel(ch)}
@@ -575,7 +793,7 @@ function FeedView({ state }) {
           {filtered.map((entry, i) => {
             const offer = offers.find(o => o.id === entry.offerId);
             return (
-              <article key={entry.id || i} className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+              <article key={entry.id || i} className="rounded-lg border border-slate-800 bg-[#0a0a0a] p-4">
                 <div className="flex items-start gap-4">
                   {offer?.imageUrl || offer?.generatedImagePath ? (
                     <img
@@ -661,7 +879,7 @@ function RejectedView({ state }) {
               ? entry.item.title
               : entry.offer?.title || entry.item.text?.slice(0, 80) || "Draft";
             return (
-              <article key={entry.item.id || i} className="rounded-xl border border-rose-500/10 bg-slate-900 p-4">
+              <article key={entry.item.id || i} className="rounded-lg border border-rose-500/10 bg-[#0a0a0a] p-4">
                 <div className="flex items-start gap-3">
                   <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-rose-500/10 text-rose-400">
                     <AlertTriangle className="size-4" />
@@ -693,7 +911,7 @@ function RejectedView({ state }) {
 
 function ConfigView({ state, loading, action, api }) {
   const telegram = state.diagnostics?.telegram;
-  const configInputClass = "h-11 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition";
+  const configInputClass = "h-11 w-full rounded-lg border border-slate-700 bg-black px-3 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20";
 
   return (
     <div className="space-y-5">
@@ -734,15 +952,15 @@ function ConfigView({ state, loading, action, api }) {
 
           <Panel title="Telegram" count={telegram?.ready ? "Configurado" : "Revisar credenciais"}>
             <div className="space-y-2 text-sm text-slate-400">
-              <div className="flex justify-between rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2">
+              <div className="flex justify-between rounded-lg border border-slate-800 bg-black/30 px-3 py-2">
                 <span>Bot token</span>
                 <StatusBadge tone={telegram?.hasBotToken ? "success" : "danger"}>{telegram?.hasBotToken ? "Ok" : "Ausente"}</StatusBadge>
               </div>
-              <div className="flex justify-between rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2">
+              <div className="flex justify-between rounded-lg border border-slate-800 bg-black/30 px-3 py-2">
                 <span>Chat ID</span>
                 <StatusBadge tone={telegram?.hasChatId ? "success" : "danger"}>{telegram?.hasChatId ? "Ok" : "Ausente"}</StatusBadge>
               </div>
-              <div className="flex justify-between rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2">
+              <div className="flex justify-between rounded-lg border border-slate-800 bg-black/30 px-3 py-2">
                 <span>Modo</span>
                 <StatusBadge tone={telegram?.dryRun ? "warning" : "success"}>{telegram?.dryRun ? "Dry-run" : "Real"}</StatusBadge>
               </div>
@@ -782,8 +1000,8 @@ function ConfigView({ state, loading, action, api }) {
         </div>
 
         <div className="col-span-12 xl:col-span-7 space-y-5">
-          <Panel title="Busca automatica" count="Cron a cada 2h — Amazon + RSS Pelando/Zoom">
-            <div className="mb-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+          <Panel title="Busca automatica" count="Cron a cada 1h — Amazon + RSS Pelando/Zoom">
+            <div className="mb-4 rounded-lg border border-slate-800 bg-black/30 p-4">
               <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
                 <StatusLine label="RSS Pelando" value="Ativo" tone="success" />
                 <StatusLine label="RSS Zoom" value="Ativo" tone="success" />
@@ -792,7 +1010,7 @@ function ConfigView({ state, loading, action, api }) {
             </div>
             <FormField label="URLs Amazon adicionais" help="Uma URL por linha para buscas personalizadas.">
               <textarea
-                className="min-h-28 w-full rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm text-slate-200 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition"
+                className="min-h-28 w-full rounded-lg border border-slate-700 bg-black p-3 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
                 defaultValue={(state.discovery?.amazon?.sourceUrls || []).join("\n")}
                 placeholder="https://www.amazon.com.br/s?k=ssd+nvme"
                 onBlur={(e) => action("discoveryUrls", () => api("/api/discovery/amazon/settings", {
@@ -836,7 +1054,7 @@ function RecentPublications({ publishLog, offers, limit = 8 }) {
       {recent.map((entry, i) => {
         const offer = offers.find(o => o.id === entry.offerId);
         return (
-          <div key={entry.id || i} className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-950/30 px-3 py-2.5">
+          <div key={entry.id || i} className="flex items-center gap-3 rounded-lg border border-slate-800 bg-black/30 px-3 py-2.5">
             <Activity className="size-3.5 shrink-0 text-emerald-400" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm text-slate-200">{offer?.title || entry.offerId}</p>
@@ -852,7 +1070,7 @@ function RecentPublications({ publishLog, offers, limit = 8 }) {
 
 function StatusLine({ label, value, tone = "neutral" }) {
   const toneClass = {
-    brand: "border-violet-500/20 bg-violet-500/10 text-violet-300",
+    brand: "border-cyan-500/20 bg-cyan-500/10 text-cyan-300",
     cyan: "border-cyan-500/20 bg-cyan-500/10 text-cyan-300",
     muted: "border-slate-700 bg-slate-800/40 text-slate-400",
     success: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
@@ -920,7 +1138,7 @@ function ToastStack({ toasts, setToasts }) {
       {toasts.map((item) => (
         <div
           key={item.id}
-          className={`flex items-start justify-between gap-3 rounded-xl border bg-slate-900 p-4 shadow-xl ${
+          className={`flex items-start justify-between gap-3 rounded-lg border bg-[#0a0a0a] p-4 shadow-xl ${
             item.tone === "error" ? "border-rose-500/30 text-rose-300" : "border-emerald-500/30 text-emerald-300"
           }`}
         >
@@ -946,7 +1164,7 @@ function ToastStack({ toasts, setToasts }) {
 function buildDashboardData(state, selectedPeriod) {
   const since = periodStart(selectedPeriod);
   const inPeriod = (date) => !since || (date && new Date(date) >= since);
-  const clicks = state.clicks.filter((click) => inPeriod(click.timestamp));
+  const clicks = (state.clicks || []).filter((click) => inPeriod(click.timestamp));
   const publishLog = state.publishLog || [];
   const publishedInPeriod = publishLog.filter(l => l.result?.ok && inPeriod(l.createdAt));
   const offers = state.offers || [];
@@ -958,7 +1176,21 @@ function buildDashboardData(state, selectedPeriod) {
   const healthTone = healthScore >= 80 ? "green" : healthScore >= 55 ? "warning" : "critical";
   const heatmap = buildHeatmap([...clicks.map((c) => c.timestamp), ...publishedInPeriod.map((l) => l.createdAt)].filter(Boolean));
   const channelBars = buildBars(countBy(publishLog.filter(l => l.result?.ok), l => channelLabel(l.channel)), () => "brand");
-  const categoryBars = buildBars(countBy(offers, o => o.category || "tech"), () => "success");
+  const categoryBars = buildBars(countBy(offers, o => displayCategory(o)), () => "success");
+  const timeline = buildTimeline(selectedPeriod, clicks, publishedInPeriod);
+  const categoryChart = categoryBars.map((item) => ({ ...item, color: "#38bdf8" }));
+  const channelChart = buildChannelChart(publishLog.filter(l => l.result?.ok));
+  const funnel = buildFunnelData(offers, publishLog);
+  const recentRejected = rejected
+    .map((offer) => ({
+      id: offer.id,
+      title: offer.title,
+      reason: offer.validationSummary || offer.rejectionReason || "Filtro premium/validacao AI",
+      at: offer.updatedAt || offer.createdAt
+    }))
+    .sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
+  const decisionRows = buildDecisionRows(offers, publishLog);
+  const nextPost = nextPostStatus(publishLog, state.diagnostics?.automation || {});
 
   return {
     clicksInPeriod: clicks.length,
@@ -971,8 +1203,100 @@ function buildDashboardData(state, selectedPeriod) {
     healthTone,
     heatmap,
     channelBars,
-    categoryBars
+    categoryBars,
+    timeline,
+    categoryChart,
+    channelChart,
+    funnel,
+    recentRejected,
+    decisionRows,
+    lastPublish: publishedInPeriod.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0] || null,
+    nextPostLabel: nextPost.label,
+    nextPostTone: nextPost.tone
   };
+}
+
+function buildTimeline(period, clicks, published) {
+  const days = period.mode ? (period.mode === "year" ? 12 : 31) : Math.min(period.days || 30, 30);
+  const buckets = new Map();
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(now.getDate() - i);
+    const key = date.toISOString().slice(0, 10);
+    buckets.set(key, {
+      key,
+      label: date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      posts: 0,
+      clicks: 0
+    });
+  }
+  for (const click of clicks) {
+    const key = new Date(click.timestamp).toISOString().slice(0, 10);
+    if (buckets.has(key)) buckets.get(key).clicks += 1;
+  }
+  for (const entry of published) {
+    const key = new Date(entry.createdAt).toISOString().slice(0, 10);
+    if (buckets.has(key)) buckets.get(key).posts += 1;
+  }
+  return [...buckets.values()];
+}
+
+function buildFunnelData(offers, publishLog) {
+  const publishedOfferIds = new Set(publishLog.filter((entry) => entry.channel === "telegram" && entry.result?.ok).map((entry) => entry.offerId));
+  const validated = offers.filter((offer) => !["rejected", "blocked", "failed"].includes(offer.status)).length;
+  const rejected = offers.filter((offer) => ["rejected", "blocked", "failed"].includes(offer.status)).length;
+  return [
+    { label: "Descobertos", value: offers.length, color: "#38bdf8" },
+    { label: "Validados", value: validated, color: "#22c55e" },
+    { label: "Publicados", value: publishedOfferIds.size, color: "#14b8a6" },
+    { label: "Rejeitados", value: rejected, color: "#f59e0b" }
+  ];
+}
+
+function buildChannelChart(published) {
+  const colors = { Telegram: "#22c55e", Discord: "#60a5fa", "Twitter/X": "#a78bfa", Admin: "#f59e0b" };
+  return Object.entries(countBy(published, (entry) => channelLabel(entry.channel)))
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, value]) => ({ label, value, color: colors[label] || "#94a3b8" }));
+}
+
+function buildDecisionRows(offers, publishLog) {
+  const lastTelegramByOffer = new Map();
+  for (const entry of publishLog.filter((item) => item.channel === "telegram")) {
+    if (!lastTelegramByOffer.has(entry.offerId)) lastTelegramByOffer.set(entry.offerId, entry);
+  }
+  return offers
+    .map((offer) => {
+      const publish = lastTelegramByOffer.get(offer.id);
+      const status = publish?.result?.ok ? "published" : offer.status || "queued";
+      return {
+        id: offer.id,
+        title: offer.title,
+        store: offer.store,
+        category: displayCategory(offer),
+        currentPrice: offer.currentPrice,
+        discountPercent: offer.discountPercent,
+        status,
+        reason: publish?.result?.ok
+          ? `Telegram msg #${publish.result.providerMessageId}`
+          : statusShortReason(offer.validationSummary || offer.rejectionReason || offer.sourceWarnings?.[0] || "Aguardando pipeline"),
+        at: publish?.createdAt || offer.updatedAt || offer.createdAt
+      };
+    })
+    .sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0))
+    .slice(0, 9);
+}
+
+function nextPostStatus(publishLog, automation) {
+  const lastTelegram = publishLog
+    .filter((entry) => entry.channel === "telegram" && entry.result?.ok)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+  if (!lastTelegram) return { label: "Livre agora", tone: "success" };
+  const minMinutes = Number(automation.minPublicationIntervalMinutes || 15);
+  const elapsed = (Date.now() - new Date(lastTelegram.createdAt).getTime()) / 60000;
+  if (elapsed >= minMinutes) return { label: "Livre agora", tone: "success" };
+  return { label: `${Math.ceil(minMinutes - elapsed)} min`, tone: "warning" };
 }
 
 function periodStart(period) {
@@ -1027,6 +1351,26 @@ function statusLabel(status) {
   }[status] || status;
 }
 
+function displayCategory(offer = {}) {
+  const text = `${offer.title || ""} ${offer.category || ""}`.toLowerCase();
+  if (text.includes("notebook") || text.includes("laptop") || text.includes("macbook")) return "Notebook";
+  if (text.includes("smart tv") || text.includes("televis") || text.includes(" tv") || text.includes("oled") || text.includes("qled")) return "TV";
+  if (text.includes("monitor")) return "Monitor";
+  if (text.includes("mesa") || text.includes("desk") || text.includes("escrivaninha")) return "Mesa";
+  if (text.includes("headset") || text.includes("fone") || text.includes("soundcore") || text.includes("jbl")) return "Audio";
+  if (text.includes("ssd") || text.includes("nvme")) return "SSD";
+  if (text.includes("roteador") || text.includes("deco") || text.includes("router")) return "Rede";
+  if (text.includes("teclado")) return "Teclado";
+  if (text.includes("mouse")) return "Mouse";
+  return offer.category && offer.category !== "tech" ? offer.category : "Tech";
+}
+
+function statusShortReason(reason = "") {
+  const clean = String(reason || "").replace(/_/g, " ").trim();
+  if (!clean) return "Sem motivo registrado";
+  return clean.length > 72 ? `${clean.slice(0, 72)}...` : clean;
+}
+
 function formatDate(value) {
   return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
@@ -1040,20 +1384,20 @@ function intensity(count, max) { return max ? Math.ceil((count / max) * 5) : 0; 
 function heatClass(level) {
   return [
     "border-slate-800 bg-slate-800",
-    "border-violet-500/20 bg-violet-500/10",
-    "border-violet-500/30 bg-violet-500/20",
-    "border-violet-500/40 bg-violet-500/40",
-    "border-violet-500/60 bg-violet-500/60",
-    "border-violet-400 bg-violet-500"
+    "border-cyan-500/20 bg-cyan-500/10",
+    "border-cyan-500/30 bg-cyan-500/20",
+    "border-cyan-500/40 bg-cyan-500/40",
+    "border-cyan-500/60 bg-cyan-500/60",
+    "border-cyan-400 bg-cyan-500"
   ][level] || "border-slate-800 bg-slate-800";
 }
 
 function barClass(tone) {
   return {
     success: "bg-emerald-500",
-    brand: "bg-violet-500",
+    brand: "bg-cyan-500",
     cyan: "bg-cyan-500",
     danger: "bg-rose-500",
     warning: "bg-amber-500"
-  }[tone] || "bg-violet-500";
+  }[tone] || "bg-cyan-500";
 }
