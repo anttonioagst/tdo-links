@@ -411,7 +411,9 @@ test("Amazon scrape includes curated promotion searches after configured URLs", 
     amazonSearchUrls: ["https://www.amazon.com.br/s?k=ssd+nvme"]
   });
   assert.equal(urls[0], "https://www.amazon.com.br/s?k=ssd+nvme");
-  assert.ok(urls.some((url) => url.includes("mouse+logitech+sem+fio")));
+  assert.ok(urls.some((url) => url.includes("s?k=logitech")));
+  assert.ok(urls.some((url) => url.includes("s?k=razer")));
+  assert.ok(urls.some((url) => url.includes("s?k=hyperx")));
   assert.ok(urls.some((url) => url.includes("deals-promo-filter=1")));
 });
 

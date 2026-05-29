@@ -12,12 +12,16 @@ export function loadConfig(env = process.env) {
     scraperMode: env.SCRAPER_MODE || "mock",
     scraperFallbackMock: env.SCRAPER_FALLBACK_MOCK !== "false",
     amazonSearchUrls: parseList(env.AMAZON_SEARCH_URLS || [
-      "https://www.amazon.com.br/s?k=ssd+nvme&deals-promo-filter=1",
-      "https://www.amazon.com.br/s?k=fone+sony&deals-promo-filter=1",
-      "https://www.amazon.com.br/s?k=headset+hyperx&deals-promo-filter=1",
-      "https://www.amazon.com.br/s?k=teclado+logitech&deals-promo-filter=1",
-      "https://www.amazon.com.br/s?k=monitor+gamer&deals-promo-filter=1",
-      "https://www.amazon.com.br/s?k=roteador+tp+link&deals-promo-filter=1"
+      "https://www.amazon.com.br/s?k=logitech&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=hyperx&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=razer&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=jbl&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=anker+soundcore&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=sony+fone&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=kingston+ssd&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=samsung+ssd&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=lg+ultragear&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=tp+link+deco&deals-promo-filter=1"
     ].join(",")),
     disclosure: env.AFFILIATE_DISCLOSURE || "Link de afiliado: posso receber comissao pela compra.",
     amazonAffiliateTag: env.AMAZON_AFFILIATE_TAG || "",
