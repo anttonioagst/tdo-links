@@ -71,7 +71,7 @@ function buildTelegramCopy(offer, hook) {
     : (offer.store || "Loja");
 
   return [
-    `📌 ${offer.title || "Oferta Tech"}`,
+    `📌 <b>${offer.title || "Oferta Tech"}</b>`,
     "",
     hook,
     "",

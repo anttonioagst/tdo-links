@@ -28,7 +28,7 @@ import { telegramPublicationStatus } from "../src/publication-policy.js";
 import { buildAmazonSearchUrl, normalizeDiscoverySettings, runAmazonDiscovery } from "../src/discovery.js";
 import { shouldRunAmazonDiscovery, runDiscoverySchedulerTick } from "../src/discovery-scheduler.js";
 import { discoveryCandidateLimit, selectDiscoveryCandidates } from "../src/agents/discovery.js";
-import { premiumCurationScore, selectPremiumCandidates } from "../src/premium-curation.js";
+import { normalizePremiumCategory, premiumCurationScore, selectPremiumCandidates } from "../src/premium-curation.js";
 import {
   commandItems,
   statusTone,
@@ -143,6 +143,7 @@ test("Telegram copy uses approved promotion price format", () => {
   }, "https://www.amazon.com.br/dp/B09XS7JWHH?tag=tdolinks-20", "");
 
   assert.match(copy, /🔥 De <s>R\$\s?2\.199,00<\/s> por <b>R\$\s?1\.499,00<\/b> \(32% OFF\)/);
+  assert.match(copy, /📌 <b>Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth<\/b>/);
   assert.doesNotMatch(copy, /🔥 Por <b?>?R\$/);
 });
 
@@ -274,6 +275,7 @@ test("creative fallback keeps Telegram promotion format with strikethrough and b
   }, { reason: "bom desconto" }, {});
 
   assert.match(result.copy.telegram, /🔥 De <s>R\$\s?2199,00<\/s> por <b>R\$\s?1499,00<\/b> \(32% OFF\)/);
+  assert.match(result.copy.telegram, /📌 <b>Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth<\/b>/);
   assert.doesNotMatch(result.copy.telegram, /🔥 Por <b>R\$/);
 });
 
@@ -330,6 +332,25 @@ test("premium curation treats price as quality signal, not a hard minimum", () =
   }, {});
 
   assert.ok(score > 0);
+});
+
+test("premium curation recognizes bigger setup categories", () => {
+  assert.equal(normalizePremiumCategory({ title: "Notebook Dell Inspiron 15" }), "notebook");
+  assert.equal(normalizePremiumCategory({ title: "Smart TV Samsung 55 polegadas 4K" }), "tv");
+  assert.equal(normalizePremiumCategory({ title: "Mesa Gamer Husky Gaming 140cm" }), "mesa");
+});
+
+test("premium curation accepts premium large-ticket deals", () => {
+  const candidates = selectPremiumCandidates([
+    { title: "Smart TV Samsung 55 polegadas 4K", currentPrice: 2199, previousPrice: 2799, discountPercent: 21, rating: 4.7, reviewCount: 900 },
+    { title: "Notebook Dell Inspiron 15 i7", currentPrice: 3899, previousPrice: 4599, discountPercent: 15, rating: 4.6, reviewCount: 600 },
+    { title: "Mesa Gamer Husky Gaming 140cm", currentPrice: 699, previousPrice: 999, discountPercent: 30, rating: 4.7, reviewCount: 250 }
+  ], 3, {});
+
+  assert.deepEqual(
+    candidates.map((offer) => normalizePremiumCategory(offer)).sort(),
+    ["mesa", "notebook", "tv"]
+  );
 });
 
 test("learning profile boosts offers similar to clicked winners", () => {

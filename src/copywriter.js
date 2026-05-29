@@ -95,7 +95,7 @@ export function telegramCopy(offer, url, disclosure) {
   const hook = isPremium ? premiumLine(offer) : `Aproveite esta oferta exclusiva na ${store} antes que acabe!`;
 
   return [
-    `📌 ${offer.title}`,
+    `📌 <b>${offer.title}</b>`,
     "",
     hook,
     "",

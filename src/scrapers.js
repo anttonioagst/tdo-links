@@ -61,7 +61,13 @@ const CURATED_PROMOTION_SEARCH_URLS = [
   "https://www.amazon.com.br/s?k=kingston+ssd&s=review-rank&deals-promo-filter=1",
   "https://www.amazon.com.br/s?k=samsung+ssd&s=review-rank&deals-promo-filter=1",
   "https://www.amazon.com.br/s?k=lg+ultragear&s=review-rank&deals-promo-filter=1",
-  "https://www.amazon.com.br/s?k=tp+link+deco&s=review-rank&deals-promo-filter=1"
+  "https://www.amazon.com.br/s?k=tp+link+deco&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=notebook+dell&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=notebook+lenovo&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=smart+tv+samsung&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=smart+tv+lg&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=mesa+gamer&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=mesa+escrivaninha&s=review-rank&deals-promo-filter=1"
 ];
 
 export async function scrapeDeals(config = {}) {

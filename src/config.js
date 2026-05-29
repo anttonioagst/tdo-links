@@ -21,7 +21,13 @@ export function loadConfig(env = process.env) {
       "https://www.amazon.com.br/s?k=kingston+ssd&deals-promo-filter=1",
       "https://www.amazon.com.br/s?k=samsung+ssd&deals-promo-filter=1",
       "https://www.amazon.com.br/s?k=lg+ultragear&deals-promo-filter=1",
-      "https://www.amazon.com.br/s?k=tp+link+deco&deals-promo-filter=1"
+      "https://www.amazon.com.br/s?k=tp+link+deco&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=notebook+dell&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=notebook+lenovo&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=smart+tv+samsung&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=smart+tv+lg&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=mesa+gamer&deals-promo-filter=1",
+      "https://www.amazon.com.br/s?k=mesa+escrivaninha&deals-promo-filter=1"
     ].join(",")),
     disclosure: env.AFFILIATE_DISCLOSURE || "Link de afiliado: posso receber comissao pela compra.",
     amazonAffiliateTag: env.AMAZON_AFFILIATE_TAG || "",

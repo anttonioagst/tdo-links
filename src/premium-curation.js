@@ -4,7 +4,8 @@ const DEFAULT_PREMIUM_BRANDS = [
   "logitech", "hyperx", "razer", "sony", "jbl", "samsung", "lg", "dell",
   "kingston", "sandisk", "anker", "soundcore", "tp-link", "corsair",
   "steelseries", "crucial", "wd", "western digital", "aoc", "asus", "lenovo",
-  "apple", "xiaomi", "philips", "benq", "gigabyte", "msi", "seagate"
+  "apple", "xiaomi", "philips", "benq", "gigabyte", "msi", "seagate",
+  "acer", "tcl", "hisense", "husky", "elements", "flexform"
 ];
 
 const DEFAULT_SECONDARY_BRANDS = [
@@ -12,12 +13,14 @@ const DEFAULT_SECONDARY_BRANDS = [
 ];
 
 const CATEGORY_KEYWORDS = [
+  ["tv", ["smart tv", "televisão", "televisao", "tv ", " tv", "oled", "qled", "crystal uhd"]],
   ["headset", ["headset", "fone", "earbud", "wh-1000", "soundcore", "jbl", "sony"]],
   ["ssd", ["ssd", "nvme", "m.2", "kingston", "sandisk", "crucial", "wd", "seagate"]],
   ["monitor", ["monitor", "display", "aoc", "lg ultragear", "benq"]],
   ["teclado", ["teclado", "keyboard"]],
   ["mouse", ["mouse", "mx master", "g502", "deathadder", "basilisk"]],
-  ["notebook", ["notebook", "laptop", "macbook", "ideapad", "vivobook"]],
+  ["notebook", ["notebook", "laptop", "macbook", "ideapad", "vivobook", "inspiron", "aspire"]],
+  ["mesa", ["mesa", "desk", "standing desk", "escrivaninha", "bancada"]],
   ["roteador", ["roteador", "router", "mesh", "deco", "tp-link"]],
   ["audio", ["caixa de som", "speaker", "soundbar"]],
   ["smart_home", ["echo", "alexa", "smart", "camera"]]
@@ -26,8 +29,10 @@ const CATEGORY_KEYWORDS = [
 const CATEGORY_POINTS = {
   headset: 12,
   ssd: 12,
+  tv: 12,
   monitor: 11,
   notebook: 11,
+  mesa: 8,
   roteador: 9,
   teclado: 7,
   audio: 9,
