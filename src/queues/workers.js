@@ -5,6 +5,7 @@ import { publishDeal } from "../agents/publisher.js";
 import { creativeQueue, publishQueue } from "./index.js";
 import { hasRealPromotion } from "../deals.js";
 import { telegramPublicationStatus } from "../publication-policy.js";
+import { enqueuePendingTelegramOffers } from "../publication-recovery.js";
 
 export function startWorkers(db, config, connection) {
   const opts = { connection, concurrency: 1 };
@@ -130,17 +131,6 @@ export function startWorkers(db, config, connection) {
     // Quota check: max N publications per window before enqueuing creative
     const publication = telegramPublicationStatus(db.state.publishLog || [], config);
 
-    if (!publication.allowed && publication.reason === "telegram_quota_reached") {
-      console.log("job_done", JSON.stringify({
-        queue: "validation", title: offer?.title, result: publication.reason,
-        recentPublished: publication.recentPublished,
-        maxPerCycle: publication.maxPerCycle,
-        windowHours: publication.windowHours,
-        waitMinutes: publication.waitMinutes
-      }));
-      return { ...validationResult, passes: false, reason: publication.reason };
-    }
-
     // Insert validated offer to DB so the UI shows image generation progress
     const canonicalUrl = (offer.originalUrl || offer.url || "").split("?")[0];
     let offerWithId = db.state.offers.find(o =>
@@ -159,6 +149,25 @@ export function startWorkers(db, config, connection) {
       };
       db.state.offers.unshift(offerWithId);
       await db.save();
+    }
+
+    if (!publication.allowed) {
+      const delay = Math.max(1, publication.waitMinutes) * 60 * 1000;
+      if (creativeQueue) {
+        await creativeQueue.add("creative", { offer: offerWithId, validationResult }, {
+          delay,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 30000 },
+          jobId: `delayed_creative_${offerWithId.id}`
+        });
+      }
+      console.log("job_done", JSON.stringify({
+        queue: "validation", title: offer?.title, result: "delayed_creative",
+        reason: publication.reason,
+        offerId: offerWithId.id,
+        waitMinutes: publication.waitMinutes
+      }));
+      return { ...validationResult, passes, delayed: true, reason: publication.reason };
     }
 
     if (creativeQueue) {
@@ -183,16 +192,26 @@ export function startWorkers(db, config, connection) {
 
     // Second quota gate — prevents backlogged creative jobs from all publishing at once
     const publication = telegramPublicationStatus(db.state.publishLog || [], config);
-    if (!publication.allowed && publication.reason === "telegram_quota_reached") {
+    if (!publication.allowed) {
+      const delay = Math.max(1, publication.waitMinutes) * 60 * 1000;
+      if (creativeQueue) {
+        await creativeQueue.add("creative", job.data, {
+          delay,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 30000 },
+          jobId: `delayed_creative_${offer.id}`
+        });
+      }
       console.log("job_done", JSON.stringify({
         queue: "creative",
         title: offer?.title,
-        result: publication.reason,
+        result: "rescheduled",
+        reason: publication.reason,
         recentPublished: publication.recentPublished,
         maxPerCycle: publication.maxPerCycle,
         waitMinutes: publication.waitMinutes
       }));
-      return { skipped: true, reason: publication.reason };
+      return { skipped: true, rescheduled: true, reason: publication.reason, waitMinutes: publication.waitMinutes };
     }
 
     const content = await createContent(offer, validationResult, config);
@@ -233,5 +252,20 @@ export function startWorkers(db, config, connection) {
   }
 
   console.log("workers_started", JSON.stringify({ queues: ["scrape", "imagegen", "publish", "validation", "creative"] }));
+
+  setInterval(() => {
+    enqueuePendingTelegramOffers(db, config, creativeQueue)
+      .then((result) => {
+        if (result.enqueued || result.reason !== "ok") {
+          console.log("publication_recovery", JSON.stringify(result));
+        }
+      })
+      .catch((err) => console.error("publication_recovery_failed", JSON.stringify({ error: err.message })));
+  }, 5 * 60 * 1000);
+
+  enqueuePendingTelegramOffers(db, config, creativeQueue)
+    .then((result) => console.log("publication_recovery_startup", JSON.stringify(result)))
+    .catch((err) => console.error("publication_recovery_startup_failed", JSON.stringify({ error: err.message })));
+
   return allWorkers;
 }

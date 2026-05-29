@@ -232,5 +232,5 @@ function telegramProviderFailure(error) {
 }
 
 function offerImages(offer) {
-  return [...new Set([...(offer?.imageUrls || []), offer?.imageUrl].filter((url) => /^https?:\/\//.test(url || "")))].slice(0, 1);
+  return [...new Set([...(offer?.imageUrls || []), offer?.imageUrl].filter((url) => /^https?:\/\//.test(url || "")))].slice(0, 4);
 }
