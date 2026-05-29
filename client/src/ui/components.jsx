@@ -45,7 +45,7 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
   return (
     <aside className={`fixed inset-y-0 left-0 z-50 w-[86px] border-r border-slate-800 bg-[#050505] px-3 py-4 text-white transition ${railState}`}>
       <button
-        className="mb-6 grid size-12 place-items-center rounded-lg border border-cyan-400/20 bg-cyan-500 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-950/30 transition hover:bg-cyan-400"
+        className="mb-6 grid size-12 place-items-center rounded-lg border border-zinc-500/30 bg-zinc-200 text-sm font-bold text-zinc-950 shadow-lg shadow-black/30 transition hover:bg-white"
         onClick={() => {
           setView("overview");
           setMobileOpen(false);
@@ -53,7 +53,7 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
         type="button"
         aria-label="Ir para Performance"
       >
-        <span className="text-white font-bold text-base">T</span>
+        <span className="text-base font-bold text-zinc-950">T</span>
       </button>
       <nav className="space-y-2">
         {commandItems.map(({ icon: Icon, label, view: itemView }) => {
@@ -64,7 +64,7 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
               className={cn(
                 "group relative grid size-12 place-items-center rounded-lg transition",
                 isActive
-                  ? "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/30"
+                  ? "bg-white/10 text-white ring-1 ring-zinc-500/40"
                   : "text-slate-500 hover:bg-slate-800 hover:text-slate-200"
               )}
               key={itemView}
@@ -138,13 +138,13 @@ export function Panel({ title, count, children, density = "comfortable", action 
 
 export function QueueColumn({ title, count, children, tone = "brand" }) {
   const accentClass = {
-    brand: "bg-cyan-500",
+    brand: "bg-zinc-400",
     success: "bg-emerald-500",
     warning: "bg-amber-500",
     danger: "bg-rose-500",
-    cyan: "bg-cyan-500",
+    cyan: "bg-zinc-400",
     muted: "bg-slate-500"
-  }[tone] || "bg-cyan-500";
+  }[tone] || "bg-zinc-400";
 
   return (
     <Panel
@@ -217,12 +217,12 @@ export function ActionButton({
 
 export function MetricTile({ icon: Icon, label, value, tone = "brand", detail }) {
   const iconTone = {
-    brand: "bg-cyan-500/15 text-cyan-400",
+    brand: "bg-zinc-700/35 text-zinc-200",
     success: "bg-emerald-500/15 text-emerald-400",
     warning: "bg-amber-500/15 text-amber-400",
     danger: "bg-rose-500/15 text-rose-400",
-    cyan: "bg-cyan-500/15 text-cyan-400"
-  }[tone] || "bg-cyan-500/15 text-cyan-400";
+    cyan: "bg-zinc-700/35 text-zinc-200"
+  }[tone] || "bg-zinc-700/35 text-zinc-200";
 
   return (
     <Card>

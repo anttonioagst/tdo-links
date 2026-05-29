@@ -127,7 +127,7 @@ export default function App() {
   if (!state || !data) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#050505] text-slate-400">
-        <Loader2 className="mr-3 size-5 animate-spin text-cyan-400" />
+        <Loader2 className="mr-3 size-5 animate-spin text-zinc-300" />
         Carregando TDO Links...
       </div>
     );
@@ -233,7 +233,7 @@ function CommandHero({ state, data, loading, action, api }) {
   const statusText = telegram?.ready ? "Autopilot online" : "Revisar Telegram";
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-800 bg-[linear-gradient(135deg,#050505_0%,#0a0a0a_52%,#111827_100%)] p-4 shadow-2xl shadow-black/30 md:p-5">
+    <section className="overflow-hidden rounded-lg border border-slate-800 bg-[linear-gradient(135deg,#050505_0%,#0a0a0a_55%,#181818_100%)] p-4 shadow-2xl shadow-black/30 md:p-5">
       <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
         <div className="min-w-0">
           <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -280,9 +280,9 @@ function CommandStat({ icon: Icon, label, value, tone = "brand" }) {
     success: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
     warning: "text-amber-300 bg-amber-500/10 border-amber-500/20",
     danger: "text-rose-300 bg-rose-500/10 border-rose-500/20",
-    cyan: "text-cyan-300 bg-cyan-500/10 border-cyan-500/20",
-    brand: "text-blue-300 bg-blue-500/10 border-blue-500/20"
-  }[tone] || "text-blue-300 bg-blue-500/10 border-blue-500/20";
+    cyan: "text-zinc-200 bg-zinc-700/30 border-zinc-600/40",
+    brand: "text-zinc-200 bg-zinc-700/30 border-zinc-600/40"
+  }[tone] || "text-zinc-200 bg-zinc-700/30 border-zinc-600/40";
 
   return (
     <div className={`rounded-lg border p-3 ${color}`}>
@@ -300,7 +300,7 @@ function PeriodSelect({ period, setPeriod }) {
     <select
       value={period}
       onChange={(e) => setPeriod(e.target.value)}
-      className="h-9 rounded-md border border-slate-700 bg-black px-3 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+      className="h-9 rounded-md border border-slate-700 bg-black px-3 text-sm text-slate-200 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-500/20"
     >
       {periods.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
     </select>
@@ -314,20 +314,20 @@ function ActivityChart({ data }) {
         <AreaChart data={data} margin={{ left: -18, right: 8, top: 12, bottom: 0 }}>
           <defs>
             <linearGradient id="postsFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#22c55e" stopOpacity={0.32} />
-              <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+              <stop offset="5%" stopColor="#f4f4f5" stopOpacity={0.24} />
+              <stop offset="95%" stopColor="#f4f4f5" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="clicksFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.28} />
-              <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
+              <stop offset="5%" stopColor="#a1a1aa" stopOpacity={0.28} />
+              <stop offset="95%" stopColor="#a1a1aa" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 12 }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fill: "#64748b", fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
           <Tooltip content={<ChartTooltip />} />
-          <Area type="monotone" dataKey="posts" name="Posts" stroke="#22c55e" fill="url(#postsFill)" strokeWidth={2} />
-          <Area type="monotone" dataKey="clicks" name="Cliques" stroke="#38bdf8" fill="url(#clicksFill)" strokeWidth={2} />
+          <Area type="monotone" dataKey="posts" name="Posts" stroke="#f4f4f5" fill="url(#postsFill)" strokeWidth={2} />
+          <Area type="monotone" dataKey="clicks" name="Cliques" stroke="#a1a1aa" fill="url(#clicksFill)" strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -362,7 +362,7 @@ function CategoryBarChart({ data }) {
           <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fill: "#64748b", fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
           <Tooltip content={<ChartTooltip />} />
-          <Bar dataKey="value" fill="#38bdf8" radius={[6, 6, 0, 0]} />
+          <Bar dataKey="value" fill="#a1a1aa" radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -530,7 +530,7 @@ function PipelineView({ state, action, api, loading }) {
             return (
               <div key={agent.key} className="rounded-lg border border-slate-800 bg-black/30 p-4">
                 <div className="mb-3 flex items-center gap-3">
-                  <div className="grid size-9 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">
+                  <div className="grid size-9 place-items-center rounded-lg bg-zinc-700/30 text-zinc-200">
                     <Icon className="size-4" />
                   </div>
                   <div>
@@ -656,17 +656,17 @@ function ImageGenPanel({ offers, action, api, loading }) {
           {active.map(offer => {
             const pct = progressFor(offer);
             return (
-              <div key={offer.id} className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
+              <div key={offer.id} className="rounded-lg border border-zinc-700 bg-zinc-900/30 p-3">
                 <div className="flex items-center gap-3">
-                  <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">
+                  <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-zinc-700/30 text-zinc-200">
                     <Loader2 className="size-4 animate-spin" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-100">{offer.title}</p>
-                    <p className="text-xs text-cyan-300">{stageLabel(offer)}</p>
+                    <p className="text-xs text-zinc-300">{stageLabel(offer)}</p>
                     <div className="mt-2 h-1.5 rounded-full bg-slate-800">
                       <div
-                        className="h-1.5 rounded-full bg-cyan-500 transition-all duration-1000"
+                        className="h-1.5 rounded-full bg-zinc-300 transition-all duration-1000"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -730,8 +730,8 @@ function ImageGenPanel({ offers, action, api, loading }) {
 function FunnelStep({ label, value, max, tone }) {
   const percent = max > 0 ? Math.round((value / max) * 100) : 0;
   const barColors = {
-    brand: "bg-cyan-500",
-    cyan: "bg-cyan-500",
+    brand: "bg-zinc-300",
+    cyan: "bg-zinc-300",
     success: "bg-emerald-500",
     danger: "bg-rose-500",
     warning: "bg-amber-500"
@@ -743,7 +743,7 @@ function FunnelStep({ label, value, max, tone }) {
         <span className="font-medium text-slate-300">{value} <span className="text-slate-600">({percent}%)</span></span>
       </div>
       <div className="h-2 rounded-full bg-slate-800">
-        <div className={`h-2 rounded-full transition-all ${barColors[tone] || "bg-cyan-500"}`} style={{ width: `${percent}%` }} />
+        <div className={`h-2 rounded-full transition-all ${barColors[tone] || "bg-zinc-300"}`} style={{ width: `${percent}%` }} />
       </div>
     </div>
   );
@@ -773,7 +773,7 @@ function FeedView({ state }) {
             onClick={() => setChannelFilter(ch)}
             className={`rounded-lg border px-3 py-1.5 text-sm transition ${
               channelFilter === ch
-                ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300"
+                ? "border-zinc-500/60 bg-white/10 text-white"
                 : "border-slate-700 bg-[#0a0a0a] text-slate-400 hover:bg-slate-800 hover:text-slate-200"
             }`}
           >
@@ -911,7 +911,7 @@ function RejectedView({ state }) {
 
 function ConfigView({ state, loading, action, api }) {
   const telegram = state.diagnostics?.telegram;
-  const configInputClass = "h-11 w-full rounded-lg border border-slate-700 bg-black px-3 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20";
+  const configInputClass = "h-11 w-full rounded-lg border border-slate-700 bg-black px-3 text-sm text-slate-200 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-500/20";
 
   return (
     <div className="space-y-5">
@@ -1010,7 +1010,7 @@ function ConfigView({ state, loading, action, api }) {
             </div>
             <FormField label="URLs Amazon adicionais" help="Uma URL por linha para buscas personalizadas.">
               <textarea
-                className="min-h-28 w-full rounded-lg border border-slate-700 bg-black p-3 text-sm text-slate-200 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+                className="min-h-28 w-full rounded-lg border border-slate-700 bg-black p-3 text-sm text-slate-200 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-500/20"
                 defaultValue={(state.discovery?.amazon?.sourceUrls || []).join("\n")}
                 placeholder="https://www.amazon.com.br/s?k=ssd+nvme"
                 onBlur={(e) => action("discoveryUrls", () => api("/api/discovery/amazon/settings", {
@@ -1070,8 +1070,8 @@ function RecentPublications({ publishLog, offers, limit = 8 }) {
 
 function StatusLine({ label, value, tone = "neutral" }) {
   const toneClass = {
-    brand: "border-cyan-500/20 bg-cyan-500/10 text-cyan-300",
-    cyan: "border-cyan-500/20 bg-cyan-500/10 text-cyan-300",
+    brand: "border-zinc-600/40 bg-zinc-800/35 text-zinc-200",
+    cyan: "border-zinc-600/40 bg-zinc-800/35 text-zinc-200",
     muted: "border-slate-700 bg-slate-800/40 text-slate-400",
     success: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
     warning: "border-amber-500/20 bg-amber-500/10 text-amber-300",
@@ -1178,7 +1178,7 @@ function buildDashboardData(state, selectedPeriod) {
   const channelBars = buildBars(countBy(publishLog.filter(l => l.result?.ok), l => channelLabel(l.channel)), () => "brand");
   const categoryBars = buildBars(countBy(offers, o => displayCategory(o)), () => "success");
   const timeline = buildTimeline(selectedPeriod, clicks, publishedInPeriod);
-  const categoryChart = categoryBars.map((item) => ({ ...item, color: "#38bdf8" }));
+  const categoryChart = categoryBars.map((item) => ({ ...item, color: "#a1a1aa" }));
   const channelChart = buildChannelChart(publishLog.filter(l => l.result?.ok));
   const funnel = buildFunnelData(offers, publishLog);
   const recentRejected = rejected
@@ -1247,15 +1247,15 @@ function buildFunnelData(offers, publishLog) {
   const validated = offers.filter((offer) => !["rejected", "blocked", "failed"].includes(offer.status)).length;
   const rejected = offers.filter((offer) => ["rejected", "blocked", "failed"].includes(offer.status)).length;
   return [
-    { label: "Descobertos", value: offers.length, color: "#38bdf8" },
-    { label: "Validados", value: validated, color: "#22c55e" },
-    { label: "Publicados", value: publishedOfferIds.size, color: "#14b8a6" },
-    { label: "Rejeitados", value: rejected, color: "#f59e0b" }
+    { label: "Descobertos", value: offers.length, color: "#d4d4d8" },
+    { label: "Validados", value: validated, color: "#a1a1aa" },
+    { label: "Publicados", value: publishedOfferIds.size, color: "#71717a" },
+    { label: "Rejeitados", value: rejected, color: "#52525b" }
   ];
 }
 
 function buildChannelChart(published) {
-  const colors = { Telegram: "#22c55e", Discord: "#60a5fa", "Twitter/X": "#a78bfa", Admin: "#f59e0b" };
+  const colors = { Telegram: "#d4d4d8", Discord: "#a1a1aa", "Twitter/X": "#71717a", Admin: "#52525b" };
   return Object.entries(countBy(published, (entry) => channelLabel(entry.channel)))
     .sort((a, b) => b[1] - a[1])
     .map(([label, value]) => ({ label, value, color: colors[label] || "#94a3b8" }));
@@ -1384,20 +1384,20 @@ function intensity(count, max) { return max ? Math.ceil((count / max) * 5) : 0; 
 function heatClass(level) {
   return [
     "border-slate-800 bg-slate-800",
-    "border-cyan-500/20 bg-cyan-500/10",
-    "border-cyan-500/30 bg-cyan-500/20",
-    "border-cyan-500/40 bg-cyan-500/40",
-    "border-cyan-500/60 bg-cyan-500/60",
-    "border-cyan-400 bg-cyan-500"
+    "border-zinc-700 bg-zinc-900",
+    "border-zinc-600 bg-zinc-800",
+    "border-zinc-500 bg-zinc-700",
+    "border-zinc-400 bg-zinc-600",
+    "border-zinc-300 bg-zinc-400"
   ][level] || "border-slate-800 bg-slate-800";
 }
 
 function barClass(tone) {
   return {
     success: "bg-emerald-500",
-    brand: "bg-cyan-500",
-    cyan: "bg-cyan-500",
+    brand: "bg-zinc-300",
+    cyan: "bg-zinc-300",
     danger: "bg-rose-500",
     warning: "bg-amber-500"
-  }[tone] || "bg-cyan-500";
+  }[tone] || "bg-zinc-300";
 }

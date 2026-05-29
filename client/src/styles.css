@@ -56,18 +56,18 @@
   --color-brand-900: #262e89;
   --color-brand-950: #161950;
 
-  --color-blue-light-25: #f5fbff;
-  --color-blue-light-50: #f0f9ff;
-  --color-blue-light-100: #e0f2fe;
-  --color-blue-light-200: #b9e6fe;
-  --color-blue-light-300: #7cd4fd;
-  --color-blue-light-400: #36bffa;
-  --color-blue-light-500: #0ba5ec;
-  --color-blue-light-600: #0086c9;
-  --color-blue-light-700: #026aa2;
-  --color-blue-light-800: #065986;
-  --color-blue-light-900: #0b4a6f;
-  --color-blue-light-950: #062c41;
+  --color-blue-light-25: #fafafa;
+  --color-blue-light-50: #f4f4f5;
+  --color-blue-light-100: #e4e4e7;
+  --color-blue-light-200: #d4d4d8;
+  --color-blue-light-300: #a1a1aa;
+  --color-blue-light-400: #71717a;
+  --color-blue-light-500: #52525b;
+  --color-blue-light-600: #3f3f46;
+  --color-blue-light-700: #27272a;
+  --color-blue-light-800: #18181b;
+  --color-blue-light-900: #09090b;
+  --color-blue-light-950: #050505;
 
   --color-gray-25: #fcfcfd;
   --color-gray-50: #f9fafb;
@@ -155,13 +155,13 @@
   --color-tdo-ink: #111827;
   --color-tdo-surface: #f6f7f9;
   --color-tdo-panel: #ffffff;
-  --color-tdo-blue: #2563eb;
-  --color-tdo-cyan: #06b6d4;
+  --color-tdo-blue: #a1a1aa;
+  --color-tdo-cyan: #71717a;
   --color-tdo-green: #10b981;
   --color-tdo-amber: #f59e0b;
   --color-tdo-red: #e11d48;
   --shadow-tdo-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 28px rgba(15, 23, 42, 0.04);
-  --shadow-tdo-glow: 0 14px 30px rgba(37, 99, 235, 0.35);
+  --shadow-tdo-glow: 0 14px 30px rgba(0, 0, 0, 0.45);
 }
 
 @layer base {
