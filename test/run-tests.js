@@ -1695,6 +1695,19 @@ test("publication recovery selects auto-ready Telegram offers that were not publ
         updatedAt: "2026-05-29T18:07:05.854Z"
       },
       {
+        id: "offer_better",
+        title: "Notebook Acer Aspire 5 Ryzen 5 16GB SSD",
+        status: "auto_ready",
+        currentPrice: 3979,
+        previousPrice: 5799,
+        discountPercent: 31,
+        rating: 4.7,
+        reviewCount: 1400,
+        imageUrls: ["https://m.media-amazon.com/images/I/notebook._AC_UL800_.jpg"],
+        createdAt: "2026-05-29T16:30:41.926Z",
+        updatedAt: "2026-05-29T16:30:49.907Z"
+      },
+      {
         id: "offer_published",
         title: "Fone Sony WH-1000XM5",
         status: "auto_ready",
@@ -1735,13 +1748,14 @@ test("publication recovery selects auto-ready Telegram offers that were not publ
       }
     ],
     publishLog: [
-      { channel: "telegram", offerId: "offer_published", result: { ok: true }, createdAt: "2026-05-29T18:10:00.000Z" }
+      { channel: "telegram", offerId: "offer_published", result: { ok: true }, createdAt: "2026-05-29T18:10:00.000Z" },
+      { channel: "telegram", offerId: "offer_pending", result: { ok: false, detail: "telegram_photo_required" }, createdAt: "2026-05-29T21:30:00.000Z" }
     ]
   };
 
   const pending = selectPendingTelegramOffers(state, 4, { now });
 
-  assert.deepEqual(pending.map((offer) => offer.id), ["offer_pending"]);
+  assert.deepEqual(pending.map((offer) => offer.id), ["offer_better"]);
 });
 
 test("Telegram publication policy allows four per hour with fifteen minute spacing", () => {
