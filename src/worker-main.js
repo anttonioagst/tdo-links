@@ -5,6 +5,7 @@ import { JsonDb } from "./db.js";
 import { initQueues, getConnection } from "./queues/index.js";
 import { startWorkers } from "./queues/workers.js";
 import { runDiscovery } from "./agents/discovery.js";
+import { enqueuePendingTelegramOffers } from "./publication-recovery.js";
 import cron from "node-cron";
 
 await loadEnvFile(resolve(".env"));
@@ -34,9 +35,14 @@ if (config.databaseUrl) {
 
 cron.schedule("*/15 * * * *", async () => {
   console.log("cron_trigger discovery");
-  runDiscovery(db, config).catch(err =>
-    console.error("cron_discovery_failed", JSON.stringify({ error: err.message }))
-  );
+  try {
+    await runDiscovery(db, config);
+    const { creativeQueue } = await import("./queues/index.js");
+    const recovery = await enqueuePendingTelegramOffers(db, config, creativeQueue);
+    console.log("cron_publication_recovery", JSON.stringify(recovery));
+  } catch (err) {
+    console.error("cron_discovery_failed", JSON.stringify({ error: err.message }));
+  }
 });
 
 console.log("worker_ready — aguardando jobs");
