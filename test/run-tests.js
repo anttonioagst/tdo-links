@@ -110,6 +110,118 @@ test("uses Amazon tracking tags per channel", () => {
   assert.equal(new URL(buildAffiliateUrl(offer, config, "x")).searchParams.get("tag"), "default-20");
 });
 
+test("manual affiliate Telegram drafts still use tracked redirect links", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({ PUBLIC_BASE_URL: "https://tdolinks.test" });
+    const draft = createDraftsForOffer(db, {
+      id: "offer_manual_tracking",
+      title: "Fone Sony Premium",
+      store: "amazon",
+      category: "audio",
+      currentPrice: 999,
+      previousPrice: 1499,
+      originalUrl: "https://www.amazon.com.br/dp/B0TEST1234",
+      affiliateUrl: "https://amzn.to/42cFr9f",
+      affiliateSource: "manual",
+      affiliateReady: true,
+      status: "auto_ready"
+    }, config);
+
+    assert.match(draft.text, new RegExp(`https://tdolinks\\.test/go/${draft.shortCode}`));
+    assert.doesNotMatch(draft.text, /https:\/\/amzn\.to\/42cFr9f/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("agent publisher creates tracked Telegram redirect for posted links", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const offer = {
+      id: "offer_agent_tracking",
+      title: "Headset HyperX Cloud",
+      currentPrice: 399,
+      previousPrice: 599,
+      discountPercent: 33,
+      originalUrl: "https://www.amazon.com.br/dp/B0TRACK123",
+      affiliateUrl: "https://amzn.to/42cFr9f",
+      affiliateSource: "manual",
+      affiliateReady: true,
+      store: "amazon"
+    };
+    db.state.offers.unshift(offer);
+    const content = {
+      imageUrls: [],
+      copy: {
+        telegram: "Oferta {LINK}",
+        discord: "Oferta {LINK}",
+        x: "Oferta"
+      }
+    };
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "https://tdolinks.test",
+      TELEGRAM_DRY_RUN: "true",
+      DISCORD_DRY_RUN: "true",
+      X_DRY_RUN: "true"
+    });
+
+    await publishDeal(offer, content, config, db);
+
+    const trackingDraft = db.state.drafts.find((draft) =>
+      draft.offerId === offer.id && draft.channel === "telegram"
+    );
+    assert.ok(trackingDraft);
+    assert.match(trackingDraft.text, new RegExp(`https://tdolinks\\.test/go/${trackingDraft.shortCode}`));
+    assert.equal(db.state.clicks.length, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("tracked redirect records clicks before forwarding to manual affiliate URL", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const config = loadConfig({ PUBLIC_BASE_URL: "https://tdolinks.test" });
+    const offer = {
+      id: "offer_click_tracking",
+      title: "Notebook Lenovo",
+      store: "amazon",
+      category: "notebook",
+      currentPrice: 2899,
+      previousPrice: 3599,
+      originalUrl: "https://www.amazon.com.br/dp/B0CLICK123",
+      affiliateUrl: "https://amzn.to/42cFr9f",
+      affiliateSource: "manual",
+      affiliateReady: true,
+      status: "auto_ready"
+    };
+    db.state.offers.unshift(offer);
+    const draft = createDraftsForOffer(db, offer, config);
+    await db.save();
+    const app = createApp({ db, config, publicDir: dir });
+
+    const response = await request(app, {
+      path: `/go/${draft.shortCode}`,
+      fetchOptions: { redirect: "manual" }
+    });
+
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.location, "https://amzn.to/42cFr9f");
+    assert.equal(db.state.clicks.length, 1);
+    assert.equal(db.state.clicks[0].offerId, offer.id);
+    assert.equal(db.state.clicks[0].channel, "telegram");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("Amazon auto_ready offer creates auto_ready draft with price review warning", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   try {
@@ -1797,7 +1909,7 @@ for (const { name, fn } of tests) {
 if (failed) process.exit(1);
 console.log(`${tests.length} tests passed`);
 
-function request(app, { method = "GET", path = "/", body = null, headers = {} }) {
+function request(app, { method = "GET", path = "/", body = null, headers = {}, fetchOptions = {} }) {
   return new Promise((resolve, reject) => {
     app.listen(0, "127.0.0.1", () => {
       const { port } = app.address();
@@ -1805,12 +1917,13 @@ function request(app, { method = "GET", path = "/", body = null, headers = {} })
       const req = globalThis.fetch(`http://127.0.0.1:${port}${path}`, {
         method,
         headers: { "content-type": "application/json", ...headers },
-        body: payload || undefined
+        body: payload || undefined,
+        ...fetchOptions
       });
       req.then(async (response) => {
         const text = await response.text();
         app.close();
-        resolve({ status: response.status, text });
+        resolve({ status: response.status, text, headers: Object.fromEntries(response.headers.entries()) });
       }).catch((error) => {
         app.close();
         reject(error);
