@@ -17,21 +17,20 @@ export function AppShell({
 }) {
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100">
-      <CommandRail view={view} setView={setView} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
-      {mobileOpen ? (
-        <button
-          className="fixed inset-0 z-40 bg-black/80 lg:hidden"
-          onClick={() => setMobileOpen(false)}
-          aria-label="Fechar menu"
-          type="button"
-        />
-      ) : null}
+      <CommandRail view={view} setView={setView} />
       <div className="min-h-screen transition lg:pl-[92px]">
         <TopContextBar
           inputRef={inputRef}
+          mobileOpen={mobileOpen}
           setMobileOpen={setMobileOpen}
           view={view}
           {...topBar}
+        />
+        <MobileCommandMenu
+          mobileOpen={mobileOpen}
+          setMobileOpen={setMobileOpen}
+          setView={setView}
+          view={view}
         />
         <main className="mx-auto max-w-[1540px] px-4 py-5 md:px-6 lg:px-8">{children}</main>
       </div>
@@ -39,16 +38,13 @@ export function AppShell({
   );
 }
 
-export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
-  const railState = mobileOpen ? "tranzinc-x-0" : "-tranzinc-x-full lg:tranzinc-x-0";
-
+export function CommandRail({ setView, view }) {
   return (
-    <aside className={`fixed inset-y-0 left-0 z-50 w-[86px] border-r border-zinc-800 bg-[#050505] px-3 py-4 text-white transition ${railState}`}>
+    <aside className="fixed inset-y-0 left-0 z-50 hidden w-[86px] border-r border-zinc-800 bg-[#050505] px-3 py-4 text-white lg:block">
       <button
         className="mb-6 grid size-12 place-items-center rounded-lg border border-zinc-500/30 bg-zinc-200 text-sm font-bold text-zinc-950 shadow-lg shadow-black/30 transition hover:bg-white"
         onClick={() => {
           setView("overview");
-          setMobileOpen(false);
         }}
         type="button"
         aria-label="Ir para Performance"
@@ -70,13 +66,12 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
               key={itemView}
               onClick={() => {
                 setView(itemView);
-                setMobileOpen(false);
               }}
               title={label}
               type="button"
             >
               <Icon className="size-5" />
-              <span className="pointer-events-none absolute left-14 top-1/2 hidden -tranzinc-y-1/2 whitespace-nowrap rounded-lg border border-zinc-700 bg-[#0a0a0a] px-2 py-1 text-xs text-zinc-200 shadow-lg group-hover:block">
+              <span className="pointer-events-none absolute left-14 top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-lg border border-zinc-700 bg-[#0a0a0a] px-2 py-1 text-xs text-zinc-200 shadow-lg group-hover:block">
                 {label}
               </span>
             </button>
@@ -87,7 +82,41 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
   );
 }
 
-export function TopContextBar({ actions, inputRef, setMobileOpen, view }) {
+export function MobileCommandMenu({ mobileOpen, setMobileOpen, setView, view }) {
+  if (!mobileOpen) return null;
+
+  return (
+    <div className="border-b border-zinc-800 bg-[#050505]/98 px-4 py-3 shadow-lg shadow-black/30 lg:hidden">
+      <nav className="mx-auto grid max-w-[1540px] grid-cols-2 gap-2 sm:grid-cols-3">
+        {commandItems.map(({ icon: Icon, label, view: itemView }) => {
+          const isActive = view === itemView;
+          return (
+            <button
+              aria-current={isActive ? "page" : undefined}
+              className={cn(
+                "flex h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm transition",
+                isActive
+                  ? "border-zinc-500/60 bg-white/10 text-white"
+                  : "border-zinc-800 bg-[#0a0a0a] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+              )}
+              key={itemView}
+              onClick={() => {
+                setView(itemView);
+                setMobileOpen(false);
+              }}
+              type="button"
+            >
+              <Icon className="size-4" />
+              <span className="truncate">{label}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
+export function TopContextBar({ actions, inputRef, mobileOpen, setMobileOpen, view }) {
   const meta = viewMeta[view] || viewMeta.overview;
 
   return (
@@ -96,8 +125,9 @@ export function TopContextBar({ actions, inputRef, setMobileOpen, view }) {
         <div className="flex min-w-0 items-center gap-3">
           <button
             className="grid size-10 place-items-center rounded-lg border border-zinc-700 bg-[#0a0a0a] text-zinc-300 transition hover:bg-zinc-800 lg:hidden"
-            onClick={() => setMobileOpen(true)}
+            onClick={() => setMobileOpen((open) => !open)}
             type="button"
+            aria-expanded={mobileOpen}
             aria-label="Abrir menu"
           >
             <Menu className="size-5" />
