@@ -27,6 +27,8 @@ const PREMIUM_LINE = {
   camera: "Qualidade profissional de imagem acessível.",
   headset: "Áudio imersivo para gaming e reuniões.",
   headphone: "Qualidade de som que você vai sentir a diferença.",
+  fone: "Áudio premium com preço bem abaixo do normal.",
+  áudio: "Áudio premium com preço bem abaixo do normal.",
   cadeira: "Ergonomia que cuida de você em longas jornadas.",
   ssd: "Velocidade real. Tudo mais rápido no seu setup."
 };
@@ -65,6 +67,59 @@ function premiumLine(offer) {
   return "Custo-benefício difícil de ignorar.";
 }
 
+function addUniqueSpec(specs, value) {
+  const clean = String(value || "").trim();
+  if (!clean || clean.length > 42) return;
+  if (specs.some((spec) => spec.toLowerCase() === clean.toLowerCase())) return;
+  specs.push(clean);
+}
+
+export function extractSpecHighlights(offer, candidateSpecs = []) {
+  const specs = [];
+  for (const spec of candidateSpecs) {
+    const clean = String(spec || "")
+      .replace(/^[-•\s]+/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (/r\$\s?\d|%|off|promo|oferta|imperd/i.test(clean)) continue;
+    addUniqueSpec(specs, clean);
+    if (specs.length >= 2) return specs;
+  }
+
+  const text = `${offer.title || ""} ${offer.category || ""}`;
+  const lower = text.toLowerCase();
+  const patterns = [
+    [/noise cancelling|cancelamento de ru[ií]do|\banc\b/i, "Cancelamento de ruído"],
+    [/bluetooth/i, "Bluetooth"],
+    [/sem fio|wireless/i, "Sem fio"],
+    [/mec[aâ]nico|mechanical/i, "Teclado mecânico"],
+    [/ergon[oô]mico|ergonomic/i, "Ergonômico"],
+    [/oled/i, "Tela OLED"],
+    [/\bqled\b/i, "Tela QLED"],
+    [/\b4k\b|ultra hd|\buhd\b/i, "Imagem 4K"],
+    [/\bfull\s?hd\b/i, "Full HD"],
+    [/\bips\b/i, "Painel IPS"],
+    [/\b(\d{2,3})\s?hz\b/i, (match) => `${match[1]}Hz`],
+    [/\b(\d+)\s?tb\b/i, (match) => `${match[1]}TB`],
+    [/\b(\d+)\s?gb\b/i, (match) => `${match[1]}GB`],
+    [/\bnvme\b/i, "SSD NVMe"],
+    [/\bssd\b/i, "SSD"],
+    [/\brtx\s?\d{3,4}\b/i, (match) => match[0].toUpperCase().replace(/\s+/, " ")],
+    [/\bgtx\s?\d{3,4}\b/i, (match) => match[0].toUpperCase().replace(/\s+/, " ")],
+    [/\bryzen\s?\d\b/i, (match) => match[0].replace(/\s+/, " ")],
+    [/\bintel\b|\bi[3579]\b/i, "Processador Intel"]
+  ];
+
+  for (const [pattern, label] of patterns) {
+    const match = lower.match(pattern);
+    if (!match) continue;
+    addUniqueSpec(specs, typeof label === "function" ? label(match) : label);
+    if (specs.length >= 2) break;
+  }
+
+  return specs;
+}
+
 function getPostUrl(offer, shortCode, config) {
   if (offer.affiliateSource === "manual" && offer.affiliateUrl) return offer.affiliateUrl;
   return trackedUrl(config, shortCode);
@@ -93,11 +148,14 @@ export function telegramCopy(offer, url, disclosure) {
   const store = storeLabel(offer.store);
   const isPremium = (offer.currentPrice ?? 0) >= 500;
   const hook = isPremium ? premiumLine(offer) : `Aproveite esta oferta exclusiva na ${store} antes que acabe!`;
+  const specLines = extractSpecHighlights(offer).map((spec) => `• ${spec}`);
 
   return [
     `📌 <b>${offer.title}</b>`,
     "",
     hook,
+    specLines.length ? "" : null,
+    ...specLines,
     "",
     `🔥 De <s>${previous}</s> por <b>${current}</b>${discountStr}`,
     "",

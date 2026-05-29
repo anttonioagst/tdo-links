@@ -19,7 +19,7 @@ import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, scoreOfferDetailed, statusForScore } from "../src/scoring.js";
 import { buildAmazonScrapeUrls, parseAmazonSearch, selectScrapedAmazonOffers } from "../src/scrapers.js";
 import { validateOffer } from "../src/validation.js";
-import { telegramCopy } from "../src/copywriter.js";
+import { createTelegramCopy, telegramCopy } from "../src/copywriter.js";
 import { createContent } from "../src/agents/creative.js";
 import { publishDeal } from "../src/agents/publisher.js";
 import { hasRealPromotion } from "../src/deals.js";
@@ -145,6 +145,37 @@ test("Telegram copy uses approved promotion price format", () => {
   assert.match(copy, /🔥 De <s>R\$\s?2\.199,00<\/s> por <b>R\$\s?1\.499,00<\/b> \(32% OFF\)/);
   assert.match(copy, /📌 <b>Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth<\/b>/);
   assert.doesNotMatch(copy, /🔥 Por <b?>?R\$/);
+});
+
+test("manual affiliate Telegram copy keeps direct affiliate link", () => {
+  const copy = createTelegramCopy({
+    title: "Headset HyperX Cloud Alpha Wireless",
+    currentPrice: 649,
+    previousPrice: 899,
+    discountPercent: 28,
+    store: "amazon",
+    affiliateSource: "manual",
+    affiliateUrl: "https://www.amazon.com.br/dp/B09TEST123?tag=tdolinks-20"
+  }, "short_test", { publicBaseUrl: "https://tdo-links-production.up.railway.app", disclosure: "" });
+
+  assert.match(copy, /https:\/\/www\.amazon\.com\.br\/dp\/B09TEST123\?tag=tdolinks-20/);
+  assert.doesNotMatch(copy, /tdo-links-production\.up\.railway\.app\/go\/short_test/);
+});
+
+test("Telegram copy keeps product specs concise and skimmable", () => {
+  const copy = telegramCopy({
+    title: "Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth",
+    currentPrice: 1499,
+    previousPrice: 2199,
+    discountPercent: 32,
+    store: "amazon"
+  }, "https://www.amazon.com.br/dp/B09XS7JWHH?tag=tdolinks-20", "");
+  const specLines = copy.split("\n").filter((line) => line.startsWith("• "));
+
+  assert.ok(specLines.length > 0);
+  assert.ok(specLines.length <= 2);
+  assert.match(copy, /• Cancelamento de ruído/);
+  assert.match(copy, /• Bluetooth/);
 });
 
 test("Telegram copy refuses automatic promotion format without previous price", () => {
@@ -276,6 +307,8 @@ test("creative fallback keeps Telegram promotion format with strikethrough and b
 
   assert.match(result.copy.telegram, /🔥 De <s>R\$\s?2199,00<\/s> por <b>R\$\s?1499,00<\/b> \(32% OFF\)/);
   assert.match(result.copy.telegram, /📌 <b>Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth<\/b>/);
+  assert.match(result.copy.telegram, /• Cancelamento de ruído/);
+  assert.match(result.copy.telegram, /• Bluetooth/);
   assert.doesNotMatch(result.copy.telegram, /🔥 Por <b>R\$/);
 });
 

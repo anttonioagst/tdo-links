@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { findOfficialProductImages } from "../imagefinder.js";
 import { hasRealPromotion, promotionDiscountPercent } from "../deals.js";
+import { extractSpecHighlights } from "../copywriter.js";
 
 const MODEL = "claude-sonnet-4-6";
 
@@ -25,11 +26,13 @@ Curador: "${validationResult.reason || "Bom deal de tecnologia"}"
 Retorne JSON válido exatamente neste formato:
 {
   "hook": "1 frase chamativa sobre o deal para o Telegram",
+  "specs": ["especificação curta 1", "especificação curta 2"],
   "discord": "copy completa para Discord",
   "x": "tweet"
 }
 
-CAMPO hook: 1 frase curta e chamativa sobre o produto/deal. Ex: "O melhor custo-benefício em headsets premium do mercado!" ou "Oferta exclusiva para gamers — enquanto durar o estoque!"
+CAMPO hook: 1 frase curta e concreta sobre o valor do produto/deal. Sem exageros genéricos.
+CAMPO specs: no máximo 2 itens, cada um com 2 a 6 palavras, só especificações reais do produto/título. Não invente. Não repita preço, desconto, loja ou urgência.
 
 FORMATO DISCORD:
 **📌 ${offer.title}**
@@ -57,7 +60,7 @@ function safeParseJson(text) {
   }
 }
 
-function buildTelegramCopy(offer, hook) {
+function buildTelegramCopy(offer, hook, specs = []) {
   if (!hasRealPromotion(offer)) {
     throw new Error("missing_real_promotion");
   }
@@ -69,17 +72,20 @@ function buildTelegramCopy(offer, hook) {
   const storeDisplay = offer.store === "amazon" ? "Amazon"
     : offer.store === "mercado_livre" ? "Mercado Livre"
     : (offer.store || "Loja");
+  const specLines = extractSpecHighlights(offer, specs).map((spec) => `• ${spec}`);
 
   return [
     `📌 <b>${offer.title || "Oferta Tech"}</b>`,
     "",
     hook,
+    specLines.length ? "" : null,
+    ...specLines,
     "",
     priceLine,
     "",
     `🛒 Ver oferta na ${storeDisplay}:`,
     "{LINK}"
-  ].join("\n");
+  ].filter((line) => line !== null).join("\n");
 }
 
 function fallbackCopy(offer) {
@@ -94,10 +100,13 @@ function fallbackCopy(offer) {
   const storeDisplay = offer.store === "amazon" ? "Amazon"
     : offer.store === "mercado_livre" ? "Mercado Livre"
     : (offer.store || "Loja");
-  const hook = `Aproveite esta oferta exclusiva na ${storeDisplay} antes que acabe!`;
+  const specs = extractSpecHighlights(offer);
+  const hook = specs.length
+    ? `Oferta forte para quem busca ${specs[0].toLowerCase()} sem pagar preço cheio.`
+    : `Oferta selecionada na ${storeDisplay} com desconto real.`;
 
   return {
-    telegram: buildTelegramCopy(offer, hook),
+    telegram: buildTelegramCopy(offer, hook, specs),
     discord: `**📌 ${title}**\n~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**${discountStr}\n> Oferta selecionada\n{LINK}`,
     x: `📌 ${title.slice(0, 60)}\n${priceStr}\nVeja no nosso canal 👇`.slice(0, 220)
   };
@@ -132,8 +141,9 @@ export async function createContent(offer, validationResult, config) {
       }
 
       if (parsed.x.length > 220) parsed.x = parsed.x.slice(0, 220);
+      const specs = extractSpecHighlights(offer, Array.isArray(parsed.specs) ? parsed.specs : []);
       return {
-        telegram: buildTelegramCopy(offer, parsed.hook),
+        telegram: buildTelegramCopy(offer, parsed.hook, specs),
         discord: parsed.discord,
         x: parsed.x
       };
