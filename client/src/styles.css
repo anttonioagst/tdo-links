@@ -41,47 +41,34 @@
   --color-current: currentColor;
   --color-transparent: transparent;
   --color-white: #ffffff;
-  --color-black: #101828;
+  --color-black: #050505;
 
-  --color-brand-25: #f2f7ff;
-  --color-brand-50: #ecf3ff;
-  --color-brand-100: #dde9ff;
-  --color-brand-200: #c2d6ff;
-  --color-brand-300: #9cb9ff;
-  --color-brand-400: #7592ff;
-  --color-brand-500: #465fff;
-  --color-brand-600: #3641f5;
-  --color-brand-700: #2a31d8;
-  --color-brand-800: #252dae;
-  --color-brand-900: #262e89;
-  --color-brand-950: #161950;
+  --color-brand-25: #fafafa;
+  --color-brand-50: #f4f4f5;
+  --color-brand-100: #e4e4e7;
+  --color-brand-200: #d4d4d8;
+  --color-brand-300: #a1a1aa;
+  --color-brand-400: #71717a;
+  --color-brand-500: #52525b;
+  --color-brand-600: #3f3f46;
+  --color-brand-700: #27272a;
+  --color-brand-800: #18181b;
+  --color-brand-900: #09090b;
+  --color-brand-950: #050505;
 
-  --color-blue-light-25: #fafafa;
-  --color-blue-light-50: #f4f4f5;
-  --color-blue-light-100: #e4e4e7;
-  --color-blue-light-200: #d4d4d8;
-  --color-blue-light-300: #a1a1aa;
-  --color-blue-light-400: #71717a;
-  --color-blue-light-500: #52525b;
-  --color-blue-light-600: #3f3f46;
-  --color-blue-light-700: #27272a;
-  --color-blue-light-800: #18181b;
-  --color-blue-light-900: #09090b;
-  --color-blue-light-950: #050505;
-
-  --color-gray-25: #fcfcfd;
-  --color-gray-50: #f9fafb;
-  --color-gray-100: #f2f4f7;
-  --color-gray-200: #e4e7ec;
-  --color-gray-300: #d0d5dd;
-  --color-gray-400: #98a2b3;
-  --color-gray-500: #667085;
-  --color-gray-600: #475467;
-  --color-gray-700: #344054;
-  --color-gray-800: #1d2939;
-  --color-gray-900: #101828;
-  --color-gray-950: #0c111d;
-  --color-gray-dark: #1a2231;
+  --color-gray-25: #fafafa;
+  --color-gray-50: #f4f4f5;
+  --color-gray-100: #e4e4e7;
+  --color-gray-200: #d4d4d8;
+  --color-gray-300: #a1a1aa;
+  --color-gray-400: #71717a;
+  --color-gray-500: #52525b;
+  --color-gray-600: #3f3f46;
+  --color-gray-700: #27272a;
+  --color-gray-800: #18181b;
+  --color-gray-900: #09090b;
+  --color-gray-950: #050505;
+  --color-gray-dark: #181818;
 
   --color-orange-25: #fffaf5;
   --color-orange-50: #fff6ed;
@@ -135,11 +122,11 @@
   --color-warning-900: #7a2e0e;
   --color-warning-950: #4e1d09;
 
-  --shadow-theme-md: 0px 4px 8px -2px rgba(16, 24, 40, 0.1), 0px 2px 4px -2px rgba(16, 24, 40, 0.06);
-  --shadow-theme-lg: 0px 12px 16px -4px rgba(16, 24, 40, 0.08), 0px 4px 6px -2px rgba(16, 24, 40, 0.03);
-  --shadow-theme-sm: 0px 1px 3px 0px rgba(16, 24, 40, 0.1), 0px 1px 2px 0px rgba(16, 24, 40, 0.06);
-  --shadow-theme-xs: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
-  --shadow-theme-xl: 0px 20px 24px -4px rgba(16, 24, 40, 0.08), 0px 8px 8px -4px rgba(16, 24, 40, 0.03);
+  --shadow-theme-md: 0px 4px 8px -2px rgba(0, 0, 0, 0.22), 0px 2px 4px -2px rgba(0, 0, 0, 0.18);
+  --shadow-theme-lg: 0px 12px 16px -4px rgba(0, 0, 0, 0.22), 0px 4px 6px -2px rgba(0, 0, 0, 0.18);
+  --shadow-theme-sm: 0px 1px 3px 0px rgba(0, 0, 0, 0.22), 0px 1px 2px 0px rgba(0, 0, 0, 0.18);
+  --shadow-theme-xs: 0px 1px 2px 0px rgba(0, 0, 0, 0.18);
+  --shadow-theme-xl: 0px 20px 24px -4px rgba(0, 0, 0, 0.26), 0px 8px 8px -4px rgba(0, 0, 0, 0.18);
 
   --z-index-1: 1;
   --z-index-9: 9;
@@ -152,15 +139,15 @@
 
 @theme {
   --color-tdo-rail: #171717;
-  --color-tdo-ink: #111827;
+  --color-tdo-ink: #181818;
   --color-tdo-surface: #f6f7f9;
   --color-tdo-panel: #ffffff;
-  --color-tdo-blue: #a1a1aa;
-  --color-tdo-cyan: #71717a;
+  --color-tdo-accent: #a1a1aa;
+  --color-tdo-muted: #71717a;
   --color-tdo-green: #10b981;
   --color-tdo-amber: #f59e0b;
   --color-tdo-red: #e11d48;
-  --shadow-tdo-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 28px rgba(15, 23, 42, 0.04);
+  --shadow-tdo-card: 0 1px 2px rgba(0, 0, 0, 0.22), 0 12px 28px rgba(0, 0, 0, 0.18);
   --shadow-tdo-glow: 0 14px 30px rgba(0, 0, 0, 0.45);
 }
 
@@ -180,7 +167,7 @@
   }
 
   body {
-    @apply relative z-1 bg-slate-950 font-outfit font-normal text-slate-100;
+    @apply relative z-1 bg-zinc-950 font-outfit font-normal text-zinc-100;
     margin: 0;
     letter-spacing: 0;
   }
@@ -266,7 +253,7 @@
 }
 
 @utility tdo-focus {
-  @apply outline-none ring-tdo-blue/20 focus:border-tdo-blue focus:ring-4;
+  @apply outline-none ring-tdo-accent/20 focus:border-tdo-accent focus:ring-4;
 }
 
 .line-clamp-2 {

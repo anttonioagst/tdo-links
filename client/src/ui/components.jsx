@@ -16,7 +16,7 @@ export function AppShell({
   topBar
 }) {
   return (
-    <div className="min-h-screen bg-[#050505] text-slate-100">
+    <div className="min-h-screen bg-[#050505] text-zinc-100">
       <CommandRail view={view} setView={setView} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       {mobileOpen ? (
         <button
@@ -40,10 +40,10 @@ export function AppShell({
 }
 
 export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
-  const railState = mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0";
+  const railState = mobileOpen ? "tranzinc-x-0" : "-tranzinc-x-full lg:tranzinc-x-0";
 
   return (
-    <aside className={`fixed inset-y-0 left-0 z-50 w-[86px] border-r border-slate-800 bg-[#050505] px-3 py-4 text-white transition ${railState}`}>
+    <aside className={`fixed inset-y-0 left-0 z-50 w-[86px] border-r border-zinc-800 bg-[#050505] px-3 py-4 text-white transition ${railState}`}>
       <button
         className="mb-6 grid size-12 place-items-center rounded-lg border border-zinc-500/30 bg-zinc-200 text-sm font-bold text-zinc-950 shadow-lg shadow-black/30 transition hover:bg-white"
         onClick={() => {
@@ -65,7 +65,7 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
                 "group relative grid size-12 place-items-center rounded-lg transition",
                 isActive
                   ? "bg-white/10 text-white ring-1 ring-zinc-500/40"
-                  : "text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+                  : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
               )}
               key={itemView}
               onClick={() => {
@@ -76,7 +76,7 @@ export function CommandRail({ mobileOpen, setMobileOpen, setView, view }) {
               type="button"
             >
               <Icon className="size-5" />
-              <span className="pointer-events-none absolute left-14 top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-lg border border-slate-700 bg-[#0a0a0a] px-2 py-1 text-xs text-slate-200 shadow-lg group-hover:block">
+              <span className="pointer-events-none absolute left-14 top-1/2 hidden -tranzinc-y-1/2 whitespace-nowrap rounded-lg border border-zinc-700 bg-[#0a0a0a] px-2 py-1 text-xs text-zinc-200 shadow-lg group-hover:block">
                 {label}
               </span>
             </button>
@@ -91,11 +91,11 @@ export function TopContextBar({ actions, inputRef, setMobileOpen, view }) {
   const meta = viewMeta[view] || viewMeta.overview;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#050505]/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-zinc-800/80 bg-[#050505]/95 backdrop-blur">
       <div className="mx-auto flex min-h-[72px] max-w-[1540px] flex-col gap-3 px-4 py-3 md:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <button
-            className="grid size-10 place-items-center rounded-lg border border-slate-700 bg-[#0a0a0a] text-slate-300 transition hover:bg-slate-800 lg:hidden"
+            className="grid size-10 place-items-center rounded-lg border border-zinc-700 bg-[#0a0a0a] text-zinc-300 transition hover:bg-zinc-800 lg:hidden"
             onClick={() => setMobileOpen(true)}
             type="button"
             aria-label="Abrir menu"
@@ -103,8 +103,8 @@ export function TopContextBar({ actions, inputRef, setMobileOpen, view }) {
             <Menu className="size-5" />
           </button>
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold text-slate-100">{meta.title}</h1>
-            <p className="truncate text-xs text-slate-500">{meta.subtitle}</p>
+            <h1 className="truncate text-lg font-semibold text-zinc-100">{meta.title}</h1>
+            <p className="truncate text-xs text-zinc-500">{meta.subtitle}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -121,13 +121,13 @@ export function Panel({ title, count, children, density = "comfortable", action 
 
   return (
     <section className={cn(
-      "rounded-lg border border-slate-800 bg-[#0a0a0a] shadow-sm shadow-black/30",
+      "rounded-lg border border-zinc-800 bg-[#0a0a0a] shadow-sm shadow-black/30",
       densityClass
     )}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-100 md:text-base">{title}</h2>
-          {hasCount ? <p className="mt-1 text-xs text-slate-500">{count}</p> : null}
+          <h2 className="text-sm font-semibold text-zinc-100 md:text-base">{title}</h2>
+          {hasCount ? <p className="mt-1 text-xs text-zinc-500">{count}</p> : null}
         </div>
         {action}
       </div>
@@ -142,8 +142,7 @@ export function QueueColumn({ title, count, children, tone = "brand" }) {
     success: "bg-emerald-500",
     warning: "bg-amber-500",
     danger: "bg-rose-500",
-    cyan: "bg-zinc-400",
-    muted: "bg-slate-500"
+    muted: "bg-zinc-500"
   }[tone] || "bg-zinc-400";
 
   return (
@@ -170,7 +169,6 @@ export function StatusBadge({ children, tone = "brand" }) {
     success: "success",
     warning: "warning",
     danger: "danger",
-    cyan: "cyan",
     muted: "muted",
   };
   return (
@@ -221,7 +219,6 @@ export function MetricTile({ icon: Icon, label, value, tone = "brand", detail })
     success: "bg-emerald-500/15 text-emerald-400",
     warning: "bg-amber-500/15 text-amber-400",
     danger: "bg-rose-500/15 text-rose-400",
-    cyan: "bg-zinc-700/35 text-zinc-200"
   }[tone] || "bg-zinc-700/35 text-zinc-200";
 
   return (
@@ -229,9 +226,9 @@ export function MetricTile({ icon: Icon, label, value, tone = "brand", detail })
       <CardContent className="p-5">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-            <p className="mt-2 text-2xl font-bold text-slate-100">{value}</p>
-            {detail ? <p className="mt-1 truncate text-xs text-slate-500">{detail}</p> : null}
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</p>
+            <p className="mt-2 text-2xl font-bold text-zinc-100">{value}</p>
+            {detail ? <p className="mt-1 truncate text-xs text-zinc-500">{detail}</p> : null}
           </div>
           {Icon ? (
             <div className={cn("grid size-11 place-items-center rounded-lg", iconTone)}>
@@ -249,8 +246,8 @@ export function InsightPanel({ title, detail, action, tone = "brand", toneLabel 
     <Card>
       <CardContent className="p-5">
         <StatusBadge tone={tone}>{toneLabel}</StatusBadge>
-        <h3 className="mt-3 text-sm font-semibold text-slate-100">{title}</h3>
-        <p className="mt-1 text-sm leading-6 text-slate-400">{detail}</p>
+        <h3 className="mt-3 text-sm font-semibold text-zinc-100">{title}</h3>
+        <p className="mt-1 text-sm leading-6 text-zinc-400">{detail}</p>
         {action}
       </CardContent>
     </Card>
@@ -259,9 +256,9 @@ export function InsightPanel({ title, detail, action, tone = "brand", toneLabel 
 
 export function EmptyState({ title, text, action }) {
   return (
-    <div className="rounded-lg border border-dashed border-slate-700 bg-[#0a0a0a]/70 p-6 text-center">
-      <h3 className="text-sm font-semibold text-slate-300">{title}</h3>
-      <p className="mt-1 text-sm text-slate-500">{text}</p>
+    <div className="rounded-lg border border-dashed border-zinc-700 bg-[#0a0a0a]/70 p-6 text-center">
+      <h3 className="text-sm font-semibold text-zinc-300">{title}</h3>
+      <p className="mt-1 text-sm text-zinc-500">{text}</p>
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
@@ -281,13 +278,13 @@ export function FormField({ label, help, error, children }) {
     : children;
 
   return (
-    <div className="block text-sm text-slate-300">
+    <div className="block text-sm text-zinc-300">
       {canBindControl ? (
-        <label className="font-medium text-slate-200" htmlFor={children.props.id || fieldId}>{label}</label>
+        <label className="font-medium text-zinc-200" htmlFor={children.props.id || fieldId}>{label}</label>
       ) : (
-        <span className="font-medium text-slate-200">{label}</span>
+        <span className="font-medium text-zinc-200">{label}</span>
       )}
-      {help ? <span className="mt-1 block text-xs leading-5 text-slate-500" id={helpId}>{help}</span> : null}
+      {help ? <span className="mt-1 block text-xs leading-5 text-zinc-500" id={helpId}>{help}</span> : null}
       <div className="mt-2">{control}</div>
       {error ? <span className="mt-1 block text-xs text-rose-400" id={errorId}>{error}</span> : null}
     </div>
@@ -297,14 +294,14 @@ export function FormField({ label, help, error, children }) {
 export function DataTable({ columns, rows, getKey, renderMobileCard }) {
   return (
     <>
-      <div className="hidden overflow-x-auto rounded-lg border border-slate-800 lg:block">
-        <table className="min-w-full divide-y divide-slate-800 text-sm">
+      <div className="hidden overflow-x-auto rounded-lg border border-zinc-800 lg:block">
+        <table className="min-w-full divide-y divide-zinc-800 text-sm">
           <thead className="sticky top-0 bg-[#0a0a0a]/95 backdrop-blur">
             <tr>
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className={cn("px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500", column.className)}
+                  className={cn("px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500", column.className)}
                   scope="col"
                 >
                   {column.label}
@@ -312,13 +309,13 @@ export function DataTable({ columns, rows, getKey, renderMobileCard }) {
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60 bg-black/20">
+          <tbody className="divide-y divide-zinc-800/60 bg-black/20">
             {rows.map((row) => (
-              <tr key={getKey(row)} className="transition hover:bg-slate-800/30">
+              <tr key={getKey(row)} className="transition hover:bg-zinc-800/30">
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={cn("px-4 py-3 align-top text-slate-300", column.cellClassName)}
+                    className={cn("px-4 py-3 align-top text-zinc-300", column.cellClassName)}
                   >
                     {column.render(row)}
                   </td>

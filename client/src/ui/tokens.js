@@ -51,7 +51,7 @@ export const statusToneMap = {
   failed: "danger",
   rejected: "danger",
   archived: "muted",
-  discovery: "cyan",
+  discovery: "brand",
   dry_run: "warning",
   ready: "success",
   problem: "danger"
