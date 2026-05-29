@@ -509,10 +509,14 @@ test("Amazon scrape includes curated promotion searches after configured URLs", 
     amazonSearchUrls: ["https://www.amazon.com.br/s?k=ssd+nvme"]
   });
   assert.equal(urls[0], "https://www.amazon.com.br/s?k=ssd+nvme");
+  assert.equal(urls[1], "https://www.amazon.com.br/s?k=ssd+nvme&page=2");
   assert.ok(urls.some((url) => url.includes("s?k=logitech")));
   assert.ok(urls.some((url) => url.includes("s?k=razer")));
   assert.ok(urls.some((url) => url.includes("s?k=hyperx")));
+  assert.ok(urls.some((url) => url.includes("s?k=notebook+acer")));
+  assert.ok(urls.some((url) => url.includes("s?k=smart+tv+tcl")));
   assert.ok(urls.some((url) => url.includes("deals-promo-filter=1")));
+  assert.ok(urls.some((url) => url.includes("page=2")));
 });
 
 test("saves manual Amazon affiliate links and prioritizes them", async () => {

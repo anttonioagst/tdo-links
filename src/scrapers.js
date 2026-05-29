@@ -64,10 +64,23 @@ const CURATED_PROMOTION_SEARCH_URLS = [
   "https://www.amazon.com.br/s?k=tp+link+deco&s=review-rank&deals-promo-filter=1",
   "https://www.amazon.com.br/s?k=notebook+dell&s=review-rank&deals-promo-filter=1",
   "https://www.amazon.com.br/s?k=notebook+lenovo&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=notebook+acer&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=notebook+asus&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=monitor+lg&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=monitor+samsung&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=monitor+aoc&s=review-rank&deals-promo-filter=1",
   "https://www.amazon.com.br/s?k=smart+tv+samsung&s=review-rank&deals-promo-filter=1",
   "https://www.amazon.com.br/s?k=smart+tv+lg&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=smart+tv+tcl&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=smart+tv+philips&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=soundbar+samsung&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=soundbar+lg&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=cadeira+flexform&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=cadeira+gamer+husky&s=review-rank&deals-promo-filter=1",
   "https://www.amazon.com.br/s?k=mesa+gamer&s=review-rank&deals-promo-filter=1",
-  "https://www.amazon.com.br/s?k=mesa+escrivaninha&s=review-rank&deals-promo-filter=1"
+  "https://www.amazon.com.br/s?k=mesa+escrivaninha&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=apple+airpods&s=review-rank&deals-promo-filter=1",
+  "https://www.amazon.com.br/s?k=echo+show&s=review-rank&deals-promo-filter=1"
 ];
 
 export async function scrapeDeals(config = {}) {
@@ -106,7 +119,28 @@ export async function scrapeAmazonDeals(config) {
 }
 
 export function buildAmazonScrapeUrls(config = {}) {
-  return [...new Set([...(config.amazonSearchUrls || []), ...CURATED_PROMOTION_SEARCH_URLS])];
+  return expandAmazonSearchPages([...new Set([...(config.amazonSearchUrls || []), ...CURATED_PROMOTION_SEARCH_URLS])]);
+}
+
+function expandAmazonSearchPages(urls) {
+  const expanded = [];
+  for (const url of urls) {
+    expanded.push(url);
+    const page2 = amazonSearchPage(url, 2);
+    if (page2) expanded.push(page2);
+  }
+  return [...new Set(expanded)];
+}
+
+function amazonSearchPage(url, page) {
+  try {
+    const parsed = new URL(url);
+    if (!/amazon\.com\.br$/i.test(parsed.hostname) || !parsed.pathname.startsWith("/s")) return null;
+    parsed.searchParams.set("page", String(page));
+    return parsed.toString();
+  } catch {
+    return null;
+  }
 }
 
 export function selectScrapedAmazonOffers(offers, limit) {
