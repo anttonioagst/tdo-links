@@ -1,7 +1,7 @@
 import { publishTelegram } from "../publishers/telegram.js";
 import { publishDiscord } from "../publishers/discord.js";
 import { publishXAcquisition } from "../publishers/x.js";
-import { createShortCode, trackedUrl } from "../links.js";
+import { buildAffiliateUrl } from "../links.js";
 import { telegramPublicationStatus } from "../publication-policy.js";
 
 const INTER_CHANNEL_DELAY_MS = 3000;
@@ -12,29 +12,6 @@ function sleep(ms) {
 
 function resolveCopy(template, affiliateUrl) {
   return (template || "").replace(/\{LINK\}/g, affiliateUrl || "");
-}
-
-function createTrackingDraft(db, offer, channel, text, config) {
-  const shortCode = createShortCode(db, offer.id, channel);
-  const link = trackedUrl(config, shortCode);
-  const draft = {
-    id: db.nextId ? db.nextId("draft") : `draft_${Date.now()}_${channel}`,
-    offerId: offer.id,
-    channel,
-    text: resolveCopy(text, link),
-    disclosure: config.disclosure || "",
-    shortCode,
-    status: "published",
-    rejectionReason: "",
-    warnings: [],
-    publishedAt: new Date().toISOString(),
-    providerMessageId: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-  if (!db.state.drafts) db.state.drafts = [];
-  db.state.drafts.unshift(draft);
-  return draft;
 }
 
 function wasAlreadyPublished(db, offerId, channel) {
@@ -61,6 +38,12 @@ export async function publishDeal(offer, content, config, db) {
   console.log("agent_event", JSON.stringify({ agent: "publisher", event: "start", offerId: offer.id, title: offer.title }));
   if (db.load) await db.load();
 
+  let affiliateUrl;
+  try {
+    affiliateUrl = buildAffiliateUrl(offer, config, "telegram");
+  } catch {
+    affiliateUrl = offer.affiliateUrl || offer.originalUrl || offer.url || "";
+  }
   const { imageUrls, copy } = content;
   const offerWithImage = imageUrls?.length
     ? { ...offer, officialImageUrls: imageUrls }
@@ -86,11 +69,9 @@ export async function publishDeal(offer, content, config, db) {
   } else if (!wasAlreadyPublished(db, offer.id, "telegram")) {
     channels.push(async () => {
       try {
-        const draft = createTrackingDraft(db, offer, "telegram", copy.telegram, config);
+        const draft = { text: resolveCopy(copy.telegram, affiliateUrl) };
         const result = await publishTelegram(draft, config, offerWithImage);
         results.telegram = result;
-        draft.providerMessageId = result.providerMessageId || null;
-        draft.updatedAt = new Date().toISOString();
         savePublishResult(db, offer.id, "telegram", result);
         if (result.ok && offerWithImage.telegramImageFileId) {
           const offerInDb = db.state.offers.find(o => o.id === offer.id);
@@ -110,12 +91,10 @@ export async function publishDeal(offer, content, config, db) {
   if (!wasAlreadyPublished(db, offer.id, "discord")) {
     channels.push(async () => {
       try {
-        const draft = createTrackingDraft(db, offer, "discord", copy.discord, config);
-        const offerForDiscord = { ...offerWithImage, affiliateUrl: trackedUrl(config, draft.shortCode) };
+        const draft = { text: resolveCopy(copy.discord, affiliateUrl) };
+        const offerForDiscord = { ...offerWithImage, affiliateUrl };
         const result = await publishDiscord(draft, config, offerForDiscord);
         results.discord = result;
-        draft.providerMessageId = result.providerMessageId || null;
-        draft.updatedAt = new Date().toISOString();
         savePublishResult(db, offer.id, "discord", result);
         console.log("agent_event", JSON.stringify({ agent: "publisher", event: "discord_done", offerId: offer.id, ok: result.ok }));
       } catch (err) {

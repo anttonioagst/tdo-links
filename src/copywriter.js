@@ -66,6 +66,7 @@ function premiumLine(offer) {
 }
 
 function getPostUrl(offer, shortCode, config) {
+  if (offer.affiliateSource === "manual" && offer.affiliateUrl) return offer.affiliateUrl;
   return trackedUrl(config, shortCode);
 }
 
