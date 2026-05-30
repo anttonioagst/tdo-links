@@ -1,4 +1,5 @@
 export function loadConfig(env = process.env) {
+  const hasDiscordBot = Boolean(env.DISCORD_BOT_TOKEN && env.DISCORD_GUILD_ID);
   return {
     port: Number(env.PORT || 4318),
     host: env.HOST || "0.0.0.0",
@@ -64,8 +65,8 @@ export function loadConfig(env = process.env) {
     discordGuildId: env.DISCORD_GUILD_ID || "",
     discordAdminRoleName: env.DISCORD_ADMIN_ROLE_NAME || "Admin TDO",
     discordSetupEnabled: env.DISCORD_SETUP_ENABLED === "true",
-    discordOpsEnabled: env.DISCORD_OPS_ENABLED === "true",
-    discordPublicDealsEnabled: env.DISCORD_PUBLIC_DEALS_ENABLED === "true",
+    discordOpsEnabled: env.DISCORD_OPS_ENABLED ? env.DISCORD_OPS_ENABLED === "true" : hasDiscordBot,
+    discordPublicDealsEnabled: env.DISCORD_PUBLIC_DEALS_ENABLED ? env.DISCORD_PUBLIC_DEALS_ENABLED === "true" : hasDiscordBot,
     adminToken: env.ADMIN_TOKEN || "",
     openaiApiKey: env.OPENAI_API_KEY || "",
     anthropicApiKey: env.ANTHROPIC_API_KEY || "",

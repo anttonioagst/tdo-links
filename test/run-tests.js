@@ -2192,6 +2192,16 @@ test("config exposes Discord bot and supervisor settings", () => {
   assert.equal(config.supervisorStaleTelegramMinutes, 90);
 });
 
+test("config enables Discord ops and public deals by default when bot is configured", () => {
+  const config = loadConfig({
+    DISCORD_BOT_TOKEN: "bot-token",
+    DISCORD_GUILD_ID: "guild-1"
+  });
+
+  assert.equal(config.discordOpsEnabled, true);
+  assert.equal(config.discordPublicDealsEnabled, true);
+});
+
 test("db state includes incidents and discord channel registry defaults", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   try {
