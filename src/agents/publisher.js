@@ -77,9 +77,14 @@ export async function publishDeal(offer, content, config, db) {
         const result = await publishTelegram(draft, config, offerWithImage);
         results.telegram = result;
         savePublishResult(db, offer.id, "telegram", result);
+        const offerInDb = db.state.offers.find(o => o.id === offer.id);
         if (result.ok && offerWithImage.telegramImageFileId) {
-          const offerInDb = db.state.offers.find(o => o.id === offer.id);
           if (offerInDb) offerInDb.telegramImageFileId = offerWithImage.telegramImageFileId;
+        } else if (!result.ok && result.detail === "telegram_photo_required" && offerInDb) {
+          offerInDb.status = "rejected";
+          offerInDb.imageStatus = "failed";
+          offerInDb.validationSummary = "telegram_photo_required";
+          offerInDb.updatedAt = new Date().toISOString();
         }
         console.log("agent_event", JSON.stringify({ agent: "publisher", event: "telegram_done", offerId: offer.id, ok: result.ok }));
       } catch (err) {

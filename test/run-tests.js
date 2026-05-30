@@ -1639,6 +1639,52 @@ test("publish pipeline records failed details when Telegram fetch throws", async
   }
 });
 
+test("publisher marks offers rejected when Telegram photo is unavailable", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response("not found", { status: 404 });
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "offer_no_photo",
+      title: "Smart TV 4K LG QNED73",
+      status: "auto_ready",
+      currentPrice: 4058,
+      previousPrice: 4984,
+      discountPercent: 19,
+      originalUrl: "https://www.amazon.com.br/dp/B0TESTPHOTO",
+      store: "amazon",
+      imageUrls: ["https://m.media-amazon.com/images/I/missing._AC_UL320_.jpg"]
+    });
+    await db.save();
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      TELEGRAM_DRY_RUN: "false",
+      TELEGRAM_BOT_TOKEN: "token",
+      TELEGRAM_CHAT_ID: "chat"
+    });
+
+    const result = await publishDeal(db.state.offers[0], {
+      imageUrls: [],
+      copy: {
+        telegram: "Oferta {LINK}",
+        discord: "Oferta {LINK}",
+        x: "Oferta"
+      }
+    }, config, db);
+
+    assert.equal(result.telegram.ok, false);
+    assert.equal(result.telegram.detail, "telegram_photo_required");
+    assert.equal(db.state.offers[0].status, "rejected");
+    assert.equal(db.state.offers[0].imageStatus, "failed");
+    assert.equal(db.state.offers[0].validationSummary, "telegram_photo_required");
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("publisher skips Telegram when publication quota is already reached", async () => {
   const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
   try {
