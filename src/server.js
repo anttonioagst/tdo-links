@@ -309,7 +309,8 @@ async function handleApi(req, res, url, db, config) {
   }
   if (req.method === "POST" && url.pathname === "/api/run/publish-now") {
     if (db.load) await db.load();
-    const offer = selectImmediatePublishOffer(db.state, config);
+    const body = await readJson(req).catch(() => ({}));
+    const offer = selectImmediatePublishOffer(db.state, config, { offerId: body.offerId });
     if (!offer) {
       sendJson(res, 200, { ok: false, skipped: true, reason: "no_eligible_auto_ready_offer" });
       return;

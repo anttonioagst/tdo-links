@@ -1992,6 +1992,16 @@ test("immediate publish selector skips published and related offers", () => {
   const state = {
     offers: [
       {
+        id: "already_discord",
+        status: "auto_ready",
+        title: "Samsung Vision AI TV 55 OLED 4K",
+        currentPrice: 6072,
+        previousPrice: 6898,
+        discountPercent: 12,
+        imageUrl: "https://example.com/tv.jpg",
+        asin: "B0DISCORDTV"
+      },
+      {
         id: "related_tv",
         status: "auto_ready",
         title: "Smart TV 4K 65\" LG QNED73 + Soundbar LG 300W",
@@ -2007,6 +2017,7 @@ test("immediate publish selector skips published and related offers", () => {
         currentPrice: 640.3,
         previousPrice: 999,
         discountPercent: 36,
+        imageUrl: "https://example.com/soundcore.jpg",
         asin: "B0SOUNDCORE"
       },
       {
@@ -2019,12 +2030,20 @@ test("immediate publish selector skips published and related offers", () => {
         asin: "B0PUBLISHEDTV"
       }
     ],
-    publishLog: [{
-      offerId: "published_tv",
-      channel: "telegram",
-      result: { ok: true },
-      createdAt: new Date().toISOString()
-    }]
+    publishLog: [
+      {
+        offerId: "published_tv",
+        channel: "telegram",
+        result: { ok: true },
+        createdAt: new Date().toISOString()
+      },
+      {
+        offerId: "already_discord",
+        channel: "discord",
+        result: { ok: true },
+        createdAt: new Date().toISOString()
+      }
+    ]
   };
 
   const selected = selectImmediatePublishOffer(state, { relatedOfferDedupeHours: 24 });
