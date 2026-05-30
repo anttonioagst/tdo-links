@@ -6,6 +6,7 @@ import { creativeQueue, publishQueue } from "./index.js";
 import { hasRealPromotion } from "../deals.js";
 import { telegramPublicationStatus } from "../publication-policy.js";
 import { enqueuePendingTelegramOffers } from "../publication-recovery.js";
+import { reportAgentEvent } from "../discord/reporter.js";
 
 export function startWorkers(db, config, connection) {
   const opts = { connection, concurrency: 1 };
@@ -61,6 +62,12 @@ export function startWorkers(db, config, connection) {
   const validationWorker = new Worker("validation", async (job) => {
     let { offer } = job.data;
     console.log("job_start", JSON.stringify({ queue: "validation", title: offer?.title }));
+    await safeReport(db, config, {
+      agent: "validation",
+      title: "Validação iniciada",
+      message: "Produto entrou no filtro de qualidade.",
+      data: { titulo: offer?.title || "", asin: offer?.asin || "" }
+    });
 
     // Verify price, rating, and review count from the actual product page.
     // Search listings show cheapest variant price and no review counts in static HTML.
@@ -121,6 +128,17 @@ export function startWorkers(db, config, connection) {
         };
       }
       await db.save();
+      await safeReport(db, config, {
+        agent: "validation",
+        severity: "warning",
+        title: "Produto rejeitado",
+        message: "O produto não passou no filtro de promoção/qualidade.",
+        data: {
+          offerId: db.state.offers[existingIndex === -1 ? 0 : existingIndex]?.id || offer.id || "",
+          motivo: rejectionReason,
+          confianca: validationResult.confidence
+        }
+      });
       console.log("job_done", JSON.stringify({
         queue: "validation", title: offer?.title, result: "rejected",
         confidence: validationResult.confidence, reason: rejectionReason
@@ -167,6 +185,13 @@ export function startWorkers(db, config, connection) {
         offerId: offerWithId.id,
         waitMinutes: publication.waitMinutes
       }));
+      await safeReport(db, config, {
+        agent: "validation",
+        severity: "warning",
+        title: "Produto aguardando janela",
+        message: "Produto aprovado, mas a publicação foi adiada pela cadência.",
+        data: { offerId: offerWithId.id, motivo: publication.reason, esperaMin: publication.waitMinutes }
+      });
       return { ...validationResult, passes, delayed: true, reason: publication.reason };
     }
 
@@ -180,6 +205,12 @@ export function startWorkers(db, config, connection) {
         recentPublished: publication.recentPublished,
         maxPerCycle: publication.maxPerCycle
       }));
+      await safeReport(db, config, {
+        agent: "validation",
+        title: "Produto aprovado",
+        message: "Produto passou no filtro e foi enviado para copy/imagem.",
+        data: { offerId: offerWithId.id, confianca: validationResult.confidence }
+      });
     }
 
     return { ...validationResult, passes };
@@ -189,6 +220,12 @@ export function startWorkers(db, config, connection) {
   const creativeWorker = new Worker("creative", async (job) => {
     const { offer, validationResult } = job.data;
     console.log("job_start", JSON.stringify({ queue: "creative", title: offer?.title }));
+    await safeReport(db, config, {
+      agent: "creative",
+      title: "Copy iniciada",
+      message: "Agente criativo começou a montar copy e imagem.",
+      data: { offerId: offer?.id || "", titulo: offer?.title || "" }
+    });
 
     // Second quota gate — prevents backlogged creative jobs from all publishing at once
     const publication = telegramPublicationStatus(db.state.publishLog || [], config);
@@ -211,6 +248,13 @@ export function startWorkers(db, config, connection) {
         maxPerCycle: publication.maxPerCycle,
         waitMinutes: publication.waitMinutes
       }));
+      await safeReport(db, config, {
+        agent: "creative",
+        severity: "warning",
+        title: "Copy reagendada",
+        message: "O produto continua aprovado, mas vai aguardar a próxima janela.",
+        data: { offerId: offer.id, motivo: publication.reason, esperaMin: publication.waitMinutes }
+      });
       return { skipped: true, rescheduled: true, reason: publication.reason, waitMinutes: publication.waitMinutes };
     }
 
@@ -236,8 +280,34 @@ export function startWorkers(db, config, connection) {
         attempts: 2, backoff: { type: "exponential", delay: 10000 }
       });
       console.log("job_done", JSON.stringify({ queue: "creative", title: offer?.title, result: "enqueued_publish", imageCount: content.imagePaths?.length ?? (content.imagePath ? 1 : 0) }));
+      await safeReport(db, config, {
+        agent: "creative",
+        title: "Copy pronta",
+        message: "Copy e imagem foram preparadas e enviadas para publicação.",
+        data: {
+          offerId: offer.id,
+          imagem: content.imageUrls?.length ? "ok" : "sem_imagem",
+          imagens: content.imageUrls?.length || 0
+        }
+      });
+      await safeReport(db, config, {
+        agent: "image",
+        title: content.imageUrls?.length ? "Imagem pronta" : "Imagem ausente",
+        severity: content.imageUrls?.length ? "info" : "warning",
+        message: content.imageUrls?.length
+          ? "Imagem oficial em boa qualidade foi anexada ao produto."
+          : "Produto seguiu sem imagem oficial aprovada.",
+        data: { offerId: offer.id, imagens: content.imageUrls?.length || 0 }
+      });
     } else {
       console.log("job_done", JSON.stringify({ queue: "creative", title: offer?.title, result: "no_publish_queue" }));
+      await safeReport(db, config, {
+        agent: "creative",
+        severity: "warning",
+        title: "Fila de publicação ausente",
+        message: "Copy foi criada, mas não havia fila de publicação disponível.",
+        data: { offerId: offer.id }
+      });
     }
 
     return { hasImage: !!content.imagePath };
@@ -268,4 +338,12 @@ export function startWorkers(db, config, connection) {
     .catch((err) => console.error("publication_recovery_startup_failed", JSON.stringify({ error: err.message })));
 
   return allWorkers;
+}
+
+async function safeReport(db, config, event) {
+  try {
+    await reportAgentEvent(db, config, event);
+  } catch {
+    // Discord telemetry is best-effort and must not stop queue workers.
+  }
 }

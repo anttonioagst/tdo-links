@@ -82,6 +82,7 @@ export function loadConfig(env = process.env) {
     maxPremiumCategoryPerWindow: Number(env.MAX_PREMIUM_CATEGORY_PER_WINDOW || 1),
     recoveryLookbackHours: Number(env.RECOVERY_LOOKBACK_HOURS || 12),
     recoveryFailedLookbackHours: Number(env.RECOVERY_FAILED_LOOKBACK_HOURS || 2),
+    relatedOfferDedupeHours: Number(env.RELATED_OFFER_DEDUPE_HOURS || 24),
     allowExternalProductImages: env.ALLOW_EXTERNAL_PRODUCT_IMAGES === "true",
     maxCandidatesPerCycle: Number(env.MAX_CANDIDATES_PER_CYCLE || 2),
     supervisorEnabled: env.SUPERVISOR_ENABLED !== "false",

@@ -71,6 +71,8 @@ export async function checkDiscordStatus(db, config, options = {}) {
     accessible: false,
     channelCount: 0,
     managedChannelCount: Object.keys(db.state.discord?.channels || {}).length,
+    opsEnabled: Boolean(config.discordOpsEnabled),
+    publicDealsEnabled: Boolean(config.discordPublicDealsEnabled),
     lastSetupAt: db.state.discord?.lastSetupAt || null,
     lastSetupError: db.state.discord?.lastSetupError || null
   };

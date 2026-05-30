@@ -35,6 +35,32 @@ export function wasSimilarOfferPublished(state = {}, offer = {}, channel = "tele
   });
 }
 
+export function relatedOfferRecentlyPublished(state = {}, offer = {}, channel = "telegram", hours = 24, now = new Date()) {
+  const currentKey = offerFamilyKey(offer);
+  if (!currentKey) return false;
+  const cutoff = new Date(now.getTime() - Number(hours || 24) * 60 * 60 * 1000);
+  const offersById = new Map((state.offers || []).map((item) => [item.id, item]));
+
+  return (state.publishLog || []).some((entry) => {
+    if (entry.channel !== channel || entry.result?.ok !== true || !entry.offerId) return false;
+    if (new Date(entry.createdAt) < cutoff) return false;
+    const publishedOffer = offersById.get(entry.offerId);
+    return offerFamilyKey(publishedOffer) === currentKey;
+  });
+}
+
+export function offerFamilyKey(offer = {}) {
+  const title = normalizeOfferTitle(offer.title)
+    .replace(/\b\d+\s?(pol|polegadas|inch|in|hz|w|mah|gb|tb|ms|m2|m)\b/g, " ")
+    .replace(/\b\d{2,5}\b/g, " ")
+    .replace(/\b(4k|8k|full hd|qhd|uhd|rgb|bluetooth|wifi|wi fi)\b/g, " ")
+    .replace(/\b(white|black|preto|branco|azul|rosa|grafite)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (title.length < 18) return "";
+  return `family:${title}`;
+}
+
 function canonicalOfferUrl(offer = {}) {
   if (offer.canonicalUrl) return String(offer.canonicalUrl).toLowerCase();
   const raw = offer.originalUrl || offer.url || "";

@@ -3,7 +3,7 @@ import { publishDiscord } from "../publishers/discord.js";
 import { publishXAcquisition } from "../publishers/x.js";
 import { buildAffiliateUrl } from "../links.js";
 import { telegramPublicationStatus } from "../publication-policy.js";
-import { wasSimilarOfferPublished } from "../publication-dedupe.js";
+import { relatedOfferRecentlyPublished, wasSimilarOfferPublished } from "../publication-dedupe.js";
 import { publishDiscordDeal } from "../discord/deals.js";
 import { reportAgentEvent } from "../discord/reporter.js";
 
@@ -60,6 +60,23 @@ export async function publishDeal(offer, content, config, db) {
   if (wasSimilarOfferPublished(db.state, offer, "telegram")) {
     results.telegram = { ok: true, skipped: true, detail: "duplicate_offer" };
     console.log("agent_event", JSON.stringify({ agent: "publisher", event: "telegram_skipped_duplicate", offerId: offer.id }));
+    await safeReport(db, config, {
+      agent: "publisher",
+      severity: "warning",
+      title: "Telegram bloqueou duplicata",
+      message: "A oferta não foi enviada porque já existe publicação recente equivalente.",
+      data: { offerId: offer.id, motivo: "duplicate_offer" }
+    });
+  } else if (relatedOfferRecentlyPublished(db.state, offer, "telegram", config.relatedOfferDedupeHours ?? 24)) {
+    results.telegram = { ok: true, skipped: true, detail: "related_offer_recently_published" };
+    console.log("agent_event", JSON.stringify({ agent: "publisher", event: "telegram_skipped_related", offerId: offer.id }));
+    await safeReport(db, config, {
+      agent: "publisher",
+      severity: "warning",
+      title: "Telegram bloqueou família repetida",
+      message: "A oferta parece variante de produto já publicado nas últimas horas.",
+      data: { offerId: offer.id, janelaHoras: config.relatedOfferDedupeHours ?? 24 }
+    });
   } else if (!publication.allowed) {
     results.telegram = { ok: true, skipped: true, detail: publication.reason, waitMinutes: publication.waitMinutes };
     console.log("agent_event", JSON.stringify({
@@ -72,6 +89,13 @@ export async function publishDeal(offer, content, config, db) {
       windowHours: publication.windowHours,
       waitMinutes: publication.waitMinutes
     }));
+    await safeReport(db, config, {
+      agent: "publisher",
+      severity: "warning",
+      title: "Telegram aguardando cadência",
+      message: "A oferta está pronta, mas foi segurada pela regra de espaçamento.",
+      data: { offerId: offer.id, motivo: publication.reason, esperaMin: publication.waitMinutes }
+    });
   } else if (!wasAlreadyPublished(db, offer.id, "telegram")) {
     channels.push(async () => {
       try {

@@ -4,6 +4,7 @@ import { hasRealPromotion } from "../deals.js";
 import { buildLearningProfile, learningScoreForOffer } from "../learning.js";
 import { premiumCurationScore, selectPremiumCandidates } from "../premium-curation.js";
 import { offerIdentityKeys } from "../publication-dedupe.js";
+import { reportAgentEvent } from "../discord/reporter.js";
 
 const RSS_FEEDS = [
   { name: "pelando", url: "https://www.pelando.com.br/rss" },
@@ -84,6 +85,11 @@ function isAlreadyKnown(offer, existingOffers) {
 
 export async function runDiscovery(db, config) {
   console.log("agent_event", JSON.stringify({ agent: "discovery", event: "start" }));
+  await safeReport(db, config, {
+    agent: "discovery",
+    title: "Busca iniciada",
+    message: "Agente de descoberta começou a procurar promoções."
+  });
 
   const existingOffers = db.state.offers || [];
   const newOffers = [];
@@ -125,6 +131,17 @@ export async function runDiscovery(db, config) {
     selected: candidates.length,
     maxCandidates
   }));
+  await safeReport(db, config, {
+    agent: "discovery",
+    title: "Candidatos ranqueados",
+    message: "Promoções encontradas foram filtradas e ranqueadas.",
+    data: {
+      encontrados: newOffers.length,
+      elegiveis: candidates.length,
+      selecionados: candidates.length,
+      limite: maxCandidates
+    }
+  });
 
   // Enqueue one validation job per selected candidate.
   // Also persist each candidate immediately so isAlreadyKnown blocks re-discovery
@@ -160,10 +177,23 @@ export async function runDiscovery(db, config) {
       }
     } catch (err) {
       console.log("agent_event", JSON.stringify({ agent: "discovery", event: "enqueue_error", error: err.message }));
+      await safeReport(db, config, {
+        agent: "discovery",
+        severity: "warning",
+        title: "Falha ao enfileirar",
+        message: "Uma promoção não entrou no funil de validação.",
+        data: { erro: err.message }
+      });
     }
   }
 
   console.log("agent_event", JSON.stringify({ agent: "discovery", event: "done", found: newOffers.length, enqueued }));
+  await safeReport(db, config, {
+    agent: "discovery",
+    title: "Busca finalizada",
+    message: "Agente de descoberta terminou o ciclo.",
+    data: { encontrados: newOffers.length, enfileirados: enqueued }
+  });
   return { found: newOffers.length, enqueued };
 }
 
@@ -183,4 +213,12 @@ export function discoveryCandidateLimit(config) {
 
 function candidateScore(offer, profile, state, config) {
   return premiumCurationScore(offer, config, state) + learningScoreForOffer(offer, profile);
+}
+
+async function safeReport(db, config, event) {
+  try {
+    await reportAgentEvent(db, config, event);
+  } catch {
+    // Discord telemetry is best-effort and must not stop discovery.
+  }
 }

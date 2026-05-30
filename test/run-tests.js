@@ -1783,6 +1783,56 @@ test("publisher skips duplicate Telegram products even with a different offer id
   }
 });
 
+test("publisher skips recently published related Telegram product families", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "offer_tv_sent",
+      title: "Smart TV 4K 86\" LG QNED73 + Soundbar LG 600W",
+      asin: "B0GV695HB8",
+      originalUrl: "https://www.amazon.com.br/dp/B0GV695HB8"
+    });
+    db.state.publishLog.push({
+      id: "pub_tv_sent",
+      offerId: "offer_tv_sent",
+      channel: "telegram",
+      result: { ok: true, detail: "ok" },
+      createdAt: new Date().toISOString()
+    });
+    await db.save();
+
+    const offer = {
+      id: "offer_tv_related",
+      title: "Smart TV 4K 65\" LG QNED73 + Soundbar LG 300W",
+      asin: "B0GV5X5H6V",
+      currentPrice: 4743.13,
+      previousPrice: 6198,
+      discountPercent: 23,
+      originalUrl: "https://www.amazon.com.br/dp/B0GV5X5H6V",
+      store: "amazon"
+    };
+    const content = {
+      imageUrls: [],
+      copy: {
+        telegram: "TV relacionada {LINK}",
+        discord: "TV relacionada {LINK}",
+        x: "TV relacionada"
+      }
+    };
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+
+    const result = await publishDeal(offer, content, config, db);
+
+    assert.equal(result.telegram.skipped, true);
+    assert.equal(result.telegram.detail, "related_offer_recently_published");
+    assert.equal(db.state.publishLog.filter((entry) => entry.channel === "telegram").length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("publication recovery selects auto-ready Telegram offers that were not published", () => {
   const now = new Date("2026-05-29T22:00:00.000Z");
   const state = {
@@ -2191,7 +2241,9 @@ test("Discord status reports unknown guild with safe diagnostics", async () => {
   const db = { state: { discord: { channels: {}, roles: {}, lastSetupAt: null, lastSetupError: null } } };
   const result = await checkDiscordStatus(db, {
     discordBotToken: "token",
-    discordGuildId: "1510299067148931133"
+    discordGuildId: "1510299067148931133",
+    discordOpsEnabled: true,
+    discordPublicDealsEnabled: false
   }, {
     fetchImpl: async () => new Response(JSON.stringify({ message: "Unknown Guild" }), { status: 404 })
   });
@@ -2199,6 +2251,8 @@ test("Discord status reports unknown guild with safe diagnostics", async () => {
   assert.equal(result.configured, true);
   assert.equal(result.guildId, "1510299067148931133");
   assert.equal(result.accessible, false);
+  assert.equal(result.opsEnabled, true);
+  assert.equal(result.publicDealsEnabled, false);
   assert.equal(result.error, "Unknown Guild");
   assert.equal(Object.prototype.hasOwnProperty.call(result, "token"), false);
 });
