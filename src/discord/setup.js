@@ -62,6 +62,38 @@ export async function setupDiscordServer(db, config, options = {}) {
   }
 }
 
+export async function checkDiscordStatus(db, config, options = {}) {
+  const configured = Boolean(config.discordBotToken && config.discordGuildId);
+  const base = {
+    configured,
+    hasBotToken: Boolean(config.discordBotToken),
+    guildId: config.discordGuildId || "",
+    accessible: false,
+    channelCount: 0,
+    managedChannelCount: Object.keys(db.state.discord?.channels || {}).length,
+    lastSetupAt: db.state.discord?.lastSetupAt || null,
+    lastSetupError: db.state.discord?.lastSetupError || null
+  };
+  if (!configured) return { ...base, error: "DISCORD_BOT_TOKEN or DISCORD_GUILD_ID not configured" };
+
+  try {
+    const client = options.client || createDiscordClient(config, options);
+    const channels = await client.listGuildChannels(config.discordGuildId);
+    return {
+      ...base,
+      accessible: true,
+      channelCount: channels.length,
+      error: null
+    };
+  } catch (error) {
+    return {
+      ...base,
+      accessible: false,
+      error: friendlyDiscordError(error?.message || String(error))
+    };
+  }
+}
+
 async function ensureChannel(client, guildId, channelsByName, body) {
   const existing = channelsByName.get(body.name);
   if (existing) return existing;
@@ -123,4 +155,11 @@ async function recordSetupError(db, message) {
   db.state.discord.lastSetupError = message;
   if (db.save) await db.save();
   return { ok: false, error: message };
+}
+
+function friendlyDiscordError(message) {
+  if (/Unknown Guild/i.test(message)) return "Unknown Guild";
+  if (/Missing Access/i.test(message)) return "Missing Access";
+  if (/401|Unauthorized/i.test(message)) return "Unauthorized";
+  return message;
 }

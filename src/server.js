@@ -5,7 +5,7 @@ import { cloneDraftForRetest, createAnalyticsReport, createDraftsForOffer, publi
 import { runAmazonDiscovery, updateAmazonDiscoverySettings } from "./discovery.js";
 import { runDiscovery } from "./agents/discovery.js";
 import { runSupervisorCheck } from "./agents/supervisor.js";
-import { setupDiscordServer } from "./discord/setup.js";
+import { checkDiscordStatus, setupDiscordServer } from "./discord/setup.js";
 import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
 import { testDiscord } from "./publishers/discord.js";
@@ -114,6 +114,11 @@ async function handleApi(req, res, url, db, config) {
   if (req.method === "POST" && url.pathname === "/api/discord/setup") {
     const result = await setupDiscordServer(db, config);
     sendJson(res, result.ok ? 200 : 400, result);
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/api/discord/status") {
+    const result = await checkDiscordStatus(db, config);
+    sendJson(res, 200, result);
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/supervisor/run") {
@@ -483,6 +488,8 @@ function publicState(db, config) {
     recommendations,
     settings: db.state.settings,
     discovery: db.state.discovery,
+    discord: db.state.discord,
+    incidents: db.state.incidents || [],
     publishLog: db.state.publishLog.slice(0, 20),
     integrations: db.state.integrations,
     priceHistory: db.state.priceHistory,

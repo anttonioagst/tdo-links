@@ -25,6 +25,7 @@ import { publishDeal } from "../src/agents/publisher.js";
 import { runSupervisorCheck } from "../src/agents/supervisor.js";
 import { discordDealChannelForOffer } from "../src/discord/deals.js";
 import { reportAgentEvent } from "../src/discord/reporter.js";
+import { checkDiscordStatus } from "../src/discord/setup.js";
 import { setupDiscordServer } from "../src/discord/setup.js";
 import { hasRealPromotion } from "../src/deals.js";
 import { buildLearningProfile, learningScoreForOffer } from "../src/learning.js";
@@ -2184,6 +2185,22 @@ test("Discord setup creates managed public and private channels without deleting
   assert.equal(db.state.discord.channels["boas-vindas"], "existing-welcome");
   assert.ok(db.state.discord.channels.supervisor);
   assert.ok(db.state.discord.channels["ofertas-do-dia"]);
+});
+
+test("Discord status reports unknown guild with safe diagnostics", async () => {
+  const db = { state: { discord: { channels: {}, roles: {}, lastSetupAt: null, lastSetupError: null } } };
+  const result = await checkDiscordStatus(db, {
+    discordBotToken: "token",
+    discordGuildId: "1510299067148931133"
+  }, {
+    fetchImpl: async () => new Response(JSON.stringify({ message: "Unknown Guild" }), { status: 404 })
+  });
+
+  assert.equal(result.configured, true);
+  assert.equal(result.guildId, "1510299067148931133");
+  assert.equal(result.accessible, false);
+  assert.equal(result.error, "Unknown Guild");
+  assert.equal(Object.prototype.hasOwnProperty.call(result, "token"), false);
 });
 
 test("Discord ops reporter sends agent event to mapped private channel and masks secrets", async () => {
