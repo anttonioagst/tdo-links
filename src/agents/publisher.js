@@ -4,6 +4,8 @@ import { publishXAcquisition } from "../publishers/x.js";
 import { buildAffiliateUrl } from "../links.js";
 import { telegramPublicationStatus } from "../publication-policy.js";
 import { wasSimilarOfferPublished } from "../publication-dedupe.js";
+import { publishDiscordDeal } from "../discord/deals.js";
+import { reportAgentEvent } from "../discord/reporter.js";
 
 const INTER_CHANNEL_DELAY_MS = 3000;
 
@@ -86,6 +88,13 @@ export async function publishDeal(offer, content, config, db) {
           offerInDb.validationSummary = "telegram_photo_required";
           offerInDb.updatedAt = new Date().toISOString();
         }
+        await safeReport(db, config, {
+          agent: "publisher",
+          severity: result.ok ? "info" : "warning",
+          title: result.ok ? "Telegram publicado" : "Falha no Telegram",
+          message: result.ok ? "Oferta enviada para o Telegram." : result.detail || result.error || "Falha ao publicar no Telegram.",
+          data: { offerId: offer.id, messageId: result.providerMessageId || "", detail: result.detail || "" }
+        });
         console.log("agent_event", JSON.stringify({ agent: "publisher", event: "telegram_done", offerId: offer.id, ok: result.ok }));
       } catch (err) {
         results.telegram = { ok: false, error: err.message };
@@ -105,6 +114,20 @@ export async function publishDeal(offer, content, config, db) {
         const result = await publishDiscord(draft, config, offerForDiscord);
         results.discord = result;
         savePublishResult(db, offer.id, "discord", result);
+        if (result.ok) {
+          const publicResult = await publishDiscordDeal(db, config, offerForDiscord).catch((error) => ({
+            ok: false,
+            detail: error?.message || String(error)
+          }));
+          results.discordPublic = publicResult;
+        }
+        await safeReport(db, config, {
+          agent: "publisher",
+          severity: result.ok ? "info" : "warning",
+          title: result.ok ? "Discord processado" : "Falha no Discord",
+          message: result.ok ? "Oferta processada no Discord." : result.detail || result.error || "Falha ao publicar no Discord.",
+          data: { offerId: offer.id, detail: result.detail || "" }
+        });
         console.log("agent_event", JSON.stringify({ agent: "publisher", event: "discord_done", offerId: offer.id, ok: result.ok }));
       } catch (err) {
         results.discord = { ok: false, error: err.message };
@@ -151,4 +174,12 @@ export async function publishDeal(offer, content, config, db) {
   }));
 
   return results;
+}
+
+async function safeReport(db, config, event) {
+  try {
+    await reportAgentEvent(db, config, event);
+  } catch {
+    // Operational reporting must never block the publishing pipeline.
+  }
 }
