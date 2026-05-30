@@ -22,6 +22,7 @@ import { validateOffer } from "../src/validation.js";
 import { createTelegramCopy, telegramCopy } from "../src/copywriter.js";
 import { createContent } from "../src/agents/creative.js";
 import { publishDeal } from "../src/agents/publisher.js";
+import { setupDiscordServer } from "../src/discord/setup.js";
 import { hasRealPromotion } from "../src/deals.js";
 import { buildLearningProfile, learningScoreForOffer } from "../src/learning.js";
 import { telegramPublicationStatus } from "../src/publication-policy.js";
@@ -2147,6 +2148,39 @@ test("db state includes incidents and discord channel registry defaults", async 
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("Discord setup creates managed public and private channels without deleting existing channels", async () => {
+  const calls = [];
+  const existingChannels = [
+    { id: "cat-public", name: "📌 INICIO", type: 4 },
+    { id: "existing-welcome", name: "boas-vindas", type: 0, parent_id: "cat-public" }
+  ];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (options.method === "GET") return new Response(JSON.stringify(existingChannels), { status: 200 });
+    if (options.method === "POST") {
+      const body = JSON.parse(options.body);
+      return new Response(JSON.stringify({ id: `created-${calls.length}`, name: body.name, type: body.type, parent_id: body.parent_id || null }), { status: 201 });
+    }
+    if (options.method === "PATCH") return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    return new Response("{}", { status: 200 });
+  };
+  const db = {
+    state: { discord: { channels: {}, roles: {}, lastSetupAt: null, lastSetupError: null } },
+    save: async () => {}
+  };
+  const result = await setupDiscordServer(db, {
+    discordBotToken: "token",
+    discordGuildId: "guild",
+    discordAdminRoleName: "Admin TDO"
+  }, { fetchImpl });
+
+  assert.equal(result.ok, true);
+  assert.ok(calls.some(call => call.options.method === "POST"));
+  assert.equal(db.state.discord.channels["boas-vindas"], "existing-welcome");
+  assert.ok(db.state.discord.channels.supervisor);
+  assert.ok(db.state.discord.channels["ofertas-do-dia"]);
 });
 
 let failed = 0;
