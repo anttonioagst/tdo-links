@@ -1858,6 +1858,39 @@ test("publication recovery selects auto-ready Telegram offers that were not publ
   assert.deepEqual(pending.map((offer) => offer.id), ["offer_better"]);
 });
 
+test("publication recovery retries photo failures after a short cooldown", () => {
+  const now = new Date("2026-05-30T14:00:00.000Z");
+  const state = {
+    offers: [
+      {
+        id: "offer_retry_photo",
+        title: "TP-Link Deco X10 Mesh Wi-Fi 6",
+        status: "auto_ready",
+        currentPrice: 799,
+        previousPrice: 901.47,
+        discountPercent: 11,
+        rating: 4.7,
+        reviewCount: 1200,
+        imageUrls: ["https://m.media-amazon.com/images/I/deco._AC_UL800_.jpg"],
+        createdAt: "2026-05-30T08:46:33.587Z",
+        updatedAt: "2026-05-30T08:51:33.444Z"
+      }
+    ],
+    publishLog: [
+      {
+        channel: "telegram",
+        offerId: "offer_retry_photo",
+        result: { ok: false, detail: "telegram_photo_required" },
+        createdAt: "2026-05-30T08:51:34.011Z"
+      }
+    ]
+  };
+
+  const pending = selectPendingTelegramOffers(state, 4, { now });
+
+  assert.deepEqual(pending.map((offer) => offer.id), ["offer_retry_photo"]);
+});
+
 test("Telegram publication policy allows four per hour with fifteen minute spacing", () => {
   const now = new Date("2026-05-28T12:30:00.000Z");
   const config = {

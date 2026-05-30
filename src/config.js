@@ -74,6 +74,8 @@ export function loadConfig(env = process.env) {
     secondaryBrands: env.SECONDARY_BRANDS || "",
     premiumCurationMinScore: Number(env.PREMIUM_CURATION_MIN_SCORE || 30),
     maxPremiumCategoryPerWindow: Number(env.MAX_PREMIUM_CATEGORY_PER_WINDOW || 1),
+    recoveryLookbackHours: Number(env.RECOVERY_LOOKBACK_HOURS || 12),
+    recoveryFailedLookbackHours: Number(env.RECOVERY_FAILED_LOOKBACK_HOURS || 2),
     allowExternalProductImages: env.ALLOW_EXTERNAL_PRODUCT_IMAGES === "true",
     maxCandidatesPerCycle: Number(env.MAX_CANDIDATES_PER_CYCLE || 2),
     databaseUrl: env.DATABASE_URL || "",

@@ -5,7 +5,7 @@ import { premiumCurationScore } from "./premium-curation.js";
 export function selectPendingTelegramOffers(state = {}, limit = 4, options = {}) {
   const now = options.now || new Date();
   const lookbackHours = Number(options.lookbackHours ?? 12);
-  const failedLookbackHours = Number(options.failedLookbackHours ?? 12);
+  const failedLookbackHours = Number(options.failedLookbackHours ?? 2);
   const minScore = Number(options.minScore ?? 30);
   const cutoff = new Date(now.getTime() - lookbackHours * 60 * 60 * 1000);
   const failedCutoff = new Date(now.getTime() - failedLookbackHours * 60 * 60 * 1000);
@@ -60,6 +60,8 @@ export async function enqueuePendingTelegramOffers(db, config, queue) {
   const availableSlots = Math.max(1, Number(config.maxPublicationsPerCycle || 4) - publication.recentPublished);
   const offers = selectPendingTelegramOffers(db.state, availableSlots, {
     config,
+    lookbackHours: config.recoveryLookbackHours ?? 12,
+    failedLookbackHours: config.recoveryFailedLookbackHours ?? 2,
     minScore: config.recoveryPremiumMinScore ?? config.premiumCurationMinScore ?? 30
   });
   let enqueued = 0;
