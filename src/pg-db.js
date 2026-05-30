@@ -229,7 +229,8 @@ export class PgDb {
     this.pool = new Pool({ connectionString: databaseUrl, max: 10 });
     this.state = {
       offers: [], drafts: [], clicks: [], experiments: [],
-      reports: [], recommendations: [], campaigns: [],
+      reports: [], recommendations: [], campaigns: [], incidents: [],
+      discord: { channels: {}, roles: {}, lastSetupAt: null, lastSetupError: null },
       integrations: { discord: { webhookUrl: "", enabled: false, dryRun: true, lastTest: null, lastError: null } },
       discovery: { amazon: { enabled: true, intervalHours: 2, minScore: 70, maxCandidatesPerRun: 10, sourceUrls: [], searchTerms: [], lastRun: null, nextRunAt: null } },
       settings: { mode: "limited", autoPublishThreshold: 85, reviewThreshold: 70 },
@@ -271,6 +272,8 @@ export class PgDb {
       if (r.key === "app") Object.assign(this.state.settings, r.value);
       if (r.key === "discovery") this.state.discovery = { ...this.state.discovery, ...r.value };
       if (r.key === "integrations") this.state.integrations = { ...this.state.integrations, ...r.value };
+      if (r.key === "incidents") this.state.incidents = Array.isArray(r.value) ? r.value : [];
+      if (r.key === "discord") this.state.discord = { ...this.state.discord, ...r.value };
     }
 
     return this.state;
@@ -305,12 +308,14 @@ export class PgDb {
 
       await client.query(`
         INSERT INTO settings (key, value) VALUES
-          ('app', $1), ('discovery', $2), ('integrations', $3)
+          ('app', $1), ('discovery', $2), ('integrations', $3), ('incidents', $4), ('discord', $5)
         ON CONFLICT (key) DO UPDATE SET value = excluded.value
       `, [
         JSON.stringify(this.state.settings),
         JSON.stringify(this.state.discovery),
-        JSON.stringify(this.state.integrations)
+        JSON.stringify(this.state.integrations),
+        JSON.stringify(this.state.incidents || []),
+        JSON.stringify(this.state.discord || { channels: {}, roles: {}, lastSetupAt: null, lastSetupError: null })
       ]);
 
       await client.query("COMMIT");

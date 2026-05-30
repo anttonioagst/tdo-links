@@ -31,6 +31,13 @@ const emptyDb = {
     }
   },
   campaigns: [],
+  incidents: [],
+  discord: {
+    channels: {},
+    roles: {},
+    lastSetupAt: null,
+    lastSetupError: null
+  },
   discovery: structuredClone(defaultDiscovery),
   settings: {
     mode: "limited",
@@ -60,6 +67,13 @@ function normalizeState(state) {
       ...base.integrations.discord,
       ...(state.integrations?.discord || {})
     }
+  };
+  merged.incidents = Array.isArray(state.incidents) ? state.incidents : [];
+  merged.discord = {
+    ...base.discord,
+    ...(state.discord || {}),
+    channels: { ...base.discord.channels, ...(state.discord?.channels || {}) },
+    roles: { ...base.discord.roles, ...(state.discord?.roles || {}) }
   };
   merged.priceHistory = state.priceHistory || {};
   return merged;

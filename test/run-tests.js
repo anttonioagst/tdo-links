@@ -2113,6 +2113,42 @@ test("POST /api/integrations/discord/test retorna resultado", async () => {
   assert.equal(typeof body.ok, "boolean");
 });
 
+test("config exposes Discord bot and supervisor settings", () => {
+  const config = loadConfig({
+    DISCORD_BOT_TOKEN: "bot-token",
+    DISCORD_GUILD_ID: "guild-1",
+    DISCORD_ADMIN_ROLE_NAME: "Admin TDO",
+    DISCORD_SETUP_ENABLED: "true",
+    DISCORD_OPS_ENABLED: "true",
+    DISCORD_PUBLIC_DEALS_ENABLED: "false",
+    SUPERVISOR_ENABLED: "true",
+    SUPERVISOR_INTERVAL_MINUTES: "5",
+    SUPERVISOR_STALE_TELEGRAM_MINUTES: "90"
+  });
+
+  assert.equal(config.discordBotToken, "bot-token");
+  assert.equal(config.discordGuildId, "guild-1");
+  assert.equal(config.discordAdminRoleName, "Admin TDO");
+  assert.equal(config.discordSetupEnabled, true);
+  assert.equal(config.discordOpsEnabled, true);
+  assert.equal(config.discordPublicDealsEnabled, false);
+  assert.equal(config.supervisorEnabled, true);
+  assert.equal(config.supervisorIntervalMinutes, 5);
+  assert.equal(config.supervisorStaleTelegramMinutes, 90);
+});
+
+test("db state includes incidents and discord channel registry defaults", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    assert.deepEqual(db.state.incidents, []);
+    assert.deepEqual(db.state.discord, { channels: {}, roles: {}, lastSetupAt: null, lastSetupError: null });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 let failed = 0;
 for (const { name, fn } of tests) {
   try {
