@@ -18,13 +18,13 @@ import { normalizeTelegramImageUrl, publishTelegram, selectBestTelegramPhoto, sq
 import { buildRecommendations } from "../src/recommendations.js";
 import { createApp } from "../src/server.js";
 import { dedupeOffers, scoreOffer, scoreOfferDetailed, statusForScore } from "../src/scoring.js";
-import { buildAmazonScrapeUrls, parseAmazonSearch, selectScrapedAmazonOffers } from "../src/scrapers.js";
+import { buildAmazonScrapeUrls, parseAmazonSearch, selectScrapedAmazonOffers, verifyAmazonProduct } from "../src/scrapers.js";
 import { validateOffer } from "../src/validation.js";
 import { createTelegramCopy, telegramCopy } from "../src/copywriter.js";
 import { createContent } from "../src/agents/creative.js";
 import { publishDeal } from "../src/agents/publisher.js";
 import { runSupervisorCheck } from "../src/agents/supervisor.js";
-import { discordDealChannelForOffer } from "../src/discord/deals.js";
+import { buildDiscordDealMessage, discordDealChannelForOffer } from "../src/discord/deals.js";
 import { reportAgentEvent } from "../src/discord/reporter.js";
 import { checkDiscordStatus } from "../src/discord/setup.js";
 import { setupDiscordServer } from "../src/discord/setup.js";
@@ -1000,6 +1000,35 @@ test("parses Amazon search HTML into normalized offer candidates", () => {
   assert.equal(offer.originalUrl, "https://www.amazon.com.br/dp/B0TEST1234");
 });
 
+test("verifyAmazonProduct returns product page images for exact ASIN", async () => {
+  const html = `
+    <html>
+      <span class="a-offscreen">R$ 282,12</span>
+      <span id="productTitle">Kit Mouse Sem Fio Logitech Pebble 2 M350s Grafite + Teclado Sem fio Logitech Pebble Keys 2 K380s Grafite</span>
+      <img id="landingImage" src="https://m.media-amazon.com/images/I/exact-product.jpg" />
+      <script>
+        var data = {"hiRes":"https://m.media-amazon.com/images/I/exact-product-hires.jpg"};
+      </script>
+      4,9 de 5 estrelas
+      <span id="acrCustomerReviewText">123 avaliações</span>
+    </html>
+  `;
+
+  const result = await verifyAmazonProduct("B0DVCHL7PG", {
+    fetchImpl: async (url) => {
+      assert.equal(url, "https://www.amazon.com.br/dp/B0DVCHL7PG");
+      return new Response(html, { status: 200 });
+    }
+  });
+
+  assert.equal(result.title, "Kit Mouse Sem Fio Logitech Pebble 2 M350s Grafite + Teclado Sem fio Logitech Pebble Keys 2 K380s Grafite");
+  assert.equal(result.imageUrl, "https://m.media-amazon.com/images/I/exact-product.jpg");
+  assert.deepEqual(result.imageUrls, [
+    "https://m.media-amazon.com/images/I/exact-product.jpg",
+    "https://m.media-amazon.com/images/I/exact-product-hires.jpg"
+  ]);
+});
+
 test("diagnostics exposes Telegram dry-run and credential health", () => {
   const config = loadConfig({
     PUBLIC_BASE_URL: "http://localhost:4318",
@@ -1834,6 +1863,53 @@ test("publisher skips recently published related Telegram product families", asy
   }
 });
 
+test("publisher blocks Amazon search offers when exact product image cannot be verified", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    const offer = {
+      id: "offer_bad_search_image",
+      title: "Kit Mouse Sem Fio Logitech Pebble 2 M350s + Teclado K380s",
+      asin: "B0DVCHL7PG",
+      source: "amazon_search",
+      currentPrice: 282.12,
+      previousPrice: 371.8,
+      discountPercent: 24,
+      originalUrl: "https://www.amazon.com.br/dp/B0DVCHL7PG",
+      imageUrl: "https://m.media-amazon.com/images/I/search-result-mismatch.jpg",
+      imageUrls: ["https://m.media-amazon.com/images/I/search-result-mismatch.jpg"],
+      store: "amazon"
+    };
+    db.state.offers.push(offer);
+    await db.save();
+
+    const config = loadConfig({
+      PUBLIC_BASE_URL: "http://localhost:4318",
+      TELEGRAM_DRY_RUN: "false",
+      TELEGRAM_BOT_TOKEN: "token",
+      TELEGRAM_CHAT_ID: "chat"
+    });
+    config.fetchImpl = async () => new Response("", { status: 404 });
+
+    const result = await publishDeal(offer, {
+      imageUrls: [],
+      copy: {
+        telegram: "Oferta {LINK}",
+        discord: "Oferta {LINK}",
+        x: "Oferta"
+      }
+    }, config, db);
+
+    assert.equal(result.telegram.skipped, true);
+    assert.equal(result.telegram.detail, "image_verification_failed");
+    assert.equal(result.discord.skipped, true);
+    assert.equal(db.state.publishLog.length, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("publication recovery selects auto-ready Telegram offers that were not published", () => {
   const now = new Date("2026-05-29T22:00:00.000Z");
   const state = {
@@ -2353,6 +2429,23 @@ test("Discord deal routing maps offers to public promotion channels", () => {
   assert.equal(discordDealChannelForOffer({ title: "Monitor LG Ultragear" }), "monitores");
   assert.equal(discordDealChannelForOffer({ title: "Headset HyperX Cloud" }), "audio-headsets");
   assert.equal(discordDealChannelForOffer({ title: "Cadeira Flexform" }), "cadeiras-mesas");
+});
+
+test("Discord public deal embed keeps image URLs and omits affiliate footer", () => {
+  const message = buildDiscordDealMessage({
+    title: "Kit Mouse Sem Fio Logitech Pebble 2",
+    currentPrice: 282.12,
+    previousPrice: 371.8,
+    discountPercent: 24,
+    telegramImageFileId: "telegram-file-id",
+    imageUrls: ["https://m.media-amazon.com/images/I/exact-product.jpg"],
+    store: "amazon"
+  }, "https://www.amazon.com.br/dp/B0DVCHL7PG?tag=tdolinks-20");
+
+  const embed = message.embeds[0];
+  assert.deepEqual(embed.image, { url: "https://m.media-amazon.com/images/I/exact-product.jpg" });
+  assert.equal(embed.footer, undefined);
+  assert.doesNotMatch(JSON.stringify(message), /Link de afiliado/i);
 });
 
 test("supervisor detects stale Telegram window and enqueues one recovery", async () => {

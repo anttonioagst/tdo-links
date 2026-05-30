@@ -26,7 +26,6 @@ export function buildDiscordDealMessage(offer = {}, affiliateUrl = "") {
       url: affiliateUrl || offer.affiliateUrl || offer.originalUrl || offer.url || undefined,
       image: bestImage(offer) ? { url: bestImage(offer) } : undefined,
       fields: specs.map((spec) => ({ name: spec.name, value: spec.value, inline: true })),
-      footer: { text: "Link de afiliado: posso receber comissão pela compra." },
       timestamp: new Date().toISOString()
     }]
   };
@@ -56,10 +55,8 @@ function compactSpecs(offer) {
 }
 
 function bestImage(offer) {
-  return offer.telegramImageFileId ? null : (
-    offer.officialImageUrls?.[0] ||
+  return offer.officialImageUrls?.[0] ||
     offer.imageUrls?.[0] ||
     offer.imageUrl ||
-    null
-  );
+    null;
 }

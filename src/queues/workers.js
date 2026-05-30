@@ -90,6 +90,11 @@ export function startWorkers(db, config, connection) {
         // Enrich with product page rating/reviews when search HTML doesn't have them
         if (verified.rating && (!offer.rating || offer.rating === 0)) updates.rating = verified.rating;
         if (verified.reviewCount && (!offer.reviewCount || offer.reviewCount === 0)) updates.reviewCount = verified.reviewCount;
+        if (verified.imageUrls?.length) {
+          updates.imageUrl = verified.imageUrl;
+          updates.imageUrls = verified.imageUrls;
+          updates.productPageImageVerifiedAt = new Date().toISOString();
+        }
         offer = { ...offer, ...updates };
       } catch (err) {
         console.log("job_event", JSON.stringify({ queue: "validation", event: "price_verify_error", asin: offer.asin, error: err.message }));

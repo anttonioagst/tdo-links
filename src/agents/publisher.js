@@ -6,6 +6,7 @@ import { telegramPublicationStatus } from "../publication-policy.js";
 import { relatedOfferRecentlyPublished, wasSimilarOfferPublished } from "../publication-dedupe.js";
 import { publishDiscordDeal } from "../discord/deals.js";
 import { reportAgentEvent } from "../discord/reporter.js";
+import { verifyAmazonProduct } from "../scrapers.js";
 
 const INTER_CHANNEL_DELAY_MS = 3000;
 
@@ -48,7 +49,7 @@ export async function publishDeal(offer, content, config, db) {
     affiliateUrl = offer.affiliateUrl || offer.originalUrl || offer.url || "";
   }
   const { imageUrls, copy } = content;
-  const offerWithImage = imageUrls?.length
+  let offerWithImage = imageUrls?.length
     ? { ...offer, officialImageUrls: imageUrls }
     : offer;
   const results = {};
@@ -97,6 +98,13 @@ export async function publishDeal(offer, content, config, db) {
       data: { offerId: offer.id, motivo: publication.reason, esperaMin: publication.waitMinutes }
     });
   } else if (!wasAlreadyPublished(db, offer.id, "telegram")) {
+    offer = await refreshExactAmazonMedia(offer, config, db);
+    if (offer.imageVerificationFailed) {
+      return blockImageUnverified(db, config, offer);
+    }
+    offerWithImage = imageUrls?.length
+      ? { ...offer, officialImageUrls: imageUrls }
+      : offer;
     channels.push(async () => {
       try {
         const draft = { text: resolveCopy(copy.telegram, affiliateUrl) };
@@ -206,4 +214,43 @@ async function safeReport(db, config, event) {
   } catch {
     // Operational reporting must never block the publishing pipeline.
   }
+}
+
+async function blockImageUnverified(db, config, offer) {
+  const skipped = { ok: true, skipped: true, detail: "image_verification_failed" };
+  await safeReport(db, config, {
+    agent: "publisher",
+    severity: "warning",
+    title: "Publicação bloqueada por imagem",
+    message: "Oferta Amazon vinda da busca não publicou porque a imagem exata do ASIN não foi verificada.",
+    data: { offerId: offer.id, asin: offer.asin || "" }
+  });
+  return { telegram: skipped, discord: skipped, x: skipped };
+}
+
+async function refreshExactAmazonMedia(offer, config, db) {
+  if (offer.store !== "amazon" || !offer.asin) return offer;
+  if (offer.source && offer.source !== "amazon_search") return offer;
+  if (offer.productPageImageVerifiedAt && offer.imageUrls?.length) return offer;
+  const verified = await verifyAmazonProduct(offer.asin, config);
+  if (!verified.imageUrls?.length) {
+    const updates = {
+      imageUrl: null,
+      imageUrls: [],
+      imageVerificationFailed: true,
+      imageStatus: "failed",
+      imageStatusUpdatedAt: new Date().toISOString()
+    };
+    const offerInDb = db.state.offers?.find((item) => item.id === offer.id);
+    if (offerInDb) Object.assign(offerInDb, updates, { updatedAt: new Date().toISOString() });
+    return { ...offer, ...updates };
+  }
+  const updates = {
+    imageUrl: verified.imageUrl,
+    imageUrls: verified.imageUrls,
+    productPageImageVerifiedAt: new Date().toISOString()
+  };
+  const offerInDb = db.state.offers?.find((item) => item.id === offer.id);
+  if (offerInDb) Object.assign(offerInDb, updates, { updatedAt: new Date().toISOString() });
+  return { ...offer, ...updates };
 }

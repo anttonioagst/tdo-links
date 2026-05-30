@@ -192,11 +192,24 @@ export async function verifyAmazonProduct(asin, config = {}) {
     const reviewCount = reviewRaw
       ? parseInt(reviewRaw.replace(/\./g, ""), 10) || null
       : null;
+    const title = cleanText(matchFirst(html, [
+      /id="productTitle"[^>]*>([\s\S]*?)<\/span>/i,
+      /<title>([\s\S]*?)<\/title>/i
+    ]));
+    const imageUrl = decodeHtml(matchFirst(html, [
+      /id="landingImage"[^>]+src="([^"]+)"/i,
+      /data-old-hires="([^"]+)"/i,
+      /"large":"([^"]+)"/i
+    ]));
+    const imageUrls = uniqueImageUrls([
+      imageUrl,
+      ...[...html.matchAll(/https:\/\/m\.media-amazon\.com\/images\/I\/[^"'\\\s]+?\.(?:jpg|jpeg|png|webp)/gi)].map((match) => decodeHtml(match[0]))
+    ]);
 
-    return { currentPrice, rating, reviewCount };
+    return { currentPrice, rating, reviewCount, title, imageUrl: imageUrls[0] || null, imageUrls };
   } catch (err) {
     console.error("amazon_product_verify_failed", asin, err.message);
-    return { currentPrice: null, rating: null, reviewCount: null };
+    return { currentPrice: null, rating: null, reviewCount: null, title: "", imageUrl: null, imageUrls: [] };
   }
 }
 
@@ -288,7 +301,8 @@ async function fetchText(url, config) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
-    const response = await fetch(url, {
+    const fetchImpl = config.fetchImpl || fetch;
+    const response = await fetchImpl(url, {
       signal: controller.signal,
       headers: {
         "accept": "text/html,application/xhtml+xml",
