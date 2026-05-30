@@ -57,7 +57,7 @@ export async function enqueuePendingTelegramOffers(db, config, queue) {
     return { enqueued: 0, skipped: true, reason: publication.reason, waitMinutes: publication.waitMinutes };
   }
 
-  const availableSlots = Math.max(1, Number(config.maxPublicationsPerCycle || 4) - publication.recentPublished);
+  const availableSlots = Math.min(1, Math.max(1, Number(config.maxPublicationsPerCycle || 4) - publication.recentPublished));
   const offers = selectPendingTelegramOffers(db.state, availableSlots, {
     config,
     lookbackHours: config.recoveryLookbackHours ?? 12,

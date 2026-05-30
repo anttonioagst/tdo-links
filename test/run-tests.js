@@ -25,7 +25,7 @@ import { publishDeal } from "../src/agents/publisher.js";
 import { hasRealPromotion } from "../src/deals.js";
 import { buildLearningProfile, learningScoreForOffer } from "../src/learning.js";
 import { telegramPublicationStatus } from "../src/publication-policy.js";
-import { selectPendingTelegramOffers } from "../src/publication-recovery.js";
+import { enqueuePendingTelegramOffers, selectPendingTelegramOffers } from "../src/publication-recovery.js";
 import { buildAmazonSearchUrl, normalizeDiscoverySettings, runAmazonDiscovery } from "../src/discovery.js";
 import { shouldRunAmazonDiscovery, runDiscoverySchedulerTick } from "../src/discovery-scheduler.js";
 import { discoveryCandidateLimit, selectDiscoveryCandidates } from "../src/agents/discovery.js";
@@ -1889,6 +1889,47 @@ test("publication recovery retries photo failures after a short cooldown", () =>
   const pending = selectPendingTelegramOffers(state, 4, { now });
 
   assert.deepEqual(pending.map((offer) => offer.id), ["offer_retry_photo"]);
+});
+
+test("publication recovery enqueues only one Telegram offer per recovery tick", async () => {
+  const state = {
+    offers: [
+      {
+        id: "offer_first_recovery",
+        title: "Notebook Acer Aspire 5 Ryzen 5",
+        status: "auto_ready",
+        currentPrice: 3499,
+        previousPrice: 4899,
+        discountPercent: 29,
+        rating: 4.7,
+        reviewCount: 1200,
+        imageUrls: ["https://m.media-amazon.com/images/I/notebook._AC_UL800_.jpg"],
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: "offer_second_recovery",
+        title: "Monitor LG Ultragear 144Hz",
+        status: "auto_ready",
+        currentPrice: 1213.97,
+        previousPrice: 1598.9,
+        discountPercent: 24,
+        rating: 4.7,
+        reviewCount: 900,
+        imageUrls: ["https://m.media-amazon.com/images/I/monitor._AC_UL800_.jpg"],
+        createdAt: new Date().toISOString()
+      }
+    ],
+    publishLog: []
+  };
+  const jobs = [];
+  const db = { state, load: async () => {} };
+  const queue = { add: async (...args) => jobs.push(args) };
+  const config = { maxPublicationsPerCycle: 4, publicationWindowHours: 1, minPublicationIntervalMinutes: 15 };
+
+  const result = await enqueuePendingTelegramOffers(db, config, queue);
+
+  assert.equal(result.enqueued, 1);
+  assert.equal(jobs.length, 1);
 });
 
 test("Telegram publication policy allows four per hour with fifteen minute spacing", () => {
