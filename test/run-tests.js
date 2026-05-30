@@ -22,6 +22,8 @@ import { validateOffer } from "../src/validation.js";
 import { createTelegramCopy, telegramCopy } from "../src/copywriter.js";
 import { createContent } from "../src/agents/creative.js";
 import { publishDeal } from "../src/agents/publisher.js";
+import { discordDealChannelForOffer } from "../src/discord/deals.js";
+import { reportAgentEvent } from "../src/discord/reporter.js";
 import { setupDiscordServer } from "../src/discord/setup.js";
 import { hasRealPromotion } from "../src/deals.js";
 import { buildLearningProfile, learningScoreForOffer } from "../src/learning.js";
@@ -2181,6 +2183,30 @@ test("Discord setup creates managed public and private channels without deleting
   assert.equal(db.state.discord.channels["boas-vindas"], "existing-welcome");
   assert.ok(db.state.discord.channels.supervisor);
   assert.ok(db.state.discord.channels["ofertas-do-dia"]);
+});
+
+test("Discord ops reporter sends agent event to mapped private channel and masks secrets", async () => {
+  const sent = [];
+  const db = { state: { discord: { channels: { supervisor: "chan-supervisor" } } } };
+  const result = await reportAgentEvent(db, { discordOpsEnabled: true, discordBotToken: "token" }, {
+    agent: "supervisor",
+    severity: "warning",
+    title: "Token check",
+    message: "Using token abc123",
+    data: { token: "secret", offerId: "offer_1" }
+  }, { client: { createMessage: async (channelId, body) => sent.push({ channelId, body }) } });
+
+  assert.equal(result.ok, true);
+  assert.equal(sent[0].channelId, "chan-supervisor");
+  assert.doesNotMatch(JSON.stringify(sent[0].body), /secret/);
+});
+
+test("Discord deal routing maps offers to public promotion channels", () => {
+  assert.equal(discordDealChannelForOffer({ title: "Notebook Acer Aspire" }), "notebooks");
+  assert.equal(discordDealChannelForOffer({ title: "Smart TV LG 55" }), "tvs");
+  assert.equal(discordDealChannelForOffer({ title: "Monitor LG Ultragear" }), "monitores");
+  assert.equal(discordDealChannelForOffer({ title: "Headset HyperX Cloud" }), "audio-headsets");
+  assert.equal(discordDealChannelForOffer({ title: "Cadeira Flexform" }), "cadeiras-mesas");
 });
 
 let failed = 0;
