@@ -3,6 +3,7 @@ import { publishDiscord } from "../publishers/discord.js";
 import { publishXAcquisition } from "../publishers/x.js";
 import { buildAffiliateUrl } from "../links.js";
 import { telegramPublicationStatus } from "../publication-policy.js";
+import { wasSimilarOfferPublished } from "../publication-dedupe.js";
 
 const INTER_CHANNEL_DELAY_MS = 3000;
 
@@ -54,7 +55,10 @@ export async function publishDeal(offer, content, config, db) {
   const channels = [];
 
   const publication = telegramPublicationStatus(db.state.publishLog || [], config);
-  if (!publication.allowed) {
+  if (wasSimilarOfferPublished(db.state, offer, "telegram")) {
+    results.telegram = { ok: true, skipped: true, detail: "duplicate_offer" };
+    console.log("agent_event", JSON.stringify({ agent: "publisher", event: "telegram_skipped_duplicate", offerId: offer.id }));
+  } else if (!publication.allowed) {
     results.telegram = { ok: true, skipped: true, detail: publication.reason, waitMinutes: publication.waitMinutes };
     console.log("agent_event", JSON.stringify({
       agent: "publisher",

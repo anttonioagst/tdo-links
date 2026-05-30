@@ -3,6 +3,7 @@ import { scrapeDeals } from "../scrapers.js";
 import { hasRealPromotion } from "../deals.js";
 import { buildLearningProfile, learningScoreForOffer } from "../learning.js";
 import { premiumCurationScore, selectPremiumCandidates } from "../premium-curation.js";
+import { offerIdentityKeys } from "../publication-dedupe.js";
 
 const RSS_FEEDS = [
   { name: "pelando", url: "https://www.pelando.com.br/rss" },
@@ -74,7 +75,11 @@ function getCanonicalUrl(offer) {
 
 function isAlreadyKnown(offer, existingOffers) {
   const canonical = getCanonicalUrl(offer);
-  return existingOffers.some(existing => getCanonicalUrl(existing) === canonical);
+  const keys = new Set(offerIdentityKeys(offer));
+  return existingOffers.some(existing =>
+    getCanonicalUrl(existing) === canonical ||
+    offerIdentityKeys(existing).some((key) => keys.has(key))
+  );
 }
 
 export async function runDiscovery(db, config) {

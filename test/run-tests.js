@@ -1682,6 +1682,56 @@ test("publisher skips Telegram when publication quota is already reached", async
   }
 });
 
+test("publisher skips duplicate Telegram products even with a different offer id", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "affiliate-mvp-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "offer_sent",
+      title: "Notebook Acer Aspire 5 A515-45-R043 AMD Ryzen 5 Tela 15.6 16 GB RAM 512 GB SSD",
+      asin: "B0OLDACER1",
+      originalUrl: "https://www.amazon.com.br/dp/B0OLDACER1"
+    });
+    db.state.publishLog.push({
+      id: "pub_sent",
+      offerId: "offer_sent",
+      channel: "telegram",
+      result: { ok: true, detail: "ok" },
+      createdAt: new Date().toISOString()
+    });
+    await db.save();
+
+    const offer = {
+      id: "offer_duplicate",
+      title: "Notebook Acer Aspire 5 A515-45-R043 AMD Ryzen 5 Tela 15.6 16 GB RAM 512 GB SSD",
+      asin: "B0NEWACER2",
+      currentPrice: 3979,
+      previousPrice: 5799,
+      discountPercent: 31,
+      originalUrl: "https://www.amazon.com.br/dp/B0NEWACER2",
+      store: "amazon"
+    };
+    const content = {
+      imageUrls: [],
+      copy: {
+        telegram: "Oferta duplicada {LINK}",
+        discord: "Oferta duplicada {LINK}",
+        x: "Oferta duplicada"
+      }
+    };
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" });
+
+    const result = await publishDeal(offer, content, config, db);
+
+    assert.equal(result.telegram.skipped, true);
+    assert.equal(result.telegram.detail, "duplicate_offer");
+    assert.equal(db.state.publishLog.filter((entry) => entry.channel === "telegram").length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("publication recovery selects auto-ready Telegram offers that were not published", () => {
   const now = new Date("2026-05-29T22:00:00.000Z");
   const state = {
