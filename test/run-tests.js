@@ -12,6 +12,7 @@ import { validatePost, validateXAcquisitionPost } from "../src/compliance.js";
 import { loadConfig } from "../src/config.js";
 import { JsonDb } from "../src/db.js";
 import { buildDiagnostics } from "../src/integrations.js";
+import { selectImmediatePublishOffer } from "../src/immediate-publish.js";
 import { buildAffiliateUrl } from "../src/links.js";
 import { normalizeTelegramImageUrl, publishTelegram, selectBestTelegramPhoto, squareTelegramPhoto, testTelegram } from "../src/publishers/telegram.js";
 import { buildRecommendations } from "../src/recommendations.js";
@@ -1985,6 +1986,50 @@ test("publication recovery enqueues only one Telegram offer per recovery tick", 
 
   assert.equal(result.enqueued, 1);
   assert.equal(jobs.length, 1);
+});
+
+test("immediate publish selector skips published and related offers", () => {
+  const state = {
+    offers: [
+      {
+        id: "related_tv",
+        status: "auto_ready",
+        title: "Smart TV 4K 65\" LG QNED73 + Soundbar LG 300W",
+        currentPrice: 4743,
+        previousPrice: 6198,
+        discountPercent: 23,
+        asin: "B0RELATEDTV"
+      },
+      {
+        id: "soundcore",
+        status: "auto_ready",
+        title: "soundcore Space One da Anker, Fone de Ouvido Bluetooth 5.3 com ANC adaptivo",
+        currentPrice: 640.3,
+        previousPrice: 999,
+        discountPercent: 36,
+        asin: "B0SOUNDCORE"
+      },
+      {
+        id: "published_tv",
+        status: "auto_ready",
+        title: "Smart TV 4K 86\" LG QNED73 + Soundbar LG 600W",
+        currentPrice: 8843,
+        previousPrice: 10734,
+        discountPercent: 18,
+        asin: "B0PUBLISHEDTV"
+      }
+    ],
+    publishLog: [{
+      offerId: "published_tv",
+      channel: "telegram",
+      result: { ok: true },
+      createdAt: new Date().toISOString()
+    }]
+  };
+
+  const selected = selectImmediatePublishOffer(state, { relatedOfferDedupeHours: 24 });
+
+  assert.equal(selected.id, "soundcore");
 });
 
 test("Telegram publication policy allows four per hour with fifteen minute spacing", () => {

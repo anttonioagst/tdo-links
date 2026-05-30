@@ -7,6 +7,9 @@ import { runDiscovery } from "./agents/discovery.js";
 import { runSupervisorCheck } from "./agents/supervisor.js";
 import { checkDiscordStatus, setupDiscordServer } from "./discord/setup.js";
 import { buildDiagnostics } from "./integrations.js";
+import { createContent } from "./agents/creative.js";
+import { publishDeal } from "./agents/publisher.js";
+import { selectImmediatePublishOffer } from "./immediate-publish.js";
 import { buildAffiliateUrl } from "./links.js";
 import { testDiscord } from "./publishers/discord.js";
 import { testTelegram } from "./publishers/telegram.js";
@@ -302,6 +305,30 @@ async function handleApi(req, res, url, db, config) {
     } else {
       sendJson(res, 200, result);
     }
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/run/publish-now") {
+    if (db.load) await db.load();
+    const offer = selectImmediatePublishOffer(db.state, config);
+    if (!offer) {
+      sendJson(res, 200, { ok: false, skipped: true, reason: "no_eligible_auto_ready_offer" });
+      return;
+    }
+    const content = await createContent(offer, {
+      valid: true,
+      confidence: offer.validationConfidence || 90,
+      reason: offer.validationSummary || "Oferta auto_ready selecionada para teste operacional."
+    }, config);
+    const offerInDb = db.state.offers.find((item) => item.id === offer.id);
+    if (offerInDb && content.imageUrls?.length) {
+      offerInDb.officialImageUrls = content.imageUrls;
+      offerInDb.imageStatus = "done";
+      offerInDb.imageStatusUpdatedAt = new Date().toISOString();
+      offerInDb.updatedAt = new Date().toISOString();
+      await db.save();
+    }
+    const result = await publishDeal(offerInDb || offer, content, config, db);
+    sendJson(res, 200, { ok: true, offerId: offer.id, title: offer.title, result });
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/run/report") {
