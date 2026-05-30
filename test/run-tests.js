@@ -22,6 +22,7 @@ import { validateOffer } from "../src/validation.js";
 import { createTelegramCopy, telegramCopy } from "../src/copywriter.js";
 import { createContent } from "../src/agents/creative.js";
 import { publishDeal } from "../src/agents/publisher.js";
+import { runSupervisorCheck } from "../src/agents/supervisor.js";
 import { discordDealChannelForOffer } from "../src/discord/deals.js";
 import { reportAgentEvent } from "../src/discord/reporter.js";
 import { setupDiscordServer } from "../src/discord/setup.js";
@@ -2207,6 +2208,68 @@ test("Discord deal routing maps offers to public promotion channels", () => {
   assert.equal(discordDealChannelForOffer({ title: "Monitor LG Ultragear" }), "monitores");
   assert.equal(discordDealChannelForOffer({ title: "Headset HyperX Cloud" }), "audio-headsets");
   assert.equal(discordDealChannelForOffer({ title: "Cadeira Flexform" }), "cadeiras-mesas");
+});
+
+test("supervisor detects stale Telegram window and enqueues one recovery", async () => {
+  const jobs = [];
+  const db = {
+    state: {
+      offers: [{
+        id: "offer_ready",
+        title: "Notebook Acer Aspire",
+        status: "auto_ready",
+        currentPrice: 3499,
+        previousPrice: 4899,
+        discountPercent: 29,
+        imageUrls: ["https://img.test/notebook.jpg"],
+        createdAt: "2026-05-30T14:55:00.000Z"
+      }],
+      publishLog: [],
+      incidents: [],
+      discord: { channels: {} }
+    },
+    load: async () => {},
+    save: async () => {}
+  };
+  const result = await runSupervisorCheck(db, {
+    supervisorEnabled: true,
+    supervisorStaleTelegramMinutes: 60,
+    maxPublicationsPerCycle: 4,
+    publicationWindowHours: 1,
+    minPublicationIntervalMinutes: 15
+  }, {
+    creativeQueue: { add: async (...args) => jobs.push(args) },
+    now: new Date("2026-05-30T15:00:00.000Z")
+  });
+
+  assert.equal(result.incidents.some((incident) => incident.type === "telegram_stale_window"), true);
+  assert.equal(result.actions.some((action) => action.type === "recovery_enqueued_one_offer"), true);
+  assert.equal(jobs.length, 1);
+});
+
+test("supervisor opens duplicate incident without publishing non-promotions", async () => {
+  const jobs = [];
+  const db = {
+    state: {
+      offers: [
+        { id: "a", title: "Notebook Acer Aspire 5", status: "auto_ready", currentPrice: 3499, previousPrice: 4899, discountPercent: 29, imageUrls: ["x"], createdAt: "2026-05-30T15:00:00.000Z" },
+        { id: "b", title: "Notebook Acer Aspire 5", status: "auto_ready", currentPrice: 3499, previousPrice: 4899, discountPercent: 29, imageUrls: ["x"], createdAt: "2026-05-30T15:00:00.000Z" },
+        { id: "c", title: "Monitor sem promocao", status: "auto_ready", currentPrice: 899, previousPrice: null, discountPercent: 0, imageUrls: ["x"], createdAt: "2026-05-30T15:00:00.000Z" }
+      ],
+      publishLog: [],
+      incidents: [],
+      discord: { channels: {} }
+    },
+    load: async () => {},
+    save: async () => {}
+  };
+  const result = await runSupervisorCheck(db, { supervisorEnabled: true, supervisorStaleTelegramMinutes: 60 }, {
+    creativeQueue: { add: async (...args) => jobs.push(args) },
+    now: new Date("2026-05-30T15:00:00.000Z")
+  });
+
+  assert.equal(result.incidents.some((incident) => incident.type === "duplicate_ready_offer"), true);
+  assert.equal(jobs.some((job) => JSON.stringify(job).includes("Monitor sem promocao")), false);
 });
 
 let failed = 0;

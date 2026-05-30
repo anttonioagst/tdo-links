@@ -4,6 +4,8 @@ import { extname, join } from "node:path";
 import { cloneDraftForRetest, createAnalyticsReport, createDraftsForOffer, publishApprovedX, refreshOfferAffiliateUrls, refreshOfferDecision, regenerateDraftCopy, regenerateDraftsForOffer } from "./agents.js";
 import { runAmazonDiscovery, updateAmazonDiscoverySettings } from "./discovery.js";
 import { runDiscovery } from "./agents/discovery.js";
+import { runSupervisorCheck } from "./agents/supervisor.js";
+import { setupDiscordServer } from "./discord/setup.js";
 import { buildDiagnostics } from "./integrations.js";
 import { buildAffiliateUrl } from "./links.js";
 import { testDiscord } from "./publishers/discord.js";
@@ -107,6 +109,21 @@ async function handleApi(req, res, url, db, config) {
     if (!result.ok) db.state.integrations.discord.lastError = result.detail;
     await db.save();
     sendJson(res, 200, result);
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/discord/setup") {
+    const result = await setupDiscordServer(db, config);
+    sendJson(res, result.ok ? 200 : 400, result);
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/supervisor/run") {
+    const { creativeQueue } = await import("./queues/index.js");
+    const result = await runSupervisorCheck(db, config, { creativeQueue });
+    sendJson(res, 200, result);
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/api/supervisor/incidents") {
+    sendJson(res, 200, { incidents: db.state.incidents || [] });
     return;
   }
   if (req.method === "PUT" && url.pathname === "/api/integrations/discord/settings") {

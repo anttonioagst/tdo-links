@@ -5,6 +5,7 @@ import { JsonDb } from "./db.js";
 import { initQueues, getConnection } from "./queues/index.js";
 import { startWorkers } from "./queues/workers.js";
 import { runDiscovery } from "./agents/discovery.js";
+import { runSupervisorCheck } from "./agents/supervisor.js";
 import { enqueuePendingTelegramOffers } from "./publication-recovery.js";
 import cron from "node-cron";
 
@@ -44,6 +45,21 @@ cron.schedule("*/15 * * * *", async () => {
     console.error("cron_discovery_failed", JSON.stringify({ error: err.message }));
   }
 });
+
+if (config.supervisorEnabled) {
+  const supervisorMs = Math.max(1, config.supervisorIntervalMinutes) * 60 * 1000;
+  setInterval(async () => {
+    try {
+      const { creativeQueue } = await import("./queues/index.js");
+      const result = await runSupervisorCheck(db, config, { creativeQueue });
+      if (result.incidents?.length || result.actions?.length) {
+        console.log("supervisor_check", JSON.stringify(result));
+      }
+    } catch (err) {
+      console.error("supervisor_check_failed", JSON.stringify({ error: err.message }));
+    }
+  }, supervisorMs);
+}
 
 console.log("worker_ready — aguardando jobs");
 
