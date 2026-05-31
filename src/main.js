@@ -45,15 +45,12 @@ if (!queuesReady) {
   async function runScrapeLoop() {
     try {
       if (db.load) await db.load();
-      if (config.anthropicApiKey) {
-        const { runDiscovery } = await import("./agents/discovery.js");
-        const result = await runDiscovery(db, config);
-        console.log("server_scrape_loop", JSON.stringify({ mode: "agent", ...result }));
-      } else {
-        const { runScrapePipeline } = await import("./agents.js");
-        const result = await runScrapePipeline(db, config);
-        console.log("server_scrape_loop", JSON.stringify({ mode: "legacy", ...result }));
-      }
+      // Use the legacy synchronous pipeline — works without BullMQ and without Redis.
+      // runDiscovery() is intentionally NOT used here because it relies on validationQueue
+      // which is null without Redis, so discovered offers would never be processed.
+      const { runScrapePipeline } = await import("./agents.js");
+      const result = await runScrapePipeline(db, config);
+      console.log("server_scrape_loop", JSON.stringify({ mode: "legacy", ...result }));
     } catch (err) {
       console.error("server_scrape_loop_failed", JSON.stringify({ error: err.message }));
     }
