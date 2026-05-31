@@ -135,13 +135,25 @@ function buildInitialPrompt(ctx) {
       const offer = (db.state.offers || []).find((o) => o.id === e.offerId);
       return { title: offer?.title?.slice(0, 60) || e.offerId, at: e.createdAt };
     });
-  const pending = (db.state.offers || [])
-    .filter((o) => PENDING_STATUSES.includes(o.status))
-    .slice(0, 30)
+  const pendingAll = (db.state.offers || []).filter((o) => PENDING_STATUSES.includes(o.status));
+  // Surface the publishable offers first so they are never buried under freshly
+  // scraped junk that has no real promotion.
+  const prontasParaPublicar = pendingAll
+    .filter((o) =>
+      o.status === "auto_ready" &&
+      hasRealPromotion(o) &&
+      hasProductImage(o) &&
+      !wasAlreadyPublished(db.state, o.id, "telegram") &&
+      !familyRecentlyPublished(db.state, o, "telegram", config.relatedOfferDedupeHours ?? 24, now))
+    .slice(0, 15)
+    .map((o) => summarizeOffer(o, db));
+  const precisamValidacao = pendingAll
+    .filter((o) => ["new", "queued"].includes(o.status))
+    .slice(0, 15)
     .map((o) => summarizeOffer(o, db));
 
   return JSON.stringify({
-    instruction: "Rode um ciclo. Decida o que validar, publicar e arquivar. Encerre com finish_cycle.",
+    instruction: "Rode um ciclo. Publique primeiro as 'prontas_para_publicar' (se a cadência permitir). Valide as 'precisam_validacao' e arquive as que não têm promoção real. Encerre com finish_cycle.",
     agora: now.toISOString(),
     cadencia: {
       pode_publicar_agora: cadence.allowed,
@@ -151,7 +163,8 @@ function buildInitialPrompt(ctx) {
       espera_minutos: cadence.waitMinutes
     },
     posts_recentes: recentPosts,
-    ofertas_pendentes: pending
+    prontas_para_publicar: prontasParaPublicar,
+    precisam_validacao: precisamValidacao
   });
 }
 
@@ -227,7 +240,7 @@ async function executeTool(name, input, ctx) {
       case "scrape_deals": return await toolScrape(ctx);
       case "validate_offer": return await toolValidate(ctx, input.offerId);
       case "publish_offer": return await toolPublish(ctx, input.offerId);
-      case "archive_offer": return toolArchive(ctx, input.offerId, input.reason);
+      case "archive_offer": return await toolArchive(ctx, input.offerId, input.reason);
       case "finish_cycle": return { ok: true };
       default: return { ok: false, error: `unknown_tool:${name}` };
     }
@@ -315,13 +328,14 @@ export async function toolPublish(ctx, offerId) {
   return { ok: true, published: result.ok, reason: result.ok ? "published" : (result.detail || "publish_failed"), dryRun: result.dryRun || false };
 }
 
-export function toolArchive(ctx, offerId, reason) {
+export async function toolArchive(ctx, offerId, reason) {
   const { db } = ctx;
   const offer = findOffer(db, offerId);
   if (!offer) return { ok: false, error: "offer_not_found" };
   offer.status = "archived";
   offer.archiveReason = reason || "archived_by_orchestrator";
   offer.updatedAt = new Date().toISOString();
+  await db.save();
   return { ok: true, offerId, status: "archived", reason: offer.archiveReason };
 }
 

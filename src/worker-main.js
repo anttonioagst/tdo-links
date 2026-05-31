@@ -31,8 +31,10 @@ if (!queuesReady && !config.orchestratorEnabled) {
 // the legacy recovery loop would race the orchestrator and double-publish.
 if (queuesReady && !config.orchestratorEnabled) startWorkers(db, config, getConnection());
 
-// Keep in-memory state fresh so quota checks read current publishLog from PostgreSQL
-if (config.databaseUrl) {
+// Keep in-memory state fresh so quota checks read current publishLog from PostgreSQL.
+// Skip while the orchestrator owns the cycle — it reloads at the start of each cycle
+// itself, and a mid-cycle reload would clobber its in-memory mutations.
+if (config.databaseUrl && !config.orchestratorEnabled) {
   setInterval(() => {
     db.load().catch((err) => console.error("worker_state_reload_failed", err.message));
   }, 15 * 1000);

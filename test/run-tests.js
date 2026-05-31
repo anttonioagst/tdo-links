@@ -2611,7 +2611,7 @@ test("orchestrator archive_offer clears an offer from the funnel", async () => {
     await db.load();
     db.state.offers.push({ id: "offer_arch", title: "Mouse generico", status: "auto_ready", createdAt: new Date().toISOString() });
     const ctx = { db, config: {}, now: new Date(), actions: [], published: 0 };
-    const result = toolArchive(ctx, "offer_arch", "duplicate_family");
+    const result = await toolArchive(ctx, "offer_arch", "duplicate_family");
     assert.equal(result.status, "archived");
     assert.equal(db.state.offers[0].status, "archived");
     assert.equal(db.state.offers[0].archiveReason, "duplicate_family");
