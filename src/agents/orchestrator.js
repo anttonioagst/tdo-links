@@ -71,7 +71,7 @@ async function runAgentLoop(client, ctx, { model, maxSteps }) {
   while (steps < maxSteps) {
     const response = await client.messages.create({
       model,
-      max_tokens: 1024,
+      max_tokens: 2048,
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
       tools: TOOLS,
       messages
@@ -82,7 +82,15 @@ async function runAgentLoop(client, ctx, { model, maxSteps }) {
     const text = (response.content || []).filter((block) => block.type === "text").map((b) => b.text).join(" ").trim();
     if (text) summary = text;
 
-    if (response.stop_reason !== "tool_use" || toolUses.length === 0) break;
+    if (toolUses.length === 0) {
+      // Model narrated instead of acting and may have been cut off — nudge it to use tools.
+      if (response.stop_reason === "max_tokens") {
+        messages.push({ role: "user", content: "Pare de escrever planos. Chame as ferramentas agora (ou finish_cycle)." });
+        steps += 1;
+        continue;
+      }
+      break; // natural stop (end_turn/stop_sequence) with no tools → done
+    }
 
     const toolResults = [];
     for (const toolUse of toolUses) {
@@ -115,7 +123,7 @@ REGRAS DE DECISÃO:
 - Valide ofertas novas (status new/queued) antes de publicar. Ofertas já "validated"/"auto_ready" podem ir direto para publish_offer.
 - Limpe a base: arquive duplicatas, ofertas sem promoção real e ofertas velhas que nunca vão publicar. Isso é o que impede o canal de travar.
 
-ESTILO: seja decisivo e econômico. Faça só as chamadas necessárias e encerre com finish_cycle resumindo o que fez. Não peça confirmação a ninguém — você é autônomo.`;
+ESTILO: AJA com as ferramentas — NÃO escreva planos longos. No máximo uma frase curta antes de chamar uma ferramenta. Emita as chamadas de ferramenta diretamente (você pode chamar várias de uma vez). Faça só o necessário e encerre com finish_cycle resumindo o que fez. Não peça confirmação a ninguém — você é autônomo.`;
 
 function buildInitialPrompt(ctx) {
   const { db, config, now } = ctx;
