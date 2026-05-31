@@ -26,7 +26,7 @@ export async function runSupervisorCheck(db, config, options = {}) {
     incidents.push(incident);
 
     if (options.creativeQueue) {
-      const recovery = await enqueuePendingTelegramOffers(db, config, options.creativeQueue);
+      const recovery = await enqueuePendingTelegramOffers(db, config, options.creativeQueue, { now });
       if (recovery.enqueued > 0) {
         actions.push({ type: "recovery_enqueued_one_offer", enqueued: recovery.enqueued });
         incident.action = "recovery_enqueued_one_offer";

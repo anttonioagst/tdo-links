@@ -6,6 +6,7 @@ import { initQueues, getConnection } from "./queues/index.js";
 import { startWorkers } from "./queues/workers.js";
 import { runDiscovery } from "./agents/discovery.js";
 import { runSupervisorCheck } from "./agents/supervisor.js";
+import { runOrchestratorCycle } from "./agents/orchestrator.js";
 import { enqueuePendingTelegramOffers } from "./publication-recovery.js";
 import cron from "node-cron";
 
@@ -20,12 +21,15 @@ await db.load();
 console.log("worker_db_ready", JSON.stringify({ backend: config.databaseUrl ? "postgres" : "json" }));
 
 const queuesReady = initQueues(config.redisUrl);
-if (!queuesReady) {
-  console.error("worker_error: REDIS_URL not set — worker requires Redis");
+// The autonomous orchestrator does not need Redis. Only the legacy queue pipeline does.
+if (!queuesReady && !config.orchestratorEnabled) {
+  console.error("worker_error: REDIS_URL not set — legacy worker requires Redis");
   process.exit(1);
 }
 
-startWorkers(db, config, getConnection());
+// Skip the legacy queue workers when the orchestrator owns the cycle — otherwise
+// the legacy recovery loop would race the orchestrator and double-publish.
+if (queuesReady && !config.orchestratorEnabled) startWorkers(db, config, getConnection());
 
 // Keep in-memory state fresh so quota checks read current publishLog from PostgreSQL
 if (config.databaseUrl) {
@@ -34,34 +38,56 @@ if (config.databaseUrl) {
   }, 15 * 1000);
 }
 
-cron.schedule("*/15 * * * *", async () => {
-  console.log("cron_trigger discovery");
-  try {
-    await runDiscovery(db, config);
-    const { creativeQueue } = await import("./queues/index.js");
-    const recovery = await enqueuePendingTelegramOffers(db, config, creativeQueue);
-    console.log("cron_publication_recovery", JSON.stringify(recovery));
-  } catch (err) {
-    console.error("cron_discovery_failed", JSON.stringify({ error: err.message }));
-  }
-});
-
-if (config.supervisorEnabled) {
-  const supervisorMs = Math.max(1, config.supervisorIntervalMinutes) * 60 * 1000;
-  setInterval(async () => {
+if (config.orchestratorEnabled) {
+  // Single autonomous agent owns the whole cycle: scrape → validate → publish →
+  // archive duplicates. Replaces the discovery cron + supervisor + recovery loop.
+  const interval = Math.max(1, config.orchestratorIntervalMinutes);
+  let running = false;
+  const tick = async () => {
+    if (running) return;
+    running = true;
     try {
-      const { creativeQueue } = await import("./queues/index.js");
-      const result = await runSupervisorCheck(db, config, { creativeQueue });
-      if (result.incidents?.length || result.actions?.length) {
-        console.log("supervisor_check", JSON.stringify(result));
-      }
+      const result = await runOrchestratorCycle(db, config);
+      console.log("orchestrator_cycle", JSON.stringify(result));
     } catch (err) {
-      console.error("supervisor_check_failed", JSON.stringify({ error: err.message }));
+      console.error("orchestrator_cycle_failed", JSON.stringify({ error: err.message }));
+    } finally {
+      running = false;
     }
-  }, supervisorMs);
-}
+  };
+  cron.schedule(`*/${interval} * * * *`, tick);
+  tick();
+  console.log("worker_ready — orquestrador autônomo ativo", JSON.stringify({ intervalMinutes: interval, model: config.orchestratorModel }));
+} else {
+  cron.schedule("*/15 * * * *", async () => {
+    console.log("cron_trigger discovery");
+    try {
+      await runDiscovery(db, config);
+      const { creativeQueue } = await import("./queues/index.js");
+      const recovery = await enqueuePendingTelegramOffers(db, config, creativeQueue);
+      console.log("cron_publication_recovery", JSON.stringify(recovery));
+    } catch (err) {
+      console.error("cron_discovery_failed", JSON.stringify({ error: err.message }));
+    }
+  });
 
-console.log("worker_ready — aguardando jobs");
+  if (config.supervisorEnabled) {
+    const supervisorMs = Math.max(1, config.supervisorIntervalMinutes) * 60 * 1000;
+    setInterval(async () => {
+      try {
+        const { creativeQueue } = await import("./queues/index.js");
+        const result = await runSupervisorCheck(db, config, { creativeQueue });
+        if (result.incidents?.length || result.actions?.length) {
+          console.log("supervisor_check", JSON.stringify(result));
+        }
+      } catch (err) {
+        console.error("supervisor_check_failed", JSON.stringify({ error: err.message }));
+      }
+    }, supervisorMs);
+  }
+
+  console.log("worker_ready — aguardando jobs");
+}
 
 async function loadEnvFile(filePath) {
   try {

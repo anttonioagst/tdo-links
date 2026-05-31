@@ -24,6 +24,7 @@ import { createTelegramCopy, telegramCopy } from "../src/copywriter.js";
 import { createContent } from "../src/agents/creative.js";
 import { publishDeal } from "../src/agents/publisher.js";
 import { runSupervisorCheck } from "../src/agents/supervisor.js";
+import { runOrchestratorCycle, toolPublish, toolValidate, toolArchive } from "../src/agents/orchestrator.js";
 import { buildDiscordDealMessage, discordDealChannelForOffer } from "../src/discord/deals.js";
 import { reportAgentEvent } from "../src/discord/reporter.js";
 import { checkDiscordStatus } from "../src/discord/setup.js";
@@ -2508,6 +2509,157 @@ test("supervisor opens duplicate incident without publishing non-promotions", as
 
   assert.equal(result.incidents.some((incident) => incident.type === "duplicate_ready_offer"), true);
   assert.equal(jobs.some((job) => JSON.stringify(job).includes("Monitor sem promocao")), false);
+});
+
+function mockAnthropic(responses) {
+  let index = 0;
+  const calls = [];
+  return {
+    calls,
+    messages: {
+      create: async (params) => {
+        calls.push(params);
+        return responses[Math.min(index++, responses.length - 1)];
+      }
+    }
+  };
+}
+
+function toolUse(name, input, id = `t_${Math.random().toString(36).slice(2, 7)}`) {
+  return { type: "tool_use", id, name, input };
+}
+
+test("orchestrator publishes a real promotion in dry-run and marks it published", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "orchestrator-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "offer_pub",
+      store: "amazon",
+      title: "Fone Sony WH-1000XM5",
+      currentPrice: 1499,
+      previousPrice: 2199,
+      discountPercent: 32,
+      originalUrl: "https://www.amazon.com.br/dp/B09XS7JWHH",
+      imageUrls: ["https://m.media-amazon.com/images/I/test.jpg"],
+      status: "auto_ready",
+      createdAt: new Date().toISOString()
+    });
+    const ctx = {
+      db,
+      config: loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318", TELEGRAM_DRY_RUN: "true", AMAZON_AFFILIATE_TAG: "tdolinks-20" }),
+      now: new Date(),
+      actions: [],
+      published: 0
+    };
+    const result = await toolPublish(ctx, "offer_pub");
+    assert.equal(result.published, true);
+    assert.equal(result.dryRun, true);
+    assert.equal(db.state.offers[0].status, "published");
+    assert.equal(ctx.published, 1);
+    assert.ok(db.state.publishLog.some((e) => e.offerId === "offer_pub" && e.channel === "telegram" && e.result.ok));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("orchestrator publish is idempotent and reports duplicates truthfully (no fake success)", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "orchestrator-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "offer_dup",
+      store: "amazon",
+      title: "Headset HyperX Cloud Alpha",
+      currentPrice: 349,
+      previousPrice: 549,
+      discountPercent: 36,
+      originalUrl: "https://www.amazon.com.br/dp/B0HYPERX01",
+      imageUrls: ["https://m.media-amazon.com/images/I/test.jpg"],
+      status: "auto_ready",
+      createdAt: new Date().toISOString()
+    });
+    db.state.publishLog.push({
+      id: "pub_prev",
+      offerId: "offer_dup",
+      channel: "telegram",
+      result: { ok: true, dryRun: true },
+      createdAt: new Date().toISOString()
+    });
+    const ctx = {
+      db,
+      config: loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318", TELEGRAM_DRY_RUN: "true" }),
+      now: new Date(),
+      actions: [],
+      published: 0
+    };
+    const result = await toolPublish(ctx, "offer_dup");
+    assert.equal(result.published, false);
+    assert.equal(result.reason, "already_published");
+    assert.equal(ctx.published, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("orchestrator archive_offer clears an offer from the funnel", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "orchestrator-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({ id: "offer_arch", title: "Mouse generico", status: "auto_ready", createdAt: new Date().toISOString() });
+    const ctx = { db, config: {}, now: new Date(), actions: [], published: 0 };
+    const result = toolArchive(ctx, "offer_arch", "duplicate_family");
+    assert.equal(result.status, "archived");
+    assert.equal(db.state.offers[0].status, "archived");
+    assert.equal(db.state.offers[0].archiveReason, "duplicate_family");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("orchestrator loop runs agent tool calls and ends on finish_cycle", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "orchestrator-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({ id: "offer_loop", title: "Monitor sem promocao", status: "new", currentPrice: 899, previousPrice: null, createdAt: new Date().toISOString() });
+    // Post 30 min ago: channel is not stale (<90min) and cadence is open (>15min interval), so the gate runs the agent.
+    db.state.publishLog.push({ id: "pub_recent", offerId: "x", channel: "telegram", result: { ok: true }, createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString() });
+    await db.save();
+    const client = mockAnthropic([
+      { stop_reason: "tool_use", content: [toolUse("archive_offer", { offerId: "offer_loop", reason: "no_promotion" })] },
+      { stop_reason: "tool_use", content: [toolUse("finish_cycle", { summary: "Arquivei 1 oferta sem promoção." })] }
+    ]);
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318", ANTHROPIC_API_KEY: "test", ORCHESTRATOR_ENABLED: "true" });
+    const result = await runOrchestratorCycle(db, config, { client, skipScrape: true });
+    assert.equal(result.skipped, false);
+    assert.equal(db.state.offers[0].status, "archived");
+    assert.ok(client.calls.length >= 1);
+    assert.match(result.summary, /Arquivei/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("orchestrator cost gate skips the LLM when nothing is pending and channel is fresh", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "orchestrator-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.publishLog.push({ id: "pub_fresh", offerId: "x", channel: "telegram", result: { ok: true }, createdAt: new Date().toISOString() });
+    await db.save();
+    const client = mockAnthropic([{ stop_reason: "end_turn", content: [] }]);
+    const config = loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318", ANTHROPIC_API_KEY: "test" });
+    const result = await runOrchestratorCycle(db, config, { client, skipScrape: true });
+    assert.equal(result.skipped, true);
+    assert.equal(result.reason, "no_pending_offers");
+    assert.equal(client.calls.length, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 let failed = 0;
