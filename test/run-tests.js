@@ -2662,6 +2662,91 @@ test("orchestrator cost gate skips the LLM when nothing is pending and channel i
   }
 });
 
+test("parseAmazonSearch extracts strikethrough list price as previousPrice", () => {
+  const html = `
+    <div data-asin="B0STRIKE01">
+      <h2><span>Monitor Gamer Samsung Odyssey G5 27 144hz</span></h2>
+      <span class="a-price-whole">1.262</span><span class="a-price-decimal">,</span><span class="a-price-fraction">00</span>
+      <span class="a-price a-text-price" data-a-strike="true"><span class="a-offscreen">R$ 1.599,00</span></span>
+      <img src="https://m.media-amazon.com/images/I/odyssey.jpg" />
+      4,7 de 5 estrelas
+    </div>
+  `;
+  const [offer] = parseAmazonSearch(html);
+  assert.equal(offer.currentPrice, 1262);
+  assert.equal(offer.previousPrice, 1599);
+});
+
+test("verifyAmazonProduct extracts previousPrice from product page list price", async () => {
+  const html = `
+    <html>
+      <span class="a-offscreen">R$ 1.262,00</span>
+      <span id="productTitle">Monitor Gamer Samsung Odyssey G5 27</span>
+      <span class="a-price a-text-price" data-a-strike="true"><span class="a-offscreen">R$ 1.599,00</span></span>
+      <img id="landingImage" src="https://m.media-amazon.com/images/I/odyssey.jpg" />
+      4,7 de 5 estrelas
+      <span id="acrCustomerReviewText">320 avaliações</span>
+    </html>
+  `;
+  const result = await verifyAmazonProduct("B0ODYSSEY1", { fetchImpl: async () => new Response(html, { status: 200 }) });
+  assert.equal(result.currentPrice, 1262);
+  assert.equal(result.previousPrice, 1599);
+});
+
+test("scraper retries on HTTP 503 and recovers", async () => {
+  const html = `<html><span class="a-offscreen">R$ 99,90</span><span id="productTitle">Item</span></html>`;
+  let calls = 0;
+  const result = await verifyAmazonProduct("B0RETRY001", {
+    scraperMaxRetries: 2,
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls === 1) return new Response("blocked", { status: 503 });
+      return new Response(html, { status: 200 });
+    }
+  });
+  assert.equal(calls, 2);
+  assert.equal(result.currentPrice, 99.9);
+});
+
+test("orchestrator validation enriches Amazon offers missing a promotion from the product page", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "orchestrator-"));
+  try {
+    const db = new JsonDb(join(dir, "db.json"));
+    await db.load();
+    db.state.offers.push({
+      id: "offer_enrich",
+      store: "amazon",
+      asin: "B0ENRICH01",
+      title: "Monitor Gamer Samsung Odyssey G5 27",
+      currentPrice: 1262,
+      previousPrice: null,
+      originalUrl: "https://www.amazon.com.br/dp/B0ENRICH01",
+      status: "new",
+      createdAt: new Date().toISOString()
+    });
+    const productHtml = `
+      <html>
+        <span class="a-offscreen">R$ 1.262,00</span>
+        <span id="productTitle">Monitor Gamer Samsung Odyssey G5 27</span>
+        <span class="a-price a-text-price" data-a-strike="true"><span class="a-offscreen">R$ 1.599,00</span></span>
+        <img id="landingImage" src="https://m.media-amazon.com/images/I/odyssey.jpg" />
+      </html>
+    `;
+    const config = {
+      ...loadConfig({ PUBLIC_BASE_URL: "http://localhost:4318" }),
+      fetchImpl: async () => new Response(productHtml, { status: 200 })
+    };
+    const ctx = { db, config, now: new Date(), actions: [], published: 0 };
+    const result = await toolValidate(ctx, "offer_enrich");
+    assert.equal(db.state.offers[0].previousPrice, 1599);
+    assert.equal(db.state.offers[0].imageUrls.includes("https://m.media-amazon.com/images/I/odyssey.jpg"), true);
+    assert.equal(result.approved, true);
+    assert.equal(db.state.offers[0].status, "auto_ready");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 let failed = 0;
 for (const { name, fn } of tests) {
   try {

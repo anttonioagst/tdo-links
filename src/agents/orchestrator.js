@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { scrapeDeals } from "../scrapers.js";
+import { scrapeDeals, verifyAmazonProduct } from "../scrapers.js";
 import { validateDeal } from "./validation.js";
 import { createContent } from "./creative.js";
 import { publishTelegram } from "../publishers/telegram.js";
@@ -263,6 +263,24 @@ export async function toolValidate(ctx, offerId) {
   const { db, config } = ctx;
   const offer = findOffer(db, offerId);
   if (!offer) return { ok: false, error: "offer_not_found" };
+
+  // Recover missing promotion data / images from the product page before judging.
+  // Amazon search results often omit the "De" price and ship only a thumbnail.
+  if (offer.store === "amazon" && offer.asin && (!hasRealPromotion(offer) || !hasProductImage(offer))) {
+    try {
+      const v = await verifyAmazonProduct(offer.asin, config);
+      if (v.currentPrice) offer.currentPrice = v.currentPrice;
+      if (v.previousPrice) offer.previousPrice = v.previousPrice;
+      if (v.rating && !offer.rating) offer.rating = v.rating;
+      if (v.reviewCount && !offer.reviewCount) offer.reviewCount = v.reviewCount;
+      if (v.imageUrls?.length) {
+        offer.imageUrl = v.imageUrl;
+        offer.imageUrls = v.imageUrls;
+        offer.productPageImageVerifiedAt = new Date().toISOString();
+      }
+      offer.priceVerifiedAt = new Date().toISOString();
+    } catch { /* enrichment is best-effort */ }
+  }
 
   const verdict = await validateDeal(offer, config);
   const threshold = config.aiConfidenceThreshold ?? 70;

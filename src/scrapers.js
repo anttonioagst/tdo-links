@@ -179,6 +179,16 @@ export async function verifyAmazonProduct(asin, config = {}) {
     ]));
     const currentPrice = (offscreen && offscreen > 0) ? offscreen : (whole && whole > 0 ? whole : null);
 
+    // List/previous price ("De") — product pages expose it more reliably than search results
+    const previousRaw = parseBrazilPrice(matchFirst(html, [
+      /class="basisPrice"[\s\S]*?R\$\s?([\d.]+,\d{2})/i,
+      /data-a-strike="true"[^>]*>[\s\S]*?R\$\s?([\d.]+,\d{2})/i,
+      /(?:Pre[çc]o de tabela|Pre[çc]o sugerido)[\s\S]{0,40}?R\$\s?([\d.]+,\d{2})/i,
+      /id="[^"]*basisPrice[^"]*"[\s\S]*?R\$\s?([\d.]+,\d{2})/i,
+      /<span[^>]*a-text-price[^>]*>[\s\S]*?R\$\s?([\d.]+,\d{2})/i
+    ]));
+    const previousPrice = previousRaw && currentPrice && previousRaw > currentPrice ? previousRaw : null;
+
     // Rating from product page
     const ratingRaw = matchFirst(html, [/(\d,\d) de 5 estrelas/i]);
     const rating = ratingRaw ? parseFloat(ratingRaw.replace(",", ".")) : null;
@@ -206,10 +216,10 @@ export async function verifyAmazonProduct(asin, config = {}) {
       ...[...html.matchAll(/https:\/\/m\.media-amazon\.com\/images\/I\/[^"'\\\s]+?\.(?:jpg|jpeg|png|webp)/gi)].map((match) => decodeHtml(match[0]))
     ]);
 
-    return { currentPrice, rating, reviewCount, title, imageUrl: imageUrls[0] || null, imageUrls };
+    return { currentPrice, previousPrice, rating, reviewCount, title, imageUrl: imageUrls[0] || null, imageUrls };
   } catch (err) {
     console.error("amazon_product_verify_failed", asin, err.message);
-    return { currentPrice: null, rating: null, reviewCount: null, title: "", imageUrl: null, imageUrls: [] };
+    return { currentPrice: null, previousPrice: null, rating: null, reviewCount: null, title: "", imageUrl: null, imageUrls: [] };
   }
 }
 
@@ -238,7 +248,11 @@ export function parseAmazonSearch(html, sourceUrl = "https://www.amazon.com.br")
     if (!currentPrice) continue;
 
     const previousPrice = parseBrazilPrice(matchFirst(chunk, [
+      // Strikethrough list price (most reliable deal signal on search results)
+      /data-a-strike="true"[^>]*>[\s\S]*?R\$\s?([\d.]+,\d{2})/i,
       /<span class="a-price a-text-price"[^>]*>[\s\S]*?<span[^>]*>R\$\s?([\d.]+,\d{2})<\/span>/i,
+      /<span[^>]*a-text-price[^>]*>[\s\S]*?R\$\s?([\d.]+,\d{2})/i,
+      /(?:De|Pre[çc]o de tabela|Pre[çc]o sugerido)[:\s]*R\$\s?([\d.]+,\d{2})/i,
       /<span class="a-offscreen">R\$\s?([\d.]+,\d{2})<\/span>/i
     ], 1, true));
 
@@ -297,7 +311,26 @@ function uniqueImageUrls(urls) {
   return [...new Set(urls.filter((url) => /^https?:\/\//.test(url || "")))].slice(0, 4);
 }
 
-async function fetchText(url, config) {
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+];
+
+function pickUserAgent(config, attempt) {
+  if (config.scraperUserAgent) return config.scraperUserAgent;
+  return USER_AGENTS[attempt % USER_AGENTS.length];
+}
+
+function isBlockedHtml(html) {
+  return /api-services-support@amazon\.com|Digite os caracteres|Type the characters|To discuss automated access|captcha/i.test(html.slice(0, 4000));
+}
+
+// Amazon throttles datacenter IPs with intermittent 503/429 and captcha pages.
+// Retrying with backoff + a rotated user-agent recovers most of those.
+async function fetchText(url, config, attempt = 0) {
+  const maxRetries = Number(config.scraperMaxRetries ?? 3);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
@@ -305,17 +338,42 @@ async function fetchText(url, config) {
     const response = await fetchImpl(url, {
       signal: controller.signal,
       headers: {
-        "accept": "text/html,application/xhtml+xml",
-        "accept-language": "pt-BR,pt;q=0.9,en;q=0.6",
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.6,en;q=0.5",
+        "accept-encoding": "gzip, deflate, br",
         "cache-control": "no-cache",
-        "user-agent": config.scraperUserAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
+        "pragma": "no-cache",
+        "upgrade-insecure-requests": "1",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "none",
+        "sec-fetch-user": "?1",
+        "user-agent": pickUserAgent(config, attempt)
       }
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.text();
+    if (!response.ok) {
+      if ([503, 429, 500, 502].includes(response.status) && attempt < maxRetries) {
+        clearTimeout(timeout);
+        await sleep(retryDelay(attempt));
+        return fetchText(url, config, attempt + 1);
+      }
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const html = await response.text();
+    if (isBlockedHtml(html) && attempt < maxRetries) {
+      clearTimeout(timeout);
+      await sleep(retryDelay(attempt));
+      return fetchText(url, config, attempt + 1);
+    }
+    return html;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function retryDelay(attempt) {
+  const base = 800 * Math.pow(2, attempt); // 800ms, 1.6s, 3.2s...
+  return base + Math.floor(Math.random() * 600); // jitter
 }
 
 function matchFirst(text, patterns, group = 1, skipFirst = false) {
