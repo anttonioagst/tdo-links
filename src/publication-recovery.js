@@ -48,17 +48,19 @@ export function selectPendingTelegramOffers(state = {}, limit = 4, options = {})
     .slice(0, limit);
 }
 
-export async function enqueuePendingTelegramOffers(db, config, queue) {
+export async function enqueuePendingTelegramOffers(db, config, queue, options = {}) {
   if (!queue) return { enqueued: 0, skipped: true, reason: "queue_unavailable" };
   if (db.load) await db.load();
 
-  const publication = telegramPublicationStatus(db.state.publishLog || [], config);
+  const now = options.now || new Date();
+  const publication = telegramPublicationStatus(db.state.publishLog || [], config, now);
   if (!publication.allowed) {
     return { enqueued: 0, skipped: true, reason: publication.reason, waitMinutes: publication.waitMinutes };
   }
 
   const availableSlots = Math.min(1, Math.max(1, Number(config.maxPublicationsPerCycle || 4) - publication.recentPublished));
   const offers = selectPendingTelegramOffers(db.state, availableSlots, {
+    now,
     config,
     lookbackHours: config.recoveryLookbackHours ?? 12,
     failedLookbackHours: config.recoveryFailedLookbackHours ?? 2,

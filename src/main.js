@@ -14,7 +14,7 @@ const db = config.databaseUrl
 await db.load();
 console.log("db_ready", JSON.stringify({ backend: config.databaseUrl ? "postgres" : "json" }));
 
-initQueues(config.redisUrl);
+const queuesReady = initQueues(config.redisUrl);
 db.state.settings.mode = db.state.settings.mode || config.autoMode;
 db.state.settings.autoPublishThreshold = db.state.settings.autoPublishThreshold || config.autoPublishThreshold;
 db.state.settings.reviewThreshold = db.state.settings.reviewThreshold || config.reviewThreshold;
@@ -35,6 +35,49 @@ if (config.databaseUrl) {
 setInterval(() => {
   db.save().catch((error) => console.error("analytics_save_failed", error));
 }, 24 * 60 * 60 * 1000);
+
+// Autonomous pipeline — only runs when there is no dedicated worker service (no Redis).
+// When Redis is present, the worker-main.js cron handles discovery and recovery.
+if (!queuesReady) {
+  const scrapeMs = Math.max(5, config.scrapeIntervalMinutes) * 60 * 1000;
+  const publishMs = Math.max(1, config.publishIntervalMinutes) * 60 * 1000;
+
+  async function runScrapeLoop() {
+    try {
+      if (db.load) await db.load();
+      if (config.anthropicApiKey) {
+        const { runDiscovery } = await import("./agents/discovery.js");
+        const result = await runDiscovery(db, config);
+        console.log("server_scrape_loop", JSON.stringify({ mode: "agent", ...result }));
+      } else {
+        const { runScrapePipeline } = await import("./agents.js");
+        const result = await runScrapePipeline(db, config);
+        console.log("server_scrape_loop", JSON.stringify({ mode: "legacy", ...result }));
+      }
+    } catch (err) {
+      console.error("server_scrape_loop_failed", JSON.stringify({ error: err.message }));
+    }
+  }
+
+  async function runPublishLoop() {
+    try {
+      if (db.load) await db.load();
+      const { runPublishPipeline } = await import("./agents.js");
+      const result = await runPublishPipeline(db, config);
+      console.log("server_publish_loop", JSON.stringify(result));
+    } catch (err) {
+      console.error("server_publish_loop_failed", JSON.stringify({ error: err.message }));
+    }
+  }
+
+  // Start immediately, then on schedule
+  setTimeout(runScrapeLoop, 10_000);
+  setInterval(runScrapeLoop, scrapeMs);
+  setTimeout(runPublishLoop, 30_000);
+  setInterval(runPublishLoop, publishMs);
+
+  console.log("server_autonomous_loop_started", JSON.stringify({ scrapeIntervalMinutes: config.scrapeIntervalMinutes, publishIntervalMinutes: config.publishIntervalMinutes }));
+}
 
 async function loadEnvFile(filePath) {
   try {
