@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { findOfficialProductImages } from "../imagefinder.js";
+import { verifyAmazonProduct } from "../scrapers.js";
 import { hasRealPromotion, promotionDiscountPercent } from "../deals.js";
 import { extractSpecHighlights } from "../copywriter.js";
 
@@ -118,6 +119,16 @@ export async function createContent(offer, validationResult, config) {
   const [imageResult, copyResult] = await Promise.allSettled([
     (async () => {
       if (!config.allowExternalProductImages) throw new Error("external_product_images_disabled");
+
+      // For Amazon products, use the canonical product page image (white background, product focus).
+      // Manufacturer site searches (Brave/SerpAPI) often return promotional or lifestyle images.
+      if (offer.store === "amazon" && offer.asin) {
+        const verified = await verifyAmazonProduct(offer.asin, config);
+        const mainImage = verified.imageUrl || verified.imageUrls?.[0];
+        if (mainImage) return [mainImage];
+        throw new Error("amazon_product_image_not_found");
+      }
+
       if (!config.openaiApiKey) throw new Error("openai_not_configured");
       return await findOfficialProductImages(offer, config);
     })(),

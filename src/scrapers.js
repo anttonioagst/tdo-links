@@ -257,6 +257,9 @@ export function parseAmazonSearch(html, sourceUrl = "https://www.amazon.com.br")
     ], 1, true));
 
     const imageUrl = decodeHtml(matchFirst(chunk, [
+      /data-old-hires="([^"]+)"/i,                            // high-res product image
+      /data-image-latency-src="([^"]+m\.media-amazon[^"]+)"/i, // lazy-load product image
+      /<img[^>]+src="([^"]+m\.media-amazon\.com[^"]+)"/i,    // Amazon CDN img tag
       /<img[^>]+src="([^"]+)"/i,
       /data-image-source-density="[^"]*"[^>]+src="([^"]+)"/i
     ]));
