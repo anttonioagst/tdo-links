@@ -146,8 +146,7 @@ export function telegramCopy(offer, url, disclosure) {
   const discountPct = promotionDiscountPercent(offer);
   const discountStr = ` (${discountPct}% OFF)`;
   const store = storeLabel(offer.store);
-  const isPremium = (offer.currentPrice ?? 0) >= 500;
-  const hook = isPremium ? premiumLine(offer) : `Aproveite esta oferta exclusiva na ${store} antes que acabe!`;
+  const hook = `Aproveite esta oferta exclusiva na ${store} antes que acabe!`;
   const specLines = extractSpecHighlights(offer).map((spec) => `• ${spec}`);
 
   return [
