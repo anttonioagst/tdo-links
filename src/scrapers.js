@@ -206,17 +206,16 @@ export async function verifyAmazonProduct(asin, config = {}) {
       /id="productTitle"[^>]*>([\s\S]*?)<\/span>/i,
       /<title>([\s\S]*?)<\/title>/i
     ]));
+    // Amazon's first (main) image is always the white-background product photo.
+    // We only keep this one image — collecting the full gallery introduces variant/carousel images.
     const imageUrl = decodeHtml(matchFirst(html, [
-      /id="landingImage"[^>]+src="([^"]+)"/i,
       /data-old-hires="([^"]+)"/i,
+      /id="landingImage"[^>]+src="([^"]+)"/i,
       /"large":"([^"]+)"/i
     ]));
-    const imageUrls = uniqueImageUrls([
-      imageUrl,
-      ...[...html.matchAll(/https:\/\/m\.media-amazon\.com\/images\/I\/[^"'\\\s]+?\.(?:jpg|jpeg|png|webp)/gi)].map((match) => decodeHtml(match[0]))
-    ]);
+    const imageUrls = imageUrl ? [imageUrl] : [];
 
-    return { currentPrice, previousPrice, rating, reviewCount, title, imageUrl: imageUrls[0] || null, imageUrls };
+    return { currentPrice, previousPrice, rating, reviewCount, title, imageUrl: imageUrl || null, imageUrls };
   } catch (err) {
     console.error("amazon_product_verify_failed", asin, err.message);
     return { currentPrice: null, previousPrice: null, rating: null, reviewCount: null, title: "", imageUrl: null, imageUrls: [] };
@@ -256,17 +255,16 @@ export function parseAmazonSearch(html, sourceUrl = "https://www.amazon.com.br")
       /<span class="a-offscreen">R\$\s?([\d.]+,\d{2})<\/span>/i
     ], 1, true));
 
+    // Amazon's first (main) image is always the white-background product photo.
+    // Collecting all CDN URLs from the chunk introduces variant/gallery/ad images.
     const imageUrl = decodeHtml(matchFirst(chunk, [
-      /data-old-hires="([^"]+)"/i,                            // high-res product image
-      /data-image-latency-src="([^"]+m\.media-amazon[^"]+)"/i, // lazy-load product image
-      /<img[^>]+src="([^"]+m\.media-amazon\.com[^"]+)"/i,    // Amazon CDN img tag
+      /data-old-hires="([^"]+)"/i,
+      /data-image-latency-src="([^"]+m\.media-amazon[^"]+)"/i,
+      /<img[^>]+src="([^"]+m\.media-amazon\.com[^"]+)"/i,
       /<img[^>]+src="([^"]+)"/i,
       /data-image-source-density="[^"]*"[^>]+src="([^"]+)"/i
     ]));
-    const imageUrls = uniqueImageUrls([
-      imageUrl,
-      ...[...chunk.matchAll(/https:\/\/m\.media-amazon\.com\/images\/I\/[^"'\\\s]+?\.(?:jpg|jpeg|png|webp)/gi)].map((match) => decodeHtml(match[0]))
-    ]);
+    const imageUrls = imageUrl ? [imageUrl] : [];
     const rating = parseFloat((matchFirst(chunk, [/(\d,\d) de 5 estrelas/i]) || "").replace(",", "."));
     const reviewCount = parseInt((matchFirst(chunk, [/<span[^>]*class="a-size-base[^"]*"[^>]*>([\d.]+)<\/span>/i]) || "0").replace(/\D/g, ""), 10) || 0;
 
