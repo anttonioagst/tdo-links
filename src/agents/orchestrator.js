@@ -7,6 +7,7 @@ import { publishDiscord } from "../publishers/discord.js";
 import { publishDiscordDeal } from "../discord/deals.js";
 import { buildAffiliateUrl } from "../links.js";
 import { hasRealPromotion } from "../deals.js";
+import { extractPremiumBrand } from "../premium-curation.js";
 import { offerIdentityKeys, offerFamilyKey } from "../publication-dedupe.js";
 import { telegramPublicationStatus } from "../publication-policy.js";
 import { reportAgentEvent } from "../discord/reporter.js";
@@ -25,6 +26,10 @@ export async function runOrchestratorCycle(db, config, options = {}) {
   // Deterministic, no-LLM pre-step: refresh candidate offers so the cheap gate
   // and the agent both see fresh deals. Best-effort — never blocks the cycle.
   const scraped = options.skipScrape ? { inserted: 0 } : await safeScrape(db, config);
+
+  // Purge non-premium offers that reached auto_ready before the brand gate existed.
+  const purged = await purgeNonPremiumAutoReady(db);
+  if (purged > 0) console.log("orchestrator_purge", JSON.stringify({ archived: purged, reason: "non_premium_brand_gate" }));
 
   const cadence = telegramPublicationStatus(db.state.publishLog || [], config, now);
   const stale = isTelegramStale(db.state.publishLog || [], config, now);
@@ -112,18 +117,22 @@ async function runAgentLoop(client, ctx, { model, maxSteps }) {
 // Prompts
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `Você é o ÚNICO operador autônomo do TDO Links, um canal brasileiro de ofertas de tecnologia no Telegram (e Discord/X secundários). A cada ciclo você decide, sozinho, o que publicar.
+const SYSTEM_PROMPT = `Você é o operador autônomo do TDO Links — canal premium de tech deals no Brasil. Padrão alto. Sem concessões.
 
-OBJETIVO: manter o canal vivo com 1 a 4 ofertas premium por hora, de qualidade, SEM duplicatas e SEM deixar o canal mudo.
+MARCAS APROVADAS (apenas estas): Logitech, HyperX, Razer, Sony, JBL, Samsung, LG, Dell, Apple, Anker, Soundcore, TP-Link, Corsair, SteelSeries, ASUS, Lenovo, Acer, AOC, BenQ, Kingston, Seagate, WD, MSI, Gigabyte, TCL, Philips, Flexform, Husky, Bose, Sennheiser, Jabra, Elgato, Marshall.
+CATEGORIAS APROVADAS: notebooks, monitores, TVs, headsets/fones premium, SSDs, teclados mecânicos, mouses premium de marca (G502, MX Master, Basilisk, DeathAdder — nunca genérico), soundbars, roteadores mesh, câmeras, GPUs, componentes.
 
-REGRAS DE DECISÃO:
-- Só publique ofertas com promoção real (preço anterior > preço atual) e com imagem.
-- NUNCA publique duas vezes a mesma oferta nem variantes da mesma família já publicada recentemente. Se uma ferramenta disser "duplicate" ou "already_published", NÃO insista: arquive a oferta com archive_offer e siga para a próxima.
-- Respeite a cadência. Se publish_offer responder "cadence_blocked", pare de tentar publicar neste ciclo — a janela ainda não abriu.
-- Valide ofertas novas (status new/queued) antes de publicar. Ofertas já "validated"/"auto_ready" podem ir direto para publish_offer.
-- Limpe a base: arquive duplicatas, ofertas sem promoção real e ofertas velhas que nunca vão publicar. Isso é o que impede o canal de travar.
+REGRAS INEGOCIÁVEIS:
+1. MARCA: se não está na lista de marcas aprovadas → archive_offer imediatamente, sem validar.
+2. DESCONTO: mínimo 18% de desconto real (preço anterior genuíno, não inflado).
+3. PREÇO: mínimo R$120 — produtos abaixo disso não convertem vendas.
+4. PROMOÇÃO: só publique com promoção real (preco_anterior > preco_atual).
+5. DUPLICATA: se publish_offer retornar "duplicate" ou "already_published" → archive_offer e siga.
+6. CADÊNCIA: se "cadence_blocked" → pare de publicar, encerre o ciclo com finish_cycle.
+7. Ofertas "auto_ready" na lista 'prontas_para_publicar' já foram validadas — publique diretamente.
+8. Ofertas "new/queued" em 'precisam_validacao' — use validate_offer primeiro.
 
-ESTILO: AJA com as ferramentas — NÃO escreva planos longos. No máximo uma frase curta antes de chamar uma ferramenta. Emita as chamadas de ferramenta diretamente (você pode chamar várias de uma vez). Faça só o necessário e encerre com finish_cycle resumindo o que fez. Não peça confirmação a ninguém — você é autônomo.`;
+ESTILO: aja direto com as ferramentas. No máximo uma linha antes de chamar. Pode chamar várias ferramentas de uma vez. Encerre sempre com finish_cycle.`;
 
 function buildInitialPrompt(ctx) {
   const { db, config, now } = ctx;
@@ -143,6 +152,7 @@ function buildInitialPrompt(ctx) {
       o.status === "auto_ready" &&
       hasRealPromotion(o) &&
       hasProductImage(o) &&
+      extractPremiumBrand(o, {}).tier === "premium" &&
       !wasAlreadyPublished(db.state, o.id, "telegram") &&
       !familyRecentlyPublished(db.state, o, "telegram", config.relatedOfferDedupeHours ?? 24, now))
     .slice(0, 15)
@@ -169,12 +179,19 @@ function buildInitialPrompt(ctx) {
 }
 
 function summarizeOffer(offer, db) {
+  const brand = extractPremiumBrand(offer, {});
+  const prev = Number(offer.previousPrice || 0);
+  const curr = Number(offer.currentPrice || 0);
+  const desconto = prev > curr ? Math.round(((prev - curr) / prev) * 100) : (offer.discountPercent || 0);
   return {
     id: offer.id,
     titulo: (offer.title || "").slice(0, 80),
     status: offer.status,
+    marca: brand.name,
+    marca_tier: brand.tier,
     preco_atual: offer.currentPrice ?? null,
     preco_anterior: offer.previousPrice ?? null,
+    desconto_pct: desconto,
     promocao_real: hasRealPromotion(offer),
     tem_imagem: hasProductImage(offer),
     ja_publicada: wasAlreadyPublished(db.state, offer.id, "telegram"),
@@ -308,6 +325,27 @@ export async function toolPublish(ctx, offerId) {
   const cadence = telegramPublicationStatus(db.state.publishLog || [], config, now);
   if (!cadence.allowed) return { ok: true, published: false, reason: "cadence_blocked", waitMinutes: cadence.waitMinutes };
 
+  // Ensure best product image before publishing.
+  // Amazon product pages always serve white-background shots; squareTelegramPhoto
+  // then pads to 1200×1200 white square. This is a safety net for offers whose
+  // images weren't fetched during validation.
+  if (offer.store === "amazon" && offer.asin && !offer.productPageImageVerifiedAt) {
+    try {
+      const v = await verifyAmazonProduct(offer.asin, config);
+      if (v.imageUrls?.length) {
+        offer.imageUrl = v.imageUrl;
+        offer.imageUrls = v.imageUrls;
+        offer.productPageImageVerifiedAt = new Date().toISOString();
+        const offerInDb = db.state.offers.find((o) => o.id === offer.id);
+        if (offerInDb) {
+          offerInDb.imageUrl = v.imageUrl;
+          offerInDb.imageUrls = v.imageUrls;
+          offerInDb.productPageImageVerifiedAt = offer.productPageImageVerifiedAt;
+        }
+      }
+    } catch { /* best-effort */ }
+  }
+
   // Build copy + image
   const content = await createContent(offer, { reason: offer.validationSummary || "Oferta selecionada" }, config);
   if (content.imageUrls?.length) {
@@ -396,6 +434,20 @@ async function safeScrape(db, config) {
     console.log("orchestrator_scrape_error", JSON.stringify({ error: err.message }));
     return { inserted: 0, offers: [], error: err.message };
   }
+}
+
+async function purgeNonPremiumAutoReady(db) {
+  const toArchive = (db.state.offers || []).filter(
+    (o) => o.status === "auto_ready" && extractPremiumBrand(o, {}).tier !== "premium"
+  );
+  if (!toArchive.length) return 0;
+  for (const o of toArchive) {
+    o.status = "archived";
+    o.archiveReason = "non_premium_brand_gate";
+    o.updatedAt = new Date().toISOString();
+  }
+  await db.save();
+  return toArchive.length;
 }
 
 function isAlreadyKnown(state, offer) {

@@ -24,6 +24,7 @@ import { createTelegramCopy, telegramCopy } from "../src/copywriter.js";
 import { createContent } from "../src/agents/creative.js";
 import { publishDeal } from "../src/agents/publisher.js";
 import { runSupervisorCheck } from "../src/agents/supervisor.js";
+import { validateDeal } from "../src/agents/validation.js";
 import { runOrchestratorCycle, toolPublish, toolValidate, toolArchive } from "../src/agents/orchestrator.js";
 import { buildDiscordDealMessage, discordDealChannelForOffer } from "../src/discord/deals.js";
 import { reportAgentEvent } from "../src/discord/reporter.js";
@@ -2660,6 +2661,42 @@ test("orchestrator cost gate skips the LLM when nothing is pending and channel i
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("validateDeal hard-rejects non-premium brands without calling the LLM", async () => {
+  const result = await validateDeal({
+    title: "Redragon M606 Mouse Gamer RGB",
+    currentPrice: 94,
+    previousPrice: 140,
+    discountPercent: 33,
+    store: "amazon"
+  }, { anthropicApiKey: "should-not-be-called" });
+  assert.equal(result.valid, false);
+  assert.ok(result.reason.includes("brand_not_premium"));
+});
+
+test("validateDeal hard-rejects products under the minimum price", async () => {
+  const result = await validateDeal({
+    title: "Logitech Mouse M90 USB",
+    currentPrice: 59,
+    previousPrice: 89,
+    discountPercent: 34,
+    store: "amazon"
+  }, { anthropicApiKey: "should-not-be-called" });
+  assert.equal(result.valid, false);
+  assert.ok(result.reason.includes("price_too_low"));
+});
+
+test("validateDeal hard-rejects discounts below minimum", async () => {
+  const result = await validateDeal({
+    title: "Logitech MX Master 3S Mouse Sem Fio",
+    currentPrice: 430,
+    previousPrice: 460,
+    discountPercent: 6,
+    store: "amazon"
+  }, { anthropicApiKey: "should-not-be-called" });
+  assert.equal(result.valid, false);
+  assert.ok(result.reason.includes("discount_too_low"));
 });
 
 test("parseAmazonSearch extracts strikethrough list price as previousPrice", () => {

@@ -8,9 +8,9 @@ const DEFAULT_PREMIUM_BRANDS = [
   "acer", "tcl", "hisense", "husky", "elements", "flexform"
 ];
 
-const DEFAULT_SECONDARY_BRANDS = [
-  "redragon", "havit", "c3tech", "multilaser", "positivo", "baseus", "ugreen"
-];
+// Secondary brands removed — they are not premium enough for this channel.
+// validateDeal now hard-rejects anything not in the premium list.
+const DEFAULT_SECONDARY_BRANDS = [];
 
 const CATEGORY_KEYWORDS = [
   ["tv", ["smart tv", "televisão", "televisao", "tv ", " tv", "oled", "qled", "crystal uhd"]],
