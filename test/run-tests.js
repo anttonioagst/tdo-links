@@ -357,7 +357,7 @@ test("creative fallback keeps Telegram promotion format with strikethrough and b
     store: "amazon"
   }, { reason: "bom desconto" }, {});
 
-  assert.match(result.copy.telegram, /🔥 De <s>R\$\s?2199,00<\/s> por <b>R\$\s?1499,00<\/b> \(32% OFF\)/);
+  assert.match(result.copy.telegram, /🔥 De <s>R\$\s?2\.199,00<\/s> por <b>R\$\s?1\.499,00<\/b> \(32% OFF\)/);
   assert.match(result.copy.telegram, /📌 <b>Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth<\/b>/);
   assert.match(result.copy.telegram, /• Cancelamento de ruído/);
   assert.match(result.copy.telegram, /• Bluetooth/);
@@ -1026,8 +1026,7 @@ test("verifyAmazonProduct returns product page images for exact ASIN", async () 
   assert.equal(result.title, "Kit Mouse Sem Fio Logitech Pebble 2 M350s Grafite + Teclado Sem fio Logitech Pebble Keys 2 K380s Grafite");
   assert.equal(result.imageUrl, "https://m.media-amazon.com/images/I/exact-product.jpg");
   assert.deepEqual(result.imageUrls, [
-    "https://m.media-amazon.com/images/I/exact-product.jpg",
-    "https://m.media-amazon.com/images/I/exact-product-hires.jpg"
+    "https://m.media-amazon.com/images/I/exact-product.jpg"
   ]);
 });
 

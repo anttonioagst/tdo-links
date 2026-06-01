@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { findOfficialProductImages } from "../imagefinder.js";
 import { verifyAmazonProduct } from "../scrapers.js";
 import { hasRealPromotion, promotionDiscountPercent } from "../deals.js";
-import { extractSpecHighlights } from "../copywriter.js";
+import { extractSpecHighlights, telegramCopy } from "../copywriter.js";
 
 const MODEL = "claude-sonnet-4-6";
 
@@ -26,14 +26,9 @@ Curador: "${validationResult.reason || "Bom deal de tecnologia"}"
 
 Retorne JSON válido exatamente neste formato:
 {
-  "hook": "1 frase chamativa sobre o deal para o Telegram",
-  "specs": ["especificação curta 1", "especificação curta 2"],
   "discord": "copy completa para Discord",
   "x": "tweet"
 }
-
-CAMPO hook: 1 frase curta e concreta sobre o valor do produto/deal. Sem exageros genéricos.
-CAMPO specs: no máximo 2 itens, cada um com 2 a 6 palavras, só especificações reais do produto/título. Não invente. Não repita preço, desconto, loja ou urgência.
 
 FORMATO DISCORD:
 **📌 ${offer.title}**
@@ -47,7 +42,7 @@ ${previousFmt ? `De R$${previousFmt} por R$${currentFmt}` : `Por R$${currentFmt}
 Veja no nosso canal 👇
 
 REGRAS:
-- Discord/X: escreva {LINK} literalmente onde couber o link
+- Discord: escreva {LINK} literalmente onde couber o link
 - X: sem link afiliado, sem hashtags, máximo 220 chars`;
 }
 
@@ -61,35 +56,7 @@ function safeParseJson(text) {
   }
 }
 
-function buildTelegramCopy(offer, hook, specs = []) {
-  if (!hasRealPromotion(offer)) {
-    throw new Error("missing_real_promotion");
-  }
-  const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
-  const previousFmt = Number(offer.previousPrice).toFixed(2).replace(".", ",");
-  const discountPct = hasRealPromotion(offer) ? promotionDiscountPercent(offer) : null;
-  const discountStr = ` (${discountPct}% OFF)`;
-  const priceLine = `🔥 De <s>R$ ${previousFmt}</s> por <b>R$ ${currentFmt}</b>${discountStr}`;
-  const storeDisplay = offer.store === "amazon" ? "Amazon"
-    : offer.store === "mercado_livre" ? "Mercado Livre"
-    : (offer.store || "Loja");
-  const specLines = extractSpecHighlights(offer, specs).map((spec) => `• ${spec}`);
-
-  return [
-    `📌 <b>${offer.title || "Oferta Tech"}</b>`,
-    "",
-    hook,
-    specLines.length ? "" : null,
-    ...specLines,
-    "",
-    priceLine,
-    "",
-    `🛒 Ver oferta na ${storeDisplay}:`,
-    "{LINK}"
-  ].filter((line) => line !== null).join("\n");
-}
-
-function fallbackCopy(offer) {
+function fallbackCopy(offer, config) {
   const currentFmt = Number(offer.currentPrice ?? 0).toFixed(2).replace(".", ",");
   const previousFmt = hasRealPromotion(offer) ? Number(offer.previousPrice).toFixed(2).replace(".", ",") : null;
   const discountPct = offer.discountPercent ? Math.round(offer.discountPercent) : null;
@@ -98,16 +65,9 @@ function fallbackCopy(offer) {
     ? `De R$ ${previousFmt} por R$ ${currentFmt}${discountStr}`
     : `Por R$ ${currentFmt}`;
   const title = offer.title || "Oferta Tech";
-  const storeDisplay = offer.store === "amazon" ? "Amazon"
-    : offer.store === "mercado_livre" ? "Mercado Livre"
-    : (offer.store || "Loja");
-  const specs = extractSpecHighlights(offer);
-  const hook = specs.length
-    ? `Oferta forte para quem busca ${specs[0].toLowerCase()} sem pagar preço cheio.`
-    : `Oferta selecionada na ${storeDisplay} com desconto real.`;
 
   return {
-    telegram: buildTelegramCopy(offer, hook, specs),
+    telegram: telegramCopy(offer, "{LINK}", config?.disclosure ?? ""),
     discord: `**📌 ${title}**\n~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**${discountStr}\n> Oferta selecionada\n{LINK}`,
     x: `📌 ${title.slice(0, 60)}\n${priceStr}\nVeja no nosso canal 👇`.slice(0, 220)
   };
@@ -134,7 +94,7 @@ export async function createContent(offer, validationResult, config) {
     })(),
 
     (async () => {
-      if (!config.anthropicApiKey) return fallbackCopy(offer);
+      if (!config.anthropicApiKey) return fallbackCopy(offer, config);
 
       const client = new Anthropic({ apiKey: config.anthropicApiKey });
       const message = await client.messages.create({
@@ -146,15 +106,14 @@ export async function createContent(offer, validationResult, config) {
       const rawText = message.content?.[0]?.text || "";
       const parsed = safeParseJson(rawText);
 
-      if (!parsed?.hook || !parsed?.discord || !parsed?.x) {
+      if (!parsed?.discord || !parsed?.x) {
         console.log("agent_event", JSON.stringify({ agent: "creative", event: "copy_parse_error", raw: rawText.slice(0, 100) }));
-        return fallbackCopy(offer);
+        return fallbackCopy(offer, config);
       }
 
       if (parsed.x.length > 220) parsed.x = parsed.x.slice(0, 220);
-      const specs = extractSpecHighlights(offer, Array.isArray(parsed.specs) ? parsed.specs : []);
       return {
-        telegram: buildTelegramCopy(offer, parsed.hook, specs),
+        telegram: telegramCopy(offer, "{LINK}", config?.disclosure ?? ""),
         discord: parsed.discord,
         x: parsed.x
       };
@@ -173,7 +132,7 @@ export async function createContent(offer, validationResult, config) {
     copy = copyResult.value;
   } else {
     console.log("agent_event", JSON.stringify({ agent: "creative", event: "copy_error", error: copyResult.reason?.message }));
-    copy = fallbackCopy(offer);
+    copy = fallbackCopy(offer, config);
   }
 
   console.log("agent_event", JSON.stringify({ agent: "creative", event: "done", title: offer.title, imageCount: imageUrls?.length ?? 0 }));
