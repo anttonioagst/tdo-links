@@ -78,10 +78,8 @@ export async function createContent(offer, validationResult, config) {
 
   const [imageResult, copyResult] = await Promise.allSettled([
     (async () => {
-      if (!config.allowExternalProductImages) throw new Error("external_product_images_disabled");
-
-      // For Amazon products, use the canonical product page image (white background, product focus).
-      // Manufacturer site searches (Brave/SerpAPI) often return promotional or lifestyle images.
+      // Amazon: always fetch the canonical product page image (first image = white background).
+      // This is independent of allowExternalProductImages — we're hitting Amazon, not a third-party search.
       if (offer.store === "amazon" && offer.asin) {
         const verified = await verifyAmazonProduct(offer.asin, config);
         const mainImage = verified.imageUrl || verified.imageUrls?.[0];
@@ -89,6 +87,8 @@ export async function createContent(offer, validationResult, config) {
         throw new Error("amazon_product_image_not_found");
       }
 
+      // Non-Amazon: only search external sources if explicitly enabled
+      if (!config.allowExternalProductImages) throw new Error("external_product_images_disabled");
       if (!config.openaiApiKey) throw new Error("openai_not_configured");
       return await findOfficialProductImages(offer, config);
     })(),
