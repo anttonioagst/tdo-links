@@ -67,7 +67,7 @@ function fallbackCopy(offer, config) {
   const title = offer.title || "Oferta Tech";
 
   return {
-    telegram: telegramCopy(offer, "{LINK}", config?.disclosure ?? ""),
+    telegram: telegramCopy(offer, "{LINK}"),
     discord: `**📌 ${title}**\n~~R$${previousFmt ?? "?"}~~ → **R$${currentFmt}**${discountStr}\n> Oferta selecionada\n{LINK}`,
     x: `📌 ${title.slice(0, 60)}\n${priceStr}\nVeja no nosso canal 👇`.slice(0, 220)
   };
@@ -113,7 +113,7 @@ export async function createContent(offer, validationResult, config) {
 
       if (parsed.x.length > 220) parsed.x = parsed.x.slice(0, 220);
       return {
-        telegram: telegramCopy(offer, "{LINK}", config?.disclosure ?? ""),
+        telegram: telegramCopy(offer, "{LINK}"),
         discord: parsed.discord,
         x: parsed.x
       };

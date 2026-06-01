@@ -130,14 +130,14 @@ export function money(value) {
 }
 
 export function createTelegramCopy(offer, shortCode, config) {
-  return telegramCopy(offer, getPostUrl(offer, shortCode, config), config.disclosure);
+  return telegramCopy(offer, getPostUrl(offer, shortCode, config));
 }
 
 export function createXPostCopy(offer, shortCode, config) {
   return xCopy(offer, getPostUrl(offer, shortCode, config));
 }
 
-export function telegramCopy(offer, url, disclosure) {
+export function telegramCopy(offer, url) {
   if (!hasRealPromotion(offer)) {
     throw new Error("missing_real_promotion");
   }
@@ -147,21 +147,17 @@ export function telegramCopy(offer, url, disclosure) {
   const discountStr = ` (${discountPct}% OFF)`;
   const store = storeLabel(offer.store);
   const hook = `Aproveite esta oferta exclusiva na ${store} antes que acabe!`;
-  const specLines = extractSpecHighlights(offer).map((spec) => `• ${spec}`);
 
   return [
     `📌 <b>${offer.title}</b>`,
     "",
     hook,
-    specLines.length ? "" : null,
-    ...specLines,
     "",
     `🔥 De <s>${previous}</s> por <b>${current}</b>${discountStr}`,
     "",
     `🛒 Ver oferta na ${store}:`,
-    url,
-    disclosure ? `\n${disclosure}` : null
-  ].filter(v => v !== null).join("\n");
+    url
+  ].join("\n");
 }
 
 export function xCopy(offer, url) {
