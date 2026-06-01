@@ -70,19 +70,20 @@ export async function publishTelegram(draft, config, offer = null) {
     const text = draft.text || "";
     const botUrl = `https://api.telegram.org/bot${config.telegramBotToken}`;
 
-    // Use cached Telegram file_id — no re-upload needed
+    // Official product images fetched by the creative agent take priority —
+    // always re-upload fresh images instead of reusing a potentially stale cached file_id.
+    if (offer?.officialImageUrls?.length) {
+      const result = await sendBestImage(botUrl, config.telegramChatId, offer.officialImageUrls, text, offer);
+      if (result.ok) return result;
+      console.log("telegram_official_images_fallback", JSON.stringify({ detail: result.detail }));
+    }
+
+    // Use cached Telegram file_id only when no fresh image is available
     if (offer?.telegramImageFileId) {
       const result = await telegramRequest(`${botUrl}/sendPhoto`, {
         chat_id: config.telegramChatId, photo: offer.telegramImageFileId, caption: text, parse_mode: "HTML"
       });
       if (result.ok) return result;
-    }
-
-    // Official product images fetched by the creative agent
-    if (offer?.officialImageUrls?.length) {
-      const result = await sendBestImage(botUrl, config.telegramChatId, offer.officialImageUrls, text, offer);
-      if (result.ok) return result;
-      console.log("telegram_official_images_fallback", JSON.stringify({ detail: result.detail }));
     }
 
     // Legacy imageUrl/imageUrls fields (scrape pipeline) — normalize and upload best candidate
