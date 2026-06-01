@@ -59,7 +59,7 @@ CRITÉRIOS DE APROVAÇÃO (todos devem ser atendidos):
 1. Marca premium consolidada: Logitech, HyperX, Razer, Sony, JBL, Samsung, LG, Dell, Apple, Anker/Soundcore, TP-Link, Corsair, SteelSeries, ASUS, Lenovo, Acer, AOC, BenQ, Kingston, Seagate, WD, MSI, Gigabyte, TCL, Philips, Flexform, Husky.
 2. Desconto que chama atenção: 20%+ em produtos até R$500; 15%+ em produtos acima de R$500 (R$100+ de economia já é impacto).
 3. Produto desejável: notebooks, monitores, TVs, headsets/fones, SSDs, teclados mecânicos, mouses premium (MX Master, G502, Basilisk, DeathAdder — NÃO genérico), câmeras, soundbars, roteadores mesh.
-4. Avaliação decente: 4.0+ (4.5+ preferível). Zero reviews = suspeito, rejeite salvo marca muito forte.
+4. Avaliação decente: 4.0+ (4.5+ preferível). Zero reviews = suspeito para marcas desconhecidas. Para marcas globais consolidadas (Samsung, LG, Sony, Apple, JBL, Anker/Soundcore, AOC, TCL, Logitech, Razer, HyperX, ASUS, Lenovo) com desconto ≥ 20%, zero reviews NÃO é motivo de rejeição — o produto pode ser novo na listagem ou ter reviews em outra versão.
 
 REJEITE SEMPRE:
 - Marcas desconhecidas ou genéricas (Redragon, Havit, C3Tech, marcas sem histórico)
