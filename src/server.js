@@ -443,6 +443,14 @@ async function handleApi(req, res, url, db, config) {
     sendJson(res, 200, draft);
     return;
   }
+  if (req.method === "POST" && url.pathname === "/api/drafts/regenerate-pending") {
+    if (!hasAdminAuth(req, config)) { sendJson(res, 401, { error: "unauthorized" }); return; }
+    const pending = db.state.drafts.filter(d => !d.publishedAt && d.channel === "telegram");
+    for (const d of pending) regenerateDraftCopy(db, d.id, config);
+    await db.save();
+    sendJson(res, 200, { regenerated: pending.length });
+    return;
+  }
   sendJson(res, 404, { error: "not_found" });
 }
 
