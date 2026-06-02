@@ -585,57 +585,17 @@ function requiresAdminAuth(req, config) {
 }
 
 function buildLinksPage(db, config) {
-  const published = (db.state.publishLog || [])
-    .filter(e => e.channel === "telegram" && e.result?.ok === true)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 4)
-    .map(e => {
-      const offer = (db.state.offers || []).find(o => o.id === e.offerId);
-      return offer || null;
-    })
-    .filter(Boolean);
-
   const telegramUrl = config.telegramChannelUrl || "https://t.me/tdolinks";
   const discordUrl = config.discordInviteUrl || "";
   const xUrl = config.xProfileUrl || "";
   const pixelId = config.metaPixelId || "";
 
-  const fmtPrice = (v) => v ? `R$ ${Number(v).toFixed(2).replace(".", ",")}` : "";
-  const fmtDiscount = (v) => v ? `${Math.round(v)}% OFF` : "";
-  const esc = (s) => String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-
-  const arrowIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>`;
-
-  const dealCards = published.map((offer, i) => {
-    const img = offer.imageUrl || offer.imageUrls?.[0] || "";
-    const title = esc(String(offer.title || "").slice(0, 55));
-    const price = fmtPrice(offer.currentPrice);
-    const prev = fmtPrice(offer.previousPrice);
-    const disc = fmtDiscount(offer.discountPercent);
-    const col = i === 0 ? "col-span-4" : i === 1 ? "col-span-2" : "col-span-3";
-    return `<div class="${col} bento-card" style="min-height:${i < 2 ? "108px" : "96px"}">
-      <a href="${telegramUrl}" target="_blank" rel="noopener" class="card-link card-link--deal">
-        <div class="card-top">
-          ${img ? `<img src="${esc(img)}" alt="${title}" class="deal-thumb" loading="lazy">` : ""}
-          <span class="arrow-btn">${arrowIcon}</span>
-        </div>
-        <p class="card-title">${title}</p>
-        <p class="deal-price">${price}${disc ? ` <span class="deal-badge">${disc}</span>` : ""}${prev ? `<span class="deal-prev">${prev}</span>` : ""}</p>
-      </a>
-    </div>`;
-  }).join("");
-
-  const emptySlots = published.length < 4 ? Array(4 - published.length).fill(0).map((_, i) => {
-    const col = (published.length + i) % 2 === 0 ? "col-span-3" : "col-span-3";
-    return `<div class="${col} bento-card" style="min-height:96px; opacity:0.4">
-      <div class="card-link" style="cursor:default">
-        <p class="card-title" style="color:var(--muted)">Em breve</p>
-        <p class="card-desc">Novo deal a caminho</p>
-      </div>
-    </div>`;
-  }).join("") : "";
-
   const pixelScript = pixelId ? `<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${pixelId}');fbq('track','ViewContent');</script><noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=${pixelId}&ev=ViewContent&noscript=1"></noscript>` : "";
+
+  const arrow = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>`;
+  const tgIcon = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>`;
+  const dcIcon = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.034.054a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>`;
+  const xIcon = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.749l7.73-8.835L1.254 2.25H8.08l4.261 5.628L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/></svg>`;
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -643,59 +603,38 @@ function buildLinksPage(db, config) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
-  <title>TDO Links — Tô de Olho em Tech</title>
-  <meta name="description" content="Curadoria real de deals de tecnologia premium no Brasil. Descontos verificados, marcas consolidadas.">
-  <meta property="og:title" content="TDO Links — Tô de Olho em Tech">
-  <meta property="og:description" content="Os melhores deals de tech do Brasil. Curadoria real, desconto de verdade.">
+  <title>TDO Links</title>
+  <meta name="description" content="Curadoria real de deals de tecnologia premium no Brasil.">
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,600,700,900&display=swap" rel="stylesheet">
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #ffffff;
+      --accent: #EC6227;
       --text: #1e2229;
       --muted: #6a707c;
-      --surface: rgba(232,235,238,0.7);
-      --surface-warm: rgba(241,230,208,0.55);
-      --accent: #EC6227;
-      --accent-glow: rgba(236,98,39,0.12);
-      --overlay-dark: #1f2229;
-      --border-glass: rgba(255,255,255,0.6);
-      --border-glass-strong: rgba(255,255,255,0.32);
-      --shadow-glass: rgba(255,255,255,0.9) 0 1px 0 0 inset, rgba(65,73,88,0.04) 0 -1px 0 0 inset, rgba(65,73,88,0.06) 0 8px 22px 0;
-      --shadow-primary: rgba(236,98,39,0.12) 0 12px 34px 0;
-      --shadow-secondary: rgba(20,24,31,0.04) 0 10px 28px 0;
-      --radius-card: 16px;
-      --radius-pill: 9999px;
-      --max-w: 540px;
+      --dark: #1f2229;
+      --shadow-primary: rgba(236,98,39,0.14) 0 12px 34px 0;
+      --shadow-secondary: rgba(20,24,31,0.05) 0 10px 28px 0;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { background: var(--bg); color: var(--text); font-family: 'Satoshi', 'Inter', ui-sans-serif, system-ui, sans-serif; -webkit-font-smoothing: antialiased; min-height: 100svh; }
-
-    /* ── Background effects ── */
-    .bg-layer { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+    html, body { background: #fff; color: var(--text); font-family: 'Satoshi','Inter',ui-sans-serif,sans-serif; -webkit-font-smoothing: antialiased; min-height: 100svh; }
+    .bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
     .orb { position: absolute; border-radius: 9999px; }
-    .orb-a { width: 360px; height: 360px; left: -6rem; top: 2.5rem; background: hsl(28 60% 88% / 0.6); filter: blur(110px); animation: drift-a 12s ease-in-out infinite alternate; }
-    .orb-b { width: 300px; height: 300px; right: -3.75rem; top: 42%; background: hsl(210 18% 91% / 0.75); filter: blur(120px); animation: drift-b 16s ease-in-out infinite alternate; }
-    .orb-c { width: 380px; height: 380px; left: 18%; bottom: -7.5rem; background: hsl(32 28% 90% / 0.55); filter: blur(130px); animation: drift-c 14s ease-in-out infinite alternate; }
-    @keyframes drift-a { from { transform: translate(0,0) scale(1); } to { transform: translate(24px,16px) scale(1.05); } }
-    @keyframes drift-b { from { transform: translate(0,0) scale(1); } to { transform: translate(-18px,22px) scale(0.97); } }
-    @keyframes drift-c { from { transform: translate(0,0) scale(1); } to { transform: translate(12px,-20px) scale(1.03); } }
-    .grid-svg { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--text); opacity: 0.035; }
-    .grain { position: absolute; inset: 0; opacity: 0.025; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E"); background-size: 200px; }
-
-    /* ── Layout ── */
-    main { position: relative; z-index: 10; margin: 0 auto; width: 100%; max-width: var(--max-w); padding: 20px 20px 96px; }
-
-    /* ── Header ── */
-    .header { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 10px; border-radius: var(--radius-card); }
-    .logo-mark { width: 40px; height: 40px; border-radius: 9999px; background: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .logo-mark svg { width: 22px; height: 22px; }
-    .header-text { min-width: 0; }
-    .brand-name { font-weight: 600; letter-spacing: -0.025em; font-size: clamp(1rem, 4.1vw, 1.35rem); line-height: 1.1; color: var(--text); }
-    .ticker-wrap { position: relative; height: 14px; overflow: hidden; margin-top: 2px; }
-    .ticker-item { position: absolute; inset-x: 0; top: 0; display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .orb-a { width: 360px; height: 360px; left: -96px; top: 40px; background: hsl(28 60% 88%/0.6); filter: blur(110px); animation: da 12s ease-in-out infinite alternate; }
+    .orb-b { width: 300px; height: 300px; right: -60px; top: 42%; background: hsl(210 18% 91%/0.75); filter: blur(120px); animation: db 16s ease-in-out infinite alternate; }
+    .orb-c { width: 380px; height: 380px; left: 18%; bottom: -120px; background: hsl(32 28% 90%/0.55); filter: blur(130px); animation: dc 14s ease-in-out infinite alternate; }
+    @keyframes da { to { transform: translate(24px,16px) scale(1.05); } }
+    @keyframes db { to { transform: translate(-18px,22px) scale(0.97); } }
+    @keyframes dc { to { transform: translate(12px,-20px) scale(1.03); } }
+    .bg-grid { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--text); opacity: 0.035; }
+    main { position: relative; z-index: 10; margin: 0 auto; width: 100%; max-width: 540px; padding: 48px 20px 96px; }
+    .header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
+    .logo-mark { width: 56px; height: 56px; border-radius: 9999px; background: var(--accent); display: flex; align-items: center; justify-content: center; box-shadow: rgba(236,98,39,0.28) 0 4px 20px; }
+    .logo-mark svg { width: 28px; height: 28px; }
+    .brand-name { font-weight: 700; font-size: clamp(1.2rem,5vw,1.55rem); letter-spacing: -0.03em; color: var(--text); line-height: 1; }
+    .brand-name span { color: var(--accent); }
+    .ticker-wrap { position: relative; height: 14px; overflow: hidden; width: 100%; margin-top: 2px; }
+    .ticker-item { position: absolute; inset-x: 0; top: 0; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 10px; font-weight: 500; color: var(--muted); }
     .ticker-dot { width: 4px; height: 4px; border-radius: 9999px; background: var(--accent); flex-shrink: 0; }
     .ticker-item:nth-child(1) { animation: tick 9s linear infinite; }
     .ticker-item:nth-child(2) { animation: tick 9s linear infinite; animation-delay: -6s; }
@@ -707,172 +646,82 @@ function buildLinksPage(db, config) {
       36%  { transform: translateY(-100%); opacity: 0; }
       100% { transform: translateY(-100%); opacity: 0; }
     }
-
-    /* ── Social icons ── */
-    .social-row { margin-top: 16px; overflow-x: auto; -ms-overflow-style: none; scrollbar-width: none; }
-    .social-row::-webkit-scrollbar { display: none; }
-    .social-inner { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0; justify-content: center; width: 100%; }
-    .social-link { display: inline-flex; align-items: center; justify-content: center; padding: 8px; opacity: 0.75; color: var(--text); text-decoration: none; border-radius: 9999px; transition: opacity 0.2s, transform 0.2s; flex-shrink: 0; }
+    .social-row { display: flex; align-items: center; justify-content: center; gap: 0; margin-top: 6px; }
+    .social-link { display: inline-flex; align-items: center; justify-content: center; padding: 8px; opacity: 0.7; color: var(--text); text-decoration: none; border-radius: 9999px; transition: opacity 0.2s, transform 0.2s; }
     .social-link:hover { opacity: 1; transform: translateY(-2px); }
     .social-link svg { width: 22px; height: 22px; }
-
-    /* ── Cards ── */
-    .cards-section { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
-
-    /* Banner card */
-    .banner-card { position: relative; display: block; border-radius: var(--radius-card); overflow: hidden; text-decoration: none; aspect-ratio: 2.04/1; }
-    .banner-card--primary { box-shadow: var(--shadow-primary); }
-    .banner-card--secondary { box-shadow: var(--shadow-secondary); }
-    .banner-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.7s ease; }
-    .banner-card:hover .banner-bg { transform: scale(1.04); }
-    .banner-gradient { position: absolute; inset-x: 0; bottom: 0; height: 45%; background: linear-gradient(transparent 0%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.28) 100%); pointer-events: none; }
+    .cards { margin-top: 28px; display: flex; flex-direction: column; gap: 12px; }
+    .banner { position: relative; display: block; border-radius: 16px; overflow: hidden; text-decoration: none; aspect-ratio: 2.04/1; }
+    .banner--primary { box-shadow: var(--shadow-primary); }
+    .banner--secondary { box-shadow: var(--shadow-secondary); }
+    .banner-bg { position: absolute; inset: 0; }
+    .banner-bg--telegram { background: linear-gradient(135deg, #1a1f2e 0%, #EC6227 100%); }
+    .banner-bg--discord  { background: linear-gradient(135deg, #1a1f2e 0%, #5865f2 100%); }
+    .banner-icon-bg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-60%); opacity: 0.12; color: #fff; }
+    .banner-icon-bg svg { width: 80px; height: 80px; }
+    .banner-fade { position: absolute; inset-x: 0; bottom: 0; height: 45%; background: linear-gradient(transparent, rgba(0,0,0,0.28)); pointer-events: none; }
     .banner-footer { position: absolute; inset-x: 0; bottom: 0; z-index: 10; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 16px; }
-    .banner-label { font-size: 11.5px; font-weight: 500; line-height: 1.35; color: rgba(255,255,255,0.95); text-shadow: rgba(0,0,0,0.18) 0 1px 4px; min-width: 0; flex: 1; }
-    .banner-arrow { width: 36px; height: 36px; border-radius: 9999px; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.32); backdrop-filter: blur(10px) saturate(140%); color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.5s; }
-    .banner-card:hover .banner-arrow { transform: rotate(45deg); }
-
-    /* Banner gradient-only (sem imagem) */
-    .banner-gradient-bg { position: absolute; inset: 0; }
-    .banner-gradient-bg--telegram { background: linear-gradient(135deg, #1a1f2e 0%, #EC6227 100%); }
-    .banner-gradient-bg--discord { background: linear-gradient(135deg, #1a1f2e 0%, #5865f2 100%); }
-    .banner-icon { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -60%); opacity: 0.15; }
-    .banner-icon svg { width: 80px; height: 80px; color: #fff; }
-
-    /* Bento grid */
-    .bento-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
-    .bento-card { min-height: 96px; display: flex; }
-    .card-link { position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; padding: 14px 14px 12px; border-radius: var(--radius-card); text-decoration: none; color: var(--text); width: 100%; transition: box-shadow 0.2s; box-shadow: var(--shadow-glass); background: var(--surface); }
-    .card-link--deal { background: rgba(255,255,255,0.9); }
-    .card-link:hover { box-shadow: var(--shadow-glass), 0 0 0 1px rgba(236,98,39,0.12); }
-    .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-    .card-title { font-size: 15px; font-weight: 500; letter-spacing: -0.005em; color: var(--text); line-height: 1.3; flex: 1; }
-    .card-desc { font-size: 10.5px; font-weight: 400; color: var(--muted); line-height: 1.35; }
-    .arrow-btn { color: var(--muted); opacity: 0.45; flex-shrink: 0; transition: opacity 0.2s, transform 0.25s; }
-    .card-link:hover .arrow-btn { opacity: 0.9; transform: translate(2px, -2px); }
-
-    /* Deal specifics */
-    .deal-thumb { width: 48px; height: 48px; object-fit: contain; border-radius: 8px; background: #fff; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.06); }
-    .deal-price { font-size: 13px; font-weight: 700; color: var(--accent); line-height: 1.2; margin-top: 2px; }
-    .deal-badge { font-size: 9px; font-weight: 700; background: #16a34a; color: #fff; padding: 1px 5px; border-radius: 4px; vertical-align: middle; margin-left: 4px; }
-    .deal-prev { font-size: 10px; font-weight: 400; color: var(--muted); text-decoration: line-through; margin-left: 6px; vertical-align: middle; }
-
-    /* CTA pill */
-    .cta-row { margin-top: 12px; display: flex; align-items: center; justify-content: center; }
-    .cta-pill { display: flex; align-items: center; gap: 10px; padding: 12px 24px; border-radius: 9999px; background: var(--overlay-dark); border: 1px solid rgba(255,255,255,0.05); text-decoration: none; transition: opacity 0.2s, transform 0.2s; }
-    .cta-pill:hover { opacity: 0.88; transform: translateY(-1px); }
-    .cta-pill-text { font-size: 14px; font-weight: 500; letter-spacing: -0.005em; color: rgba(255,255,255,0.92); }
-    .cta-pill svg { flex-shrink: 0; color: rgba(255,255,255,0.9); }
-
-    /* col helpers */
-    .col-span-2 { grid-column: span 2; }
-    .col-span-3 { grid-column: span 3; }
-    .col-span-4 { grid-column: span 4; }
-    .col-span-6 { grid-column: span 6; }
-
-    /* footer */
-    footer { margin-top: 40px; text-align: center; font-size: 10px; font-weight: 400; color: rgba(30,34,41,0.4); }
+    .banner-label { font-size: 11.5px; font-weight: 500; color: rgba(255,255,255,0.95); text-shadow: 0 1px 4px rgba(0,0,0,0.18); flex: 1; line-height: 1.35; }
+    .banner-arrow { width: 36px; height: 36px; border-radius: 9999px; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.32); backdrop-filter: blur(10px); color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.5s; }
+    .banner:hover .banner-arrow { transform: rotate(45deg); }
+    footer { margin-top: 40px; text-align: center; font-size: 10px; color: rgba(30,34,41,0.38); }
   </style>
   ${pixelScript}
 </head>
 <body>
-<div class="bg-layer" aria-hidden="true">
-  <div class="orb orb-a"></div>
-  <div class="orb orb-b"></div>
-  <div class="orb orb-c"></div>
-  <svg class="grid-svg" xmlns="http://www.w3.org/2000/svg">
+<div class="bg" aria-hidden="true">
+  <div class="orb orb-a"></div><div class="orb orb-b"></div><div class="orb orb-c"></div>
+  <svg class="bg-grid" xmlns="http://www.w3.org/2000/svg">
     <defs><pattern id="g" width="40" height="40" patternUnits="userSpaceOnUse">
       <path d="M40 0H0V40" fill="none" stroke="currentColor" stroke-width="0.5"/>
     </pattern></defs>
     <rect width="100%" height="100%" fill="url(#g)"/>
   </svg>
-  <div class="grain"></div>
 </div>
-
 <main>
-  <!-- Header -->
   <section class="header">
     <div class="logo-mark">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <ellipse cx="12" cy="12" rx="10" ry="6.5" stroke="white" stroke-width="1.5"/>
-        <circle cx="12" cy="12" r="2.5" fill="white"/>
-      </svg>
+      <svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="12" rx="10" ry="6.5" stroke="white" stroke-width="1.5"/><circle cx="12" cy="12" r="2.5" fill="white"/></svg>
     </div>
-    <div class="header-text">
-      <h1 class="brand-name">Tô de Olho</h1>
-      <div class="ticker-wrap" aria-hidden="true">
-        <div class="ticker-item"><span class="ticker-dot"></span><span>Curadoria real de tech premium</span></div>
-        <div class="ticker-item"><span class="ticker-dot"></span><span>Descontos verificados · Marcas consolidadas</span></div>
-        <div class="ticker-item"><span class="ticker-dot"></span><span>Só o que realmente vale comprar</span></div>
-      </div>
+    <h1 class="brand-name">TDO <span>LINKS</span></h1>
+    <div class="ticker-wrap" aria-hidden="true">
+      <div class="ticker-item"><span class="ticker-dot"></span><span>Curadoria real de tech premium</span></div>
+      <div class="ticker-item"><span class="ticker-dot"></span><span>Descontos verificados · Marcas consolidadas</span></div>
+      <div class="ticker-item"><span class="ticker-dot"></span><span>Só o que realmente vale comprar</span></div>
+    </div>
+    <div class="social-row">
+      <a href="${telegramUrl}" target="_blank" rel="noopener" aria-label="Telegram" class="social-link" ${pixelId ? `onclick="fbq('track','Lead')"` : ""}>${tgIcon}</a>
+      ${discordUrl ? `<a href="${discordUrl}" target="_blank" rel="noopener" aria-label="Discord" class="social-link">${dcIcon}</a>` : ""}
+      ${xUrl ? `<a href="${xUrl}" target="_blank" rel="noopener" aria-label="X" class="social-link">${xIcon}</a>` : ""}
     </div>
   </section>
-
-  <!-- Social icons -->
-  <div class="social-row">
-    <div class="social-inner">
-      <a href="${telegramUrl}" target="_blank" rel="noopener" aria-label="Telegram" class="social-link" ${pixelId ? `onclick="fbq('track','Lead')"` : ""}>
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-      </a>
-      ${discordUrl ? `<a href="${discordUrl}" target="_blank" rel="noopener" aria-label="Discord" class="social-link">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.034.054a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-      </a>` : ""}
-      ${xUrl ? `<a href="${xUrl}" target="_blank" rel="noopener" aria-label="X (Twitter)" class="social-link">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.749l7.73-8.835L1.254 2.25H8.08l4.261 5.628L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/></svg>
-      </a>` : ""}
-    </div>
-  </div>
-
-  <!-- Cards section -->
-  <div class="cards-section">
-    <!-- Primary banner: Telegram CTA -->
-    <a href="${telegramUrl}" target="_blank" rel="noopener" class="banner-card banner-card--primary" ${pixelId ? `onclick="fbq('track','Lead')"` : ""}>
-      <div class="banner-gradient-bg banner-gradient-bg--telegram"></div>
-      <div class="banner-icon">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-      </div>
-      <div class="banner-gradient"></div>
+  <div class="cards">
+    <a href="${telegramUrl}" target="_blank" rel="noopener" class="banner banner--primary" ${pixelId ? `onclick="fbq('track','Lead')"` : ""}>
+      <div class="banner-bg banner-bg--telegram"></div>
+      <div class="banner-icon-bg">${tgIcon}</div>
+      <div class="banner-fade"></div>
       <div class="banner-footer">
-        <p class="banner-label">Entrar no canal · Deals em tempo real</p>
-        <span class="banner-arrow">${arrowIcon}</span>
+        <p class="banner-label">Canal do Telegram · Deals em tempo real</p>
+        <span class="banner-arrow">${arrow}</span>
       </div>
     </a>
-
-    ${discordUrl ? `<!-- Secondary banner: Discord -->
-    <a href="${discordUrl}" target="_blank" rel="noopener" class="banner-card banner-card--secondary">
-      <div class="banner-gradient-bg banner-gradient-bg--discord"></div>
-      <div class="banner-icon">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.034.054a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-      </div>
-      <div class="banner-gradient"></div>
+    <a href="${discordUrl || telegramUrl}" target="_blank" rel="noopener" class="banner banner--secondary">
+      <div class="banner-bg banner-bg--discord"></div>
+      <div class="banner-icon-bg">${dcIcon}</div>
+      <div class="banner-fade"></div>
       <div class="banner-footer">
         <p class="banner-label">Comunidade no Discord · Discussão e novidades</p>
-        <span class="banner-arrow">${arrowIcon}</span>
+        <span class="banner-arrow">${arrow}</span>
       </div>
-    </a>` : ""}
-
-    <!-- Bento grid: últimas ofertas -->
-    ${published.length ? `<div class="bento-grid">
-      ${dealCards}
-      ${emptySlots}
-      <div class="col-span-6" style="display:flex;align-items:center;justify-content:center;margin-top:4px">
-        <a href="${telegramUrl}" target="_blank" rel="noopener" class="cta-pill" ${pixelId ? `onclick="fbq('track','Lead')"` : ""}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-          <p class="cta-pill-text">Ver todos os deals no canal</p>
-        </a>
-      </div>
-    </div>` : `<div class="cta-row">
-      <a href="${telegramUrl}" target="_blank" rel="noopener" class="cta-pill" ${pixelId ? `onclick="fbq('track','Lead')"` : ""}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-        <p class="cta-pill-text">Entrar no canal de deals</p>
-      </a>
-    </div>`}
+    </a>
   </div>
-
   <footer>© TDO Links ${new Date().getFullYear()} · Tô de Olho em tech pra você</footer>
 </main>
 </body>
 </html>`;
 }
+
+
 
 function hasAdminAuth(req, config) {
   const headerToken = req.headers["x-admin-token"];
