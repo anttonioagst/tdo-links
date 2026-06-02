@@ -72,7 +72,7 @@ function BannerCard({ href, bgClass, icon, label, primary }) {
         background: "linear-gradient(transparent, rgba(0,0,0,0.28))",
         pointerEvents: "none",
       }} />
-      {/* footer */}
+      {/* footer — label flex:1 pushes arrow to far right always */}
       <div style={{
         position: "absolute", insetInline: 0, bottom: 0, zIndex: 10,
         display: "flex", alignItems: "flex-end", justifyContent: "space-between",
@@ -81,6 +81,7 @@ function BannerCard({ href, bgClass, icon, label, primary }) {
         <p style={{
           fontSize: 11.5, fontWeight: 500, color: "rgba(255,255,255,0.95)",
           textShadow: "0 1px 4px rgba(0,0,0,0.18)", flex: 1, lineHeight: 1.35,
+          minWidth: 0,
         }}>{label}</p>
         <span style={{
           width: 36, height: 36, borderRadius: 9999,
@@ -113,6 +114,43 @@ function TickerItem({ text, delay }) {
       <span style={{ width: 4, height: 4, borderRadius: 9999, background: "#EC6227", flexShrink: 0 }} />
       <span>{text}</span>
     </div>
+  );
+}
+
+function MiniCard({ href, title, desc, span = 3 }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <a
+      href={href || "#"}
+      target={href && href !== "#" ? "_blank" : undefined}
+      rel="noopener noreferrer"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        gridColumn: `span ${span}`,
+        minHeight: 96,
+        display: "flex", flexDirection: "column", justifyContent: "space-between",
+        gap: 6, padding: "14px 14px 12px",
+        borderRadius: 16, textDecoration: "none", color: "#1e2229",
+        background: "rgba(232,235,238,0.7)",
+        boxShadow: hovered
+          ? "rgba(255,255,255,0.9) 0 1px 0 0 inset, rgba(65,73,88,0.04) 0 -1px 0 0 inset, rgba(65,73,88,0.06) 0 8px 22px 0, 0 0 0 1px rgba(236,98,39,0.1)"
+          : "rgba(255,255,255,0.9) 0 1px 0 0 inset, rgba(65,73,88,0.04) 0 -1px 0 0 inset, rgba(65,73,88,0.06) 0 8px 22px 0",
+        transition: "box-shadow 0.2s",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+        <p style={{ fontSize: 15, fontWeight: 500, letterSpacing: "-0.005em", lineHeight: 1.3, flex: 1 }}>{title}</p>
+        <span style={{
+          color: "#6a707c", opacity: hovered ? 0.9 : 0.45, flexShrink: 0,
+          transition: "opacity 0.2s, transform 0.25s",
+          transform: hovered ? "translate(2px,-2px)" : "translate(0,0)",
+        }}>
+          {ARROW}
+        </span>
+      </div>
+      {desc && <p style={{ fontSize: 10.5, color: "#6a707c", lineHeight: 1.35 }}>{desc}</p>}
+    </a>
   );
 }
 
@@ -213,8 +251,8 @@ export default function Links() {
         {/* Main */}
         <main style={{ position: "relative", zIndex: 10, margin: "0 auto", width: "100%", maxWidth: 540, padding: "20px 20px 96px" }}>
 
-          {/* Header — horizontal, identical to Human Academy */}
-          <section style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 16, padding: 10 }}>
+          {/* Header — horizontal, centered on page */}
+          <section style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 16, padding: 10, width: "fit-content", margin: "0 auto" }}>
             {/* Logo mark */}
             <div style={{
               width: 40, height: 40, borderRadius: 9999,
@@ -276,6 +314,41 @@ export default function Links() {
               label="Comunidade no Discord · Discussão e novidades"
               primary={false}
             />
+          </div>
+
+          {/* Mini cards bento grid */}
+          <div style={{
+            marginTop: 12,
+            display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12,
+          }}>
+            <MiniCard href={cfg.telegramUrl} title="Ofertas" desc="Últimas ofertas publicadas no canal" span={3} />
+            <MiniCard href="#" title="Amazon BR" desc="Deals direto da Amazon Brasil" span={3} />
+            <MiniCard href={cfg.telegramUrl} title="Telegram" desc="Entrar no canal de deals" span={4} />
+            <MiniCard href={cfg.xUrl} title="X" desc="Seguir no Twitter" span={2} />
+            <MiniCard href={cfg.discordUrl} title="Discord" desc="Comunidade de entusiastas de tech" span={3} />
+            <MiniCard href={cfg.instagramUrl} title="Instagram" desc="Conteúdo e novidades" span={3} />
+
+            {/* Full-width dark pill CTA */}
+            <div style={{ gridColumn: "span 6", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 4 }}>
+              <a
+                href={cfg.telegramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "12px 24px", borderRadius: 9999,
+                  background: "#1f2229", border: "1px solid rgba(255,255,255,0.05)",
+                  textDecoration: "none", transition: "opacity 0.2s, transform 0.2s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = "0.88"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateY(0)"; }}
+              >
+                {ICONS.telegram}
+                <span style={{ fontSize: 14, fontWeight: 500, letterSpacing: "-0.005em", color: "rgba(255,255,255,0.92)" }}>
+                  Ver todos os deals no canal
+                </span>
+              </a>
+            </div>
           </div>
 
           <footer style={{ marginTop: 40, textAlign: "center", fontSize: 10, color: "rgba(30,34,41,0.38)" }}>
