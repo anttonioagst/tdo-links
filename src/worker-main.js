@@ -7,6 +7,7 @@ import { startWorkers } from "./queues/workers.js";
 import { runDiscovery } from "./agents/discovery.js";
 import { runSupervisorCheck } from "./agents/supervisor.js";
 import { runOrchestratorCycle } from "./agents/orchestrator.js";
+import { runWatchdogCheck } from "./agents/watchdog.js";
 import { enqueuePendingTelegramOffers } from "./publication-recovery.js";
 import cron from "node-cron";
 
@@ -59,6 +60,24 @@ if (config.orchestratorEnabled) {
   };
   cron.schedule(`*/${interval} * * * *`, tick);
   tick();
+
+  // Watchdog: independent of the orchestrator cycle — checks for prolonged silence
+  // and sends a Telegram alert to admin when the bot hasn't posted in > N minutes.
+  if (config.watchdogEnabled) {
+    const watchdogMs = Math.max(5, config.watchdogIntervalMinutes) * 60 * 1000;
+    setInterval(async () => {
+      try {
+        const result = await runWatchdogCheck(db, config);
+        if (result.alertSent || result.silent) {
+          console.log("watchdog_check", JSON.stringify(result));
+        }
+      } catch (err) {
+        console.error("watchdog_failed", JSON.stringify({ error: err.message }));
+      }
+    }, watchdogMs);
+    console.log("watchdog_active", JSON.stringify({ intervalMinutes: config.watchdogIntervalMinutes, alertAfterMinutes: config.watchdogAlertAfterMinutes }));
+  }
+
   console.log("worker_ready — orquestrador autônomo ativo", JSON.stringify({ intervalMinutes: interval, model: config.orchestratorModel }));
 } else {
   cron.schedule("*/15 * * * *", async () => {
