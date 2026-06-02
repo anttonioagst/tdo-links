@@ -1,13 +1,16 @@
-// Watchdog — runs alongside the orchestrator to detect prolonged silence and alert admin via Telegram.
-// Sends one alert when silence crosses the threshold, then stays quiet until the bot posts again.
+// Watchdog — detects prolonged Telegram silence, tries to recover automatically,
+// and only alerts admin if recovery also fails.
 
-const ALERT_COOLDOWN_MS = 60 * 60 * 1000; // re-alert at most once per hour after first trigger
+import { runOrchestratorCycle } from "./orchestrator.js";
 
+const RECOVERY_COOLDOWN_MS = 30 * 60 * 1000;  // attempt recovery at most every 30 min
+const ALERT_COOLDOWN_MS    = 60 * 60 * 1000;  // re-alert at most every hour
+
+let lastRecoveryAt = null;
 let lastAlertSentAt = null;
 
 export async function runWatchdogCheck(db, config) {
   if (!config.watchdogEnabled) return { ok: true, skipped: true };
-  if (!config.telegramBotToken || !config.telegramAdminChatId) return { ok: true, skipped: true, reason: "no_telegram_credentials" };
 
   if (db.load) await db.load();
 
@@ -23,63 +26,81 @@ export async function runWatchdogCheck(db, config) {
   const silenceMinutes = Math.round(silenceMs / 60000);
 
   if (silenceMs < thresholdMs) {
-    // Bot is posting normally — reset alert state
+    lastRecoveryAt = null;
     lastAlertSentAt = null;
     return { ok: true, silent: false, silenceMinutes };
   }
 
-  // Already alerted recently — don't spam
+  // --- STEP 1: try to recover automatically ---
+  let recovered = false;
+
+  if (!lastRecoveryAt || now - lastRecoveryAt > RECOVERY_COOLDOWN_MS) {
+    lastRecoveryAt = now;
+    console.log("watchdog_recovery_start", JSON.stringify({ silenceMinutes }));
+
+    try {
+      // Force the orchestrator to run a full cycle right now.
+      // scrapeDeals already falls back to Pelando/Promobit when Amazon is blocked.
+      const result = await runOrchestratorCycle(db, config);
+      console.log("watchdog_recovery_result", JSON.stringify({ published: result.published, ok: result.ok }));
+      recovered = result.published > 0;
+    } catch (err) {
+      console.log("watchdog_recovery_error", JSON.stringify({ error: err.message }));
+    }
+  }
+
+  if (recovered) return { ok: true, silent: false, recovered: true, silenceMinutes };
+
+  // --- STEP 2: recovery failed — alert admin ---
+  if (!config.telegramBotToken || !config.telegramAdminChatId) {
+    return { ok: true, silent: true, silenceMinutes, alertSkipped: "no_credentials" };
+  }
+
   if (lastAlertSentAt && now - lastAlertSentAt < ALERT_COOLDOWN_MS) {
     return { ok: true, silent: true, silenceMinutes, alertSkipped: "cooldown" };
   }
 
-  // Count current queue state
   const offers = db.state.offers || [];
-  const ready = offers.filter(o => o.status === "auto_ready").length;
+  const ready   = offers.filter(o => o.status === "auto_ready").length;
   const pending = offers.filter(o => o.status === "new" || o.status === "queued").length;
 
   const hoursAgo = silenceMinutes >= 60
-    ? `${Math.floor(silenceMinutes / 60)}h${silenceMinutes % 60 > 0 ? `${silenceMinutes % 60}m` : ""}`
+    ? `${Math.floor(silenceMinutes / 60)}h${silenceMinutes % 60 > 0 ? `${silenceMinutes % 60}min` : ""}`
     : `${silenceMinutes}min`;
 
-  const queueLine = ready > 0
-    ? `📦 ${ready} oferta(s) pronta(s) na fila`
+  const statusLine = ready > 0
+    ? `📦 ${ready} oferta(s) pronta(s) mas não conseguiu publicar`
     : pending > 0
-      ? `🔄 ${pending} oferta(s) aguardando validação`
-      : `❌ Fila vazia — Amazon bloqueando scraping`;
+      ? `🔄 ${pending} oferta(s) aguardando validação — nenhuma aprovada`
+      : `❌ Fila vazia — Amazon bloqueado e feeds sem novos deals`;
 
   const text = [
-    `🚨 <b>TDO Links — Bot silencioso há ${hoursAgo}</b>`,
+    `🚨 <b>TDO Links — Intervenção manual necessária</b>`,
     "",
-    `Nenhum post no Telegram desde ${lastOk ? new Date(lastOk.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "sempre"}.`,
+    `Bot silencioso há <b>${hoursAgo}</b>. Tentei recuperar automaticamente mas não consegui publicar.`,
     "",
-    queueLine,
+    statusLine,
     "",
-    `O sistema está tentando recuperar automaticamente via feeds alternativos (Pelando/Promobit).`,
-    `Se o problema persistir, verifique os logs no Railway.`
+    `Verifique os logs no Railway para diagnóstico.`
   ].join("\n");
 
   try {
     const botUrl = `https://api.telegram.org/bot${config.telegramBotToken}`;
-    const response = await fetch(`${botUrl}/sendMessage`, {
+    const res = await fetch(`${botUrl}/sendMessage`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        chat_id: config.telegramAdminChatId,
-        text,
-        parse_mode: "HTML"
-      })
+      body: JSON.stringify({ chat_id: config.telegramAdminChatId, text, parse_mode: "HTML" })
     });
-    const payload = await response.json().catch(() => ({}));
-    if (response.ok && payload.ok) {
+    const payload = await res.json().catch(() => ({}));
+    if (res.ok && payload.ok) {
       lastAlertSentAt = now;
       console.log("watchdog_alert_sent", JSON.stringify({ silenceMinutes, ready, pending }));
-      return { ok: true, silent: true, silenceMinutes, alertSent: true };
+    } else {
+      console.log("watchdog_alert_failed", JSON.stringify({ detail: payload.description }));
     }
-    console.log("watchdog_alert_failed", JSON.stringify({ detail: payload.description }));
-    return { ok: false, silent: true, silenceMinutes, alertSent: false };
+    return { ok: true, silent: true, silenceMinutes, alertSent: res.ok && payload.ok };
   } catch (err) {
     console.log("watchdog_alert_error", JSON.stringify({ error: err.message }));
-    return { ok: false, silent: true, silenceMinutes, error: err.message };
+    return { ok: false, silent: true, silenceMinutes };
   }
 }
