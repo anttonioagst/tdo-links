@@ -101,7 +101,9 @@ export function loadConfig(env = process.env) {
     redisUrl: env.REDIS_URL || "",
     braveSearchApiKey: env.BRAVE_SEARCH_API_KEY || "",
     serpApiKey: env.SERP_API_KEY || "",
-    metaPixelId: env.META_PIXEL_ID || ""
+    metaPixelId: env.META_PIXEL_ID || "",
+    instagramUrl: env.INSTAGRAM_URL || "",
+    facebookUrl: env.FACEBOOK_URL || ""
   };
 }
 

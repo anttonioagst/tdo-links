@@ -35,8 +35,8 @@ export function createApp({ db, config, publicDir }) {
         return;
       }
       if (url.pathname === "/links") {
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        res.end(buildLinksPage(db, config));
+        // React Router handles this route — serve the SPA entry point
+        await serveStatic(res, publicDir, "/index.html");
         return;
       }
       await serveStatic(res, publicDir, url.pathname === "/" ? "/index.html" : url.pathname);
@@ -67,6 +67,18 @@ async function handleApi(req, res, url, db, config) {
     } catch {
       sendJson(res, 404, { error: "image_file_not_found" });
     }
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/api/links-config") {
+    res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+    res.end(JSON.stringify({
+      telegramUrl:  config.telegramChannelUrl || "https://t.me/tdolinks",
+      discordUrl:   config.discordInviteUrl   || "",
+      xUrl:         config.xProfileUrl        || "",
+      instagramUrl: config.instagramUrl       || "",
+      facebookUrl:  config.facebookUrl        || "",
+      metaPixelId:  config.metaPixelId        || ""
+    }));
     return;
   }
   if (req.method === "GET" && url.pathname === "/api/recent-deals") {
