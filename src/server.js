@@ -586,16 +586,13 @@ function requiresAdminAuth(req, config) {
 
 function buildLinksPage(db, config) {
   const telegramUrl = config.telegramChannelUrl || "https://t.me/tdolinks";
-  const discordUrl = config.discordInviteUrl || "";
-  const xUrl = config.xProfileUrl || "";
-  const pixelId = config.metaPixelId || "";
+  const discordUrl  = config.discordInviteUrl   || "";
+  const xUrl        = config.xProfileUrl        || "";
+  const pixelId     = config.metaPixelId        || "";
 
   const pixelScript = pixelId ? `<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${pixelId}');fbq('track','ViewContent');</script><noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=${pixelId}&ev=ViewContent&noscript=1"></noscript>` : "";
 
   const arrow = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>`;
-  const tgIcon = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>`;
-  const dcIcon = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.034.054a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>`;
-  const xIcon = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.749l7.73-8.835L1.254 2.25H8.08l4.261 5.628L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/></svg>`;
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -606,65 +603,109 @@ function buildLinksPage(db, config) {
   <title>TDO Links</title>
   <meta name="description" content="Curadoria real de deals de tecnologia premium no Brasil.">
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
-  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,900&display=swap" rel="stylesheet">
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,600,700,900&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --accent: #EC6227;
-      --text: #1e2229;
-      --muted: #6a707c;
-      --dark: #1f2229;
-      --shadow-primary: rgba(236,98,39,0.14) 0 12px 34px 0;
-      --shadow-secondary: rgba(20,24,31,0.05) 0 10px 28px 0;
+    :root{--accent:#EC6227;--text:#1e2229;--muted:#6a707c;--shadow-primary:rgba(236,98,39,0.12) 0 12px 34px 0;--shadow-secondary:rgba(20,24,31,0.04) 0 10px 28px 0;}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html,body{background:#fff;color:var(--text);font-family:'Satoshi','Inter',ui-sans-serif,sans-serif;-webkit-font-smoothing:antialiased;min-height:100svh;}
+
+    /* background */
+    .bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+    .orb{position:absolute;border-radius:9999px;}
+    .orb-a{width:360px;height:360px;left:-96px;top:40px;background:hsl(28 60% 88%/0.6);filter:blur(110px);animation:da 12s ease-in-out infinite alternate;}
+    .orb-b{width:300px;height:300px;right:-60px;top:42%;background:hsl(210 18% 91%/0.75);filter:blur(120px);animation:db 16s ease-in-out infinite alternate;}
+    .orb-c{width:380px;height:380px;left:18%;bottom:-120px;background:hsl(32 28% 90%/0.55);filter:blur(130px);animation:dc 14s ease-in-out infinite alternate;}
+    @keyframes da{to{transform:translate(24px,16px) scale(1.05);}}
+    @keyframes db{to{transform:translate(-18px,22px) scale(0.97);}}
+    @keyframes dc{to{transform:translate(12px,-20px) scale(1.03);}}
+    .bg-grid{position:absolute;inset:0;width:100%;height:100%;color:var(--text);opacity:0.035;}
+
+    /* layout */
+    main{position:relative;z-index:10;margin:0 auto;width:100%;max-width:540px;padding:20px 20px 96px;}
+
+    /* ── header: horizontal, igual ao Human Academy ── */
+    .header{
+      display:flex;align-items:center;gap:10px;
+      border-radius:16px;padding:10px;
     }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { background: #fff; color: var(--text); font-family: 'Satoshi','Inter',ui-sans-serif,sans-serif; -webkit-font-smoothing: antialiased; min-height: 100svh; }
-    .bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-    .orb { position: absolute; border-radius: 9999px; }
-    .orb-a { width: 360px; height: 360px; left: -96px; top: 40px; background: hsl(28 60% 88%/0.6); filter: blur(110px); animation: da 12s ease-in-out infinite alternate; }
-    .orb-b { width: 300px; height: 300px; right: -60px; top: 42%; background: hsl(210 18% 91%/0.75); filter: blur(120px); animation: db 16s ease-in-out infinite alternate; }
-    .orb-c { width: 380px; height: 380px; left: 18%; bottom: -120px; background: hsl(32 28% 90%/0.55); filter: blur(130px); animation: dc 14s ease-in-out infinite alternate; }
-    @keyframes da { to { transform: translate(24px,16px) scale(1.05); } }
-    @keyframes db { to { transform: translate(-18px,22px) scale(0.97); } }
-    @keyframes dc { to { transform: translate(12px,-20px) scale(1.03); } }
-    .bg-grid { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--text); opacity: 0.035; }
-    main { position: relative; z-index: 10; margin: 0 auto; width: 100%; max-width: 540px; padding: 48px 20px 96px; }
-    .header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
-    .logo-mark { width: 56px; height: 56px; border-radius: 9999px; background: var(--accent); display: flex; align-items: center; justify-content: center; box-shadow: rgba(236,98,39,0.28) 0 4px 20px; }
-    .logo-mark svg { width: 28px; height: 28px; }
-    .brand-name { font-weight: 700; font-size: clamp(1.2rem,5vw,1.55rem); letter-spacing: -0.03em; color: var(--text); line-height: 1; }
-    .brand-name span { color: var(--accent); }
-    .ticker-wrap { position: relative; height: 14px; overflow: hidden; width: 100%; margin-top: 2px; }
-    .ticker-item { position: absolute; inset-x: 0; top: 0; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 10px; font-weight: 500; color: var(--muted); }
-    .ticker-dot { width: 4px; height: 4px; border-radius: 9999px; background: var(--accent); flex-shrink: 0; }
-    .ticker-item:nth-child(1) { animation: tick 9s linear infinite; }
-    .ticker-item:nth-child(2) { animation: tick 9s linear infinite; animation-delay: -6s; }
-    .ticker-item:nth-child(3) { animation: tick 9s linear infinite; animation-delay: -3s; }
-    @keyframes tick {
-      0%   { transform: translateY(100%); opacity: 0; }
-      8%   { transform: translateY(0);    opacity: 1; }
-      28%  { transform: translateY(0);    opacity: 1; }
-      36%  { transform: translateY(-100%); opacity: 0; }
-      100% { transform: translateY(-100%); opacity: 0; }
+    .logo-mark{
+      width:40px;height:40px;border-radius:9999px;
+      background:var(--accent);
+      display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;
     }
-    .social-row { display: flex; align-items: center; justify-content: center; gap: 0; margin-top: 6px; }
-    .social-link { display: inline-flex; align-items: center; justify-content: center; padding: 8px; opacity: 0.7; color: var(--text); text-decoration: none; border-radius: 9999px; transition: opacity 0.2s, transform 0.2s; }
-    .social-link:hover { opacity: 1; transform: translateY(-2px); }
-    .social-link svg { width: 22px; height: 22px; }
-    .cards { margin-top: 28px; display: flex; flex-direction: column; gap: 12px; }
-    .banner { position: relative; display: block; border-radius: 16px; overflow: hidden; text-decoration: none; aspect-ratio: 2.04/1; }
-    .banner--primary { box-shadow: var(--shadow-primary); }
-    .banner--secondary { box-shadow: var(--shadow-secondary); }
-    .banner-bg { position: absolute; inset: 0; }
-    .banner-bg--telegram { background: linear-gradient(135deg, #1a1f2e 0%, #EC6227 100%); }
-    .banner-bg--discord  { background: linear-gradient(135deg, #1a1f2e 0%, #5865f2 100%); }
-    .banner-icon-bg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-60%); opacity: 0.12; color: #fff; }
-    .banner-icon-bg svg { width: 80px; height: 80px; }
-    .banner-fade { position: absolute; inset-x: 0; bottom: 0; height: 45%; background: linear-gradient(transparent, rgba(0,0,0,0.28)); pointer-events: none; }
-    .banner-footer { position: absolute; inset-x: 0; bottom: 0; z-index: 10; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 16px; }
-    .banner-label { font-size: 11.5px; font-weight: 500; color: rgba(255,255,255,0.95); text-shadow: 0 1px 4px rgba(0,0,0,0.18); flex: 1; line-height: 1.35; }
-    .banner-arrow { width: 36px; height: 36px; border-radius: 9999px; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.32); backdrop-filter: blur(10px); color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.5s; }
-    .banner:hover .banner-arrow { transform: rotate(45deg); }
-    footer { margin-top: 40px; text-align: center; font-size: 10px; color: rgba(30,34,41,0.38); }
+    .logo-mark svg{width:22px;height:22px;}
+    .divider{
+      width:1px;height:40px;flex-shrink:0;
+      background:linear-gradient(180deg,transparent,rgba(236,98,39,0.5),rgba(236,98,39,0.25),transparent);
+      display:none;
+    }
+    @media(min-width:400px){.divider{display:block;}}
+    .header-text{min-width:0;}
+    .brand-name{
+      font-weight:600;
+      font-size:clamp(1rem,4.1vw,1.35rem);
+      letter-spacing:-0.025em;
+      line-height:1.1;
+      color:var(--text);
+    }
+    .brand-name span{color:var(--accent);}
+
+    /* ticker — igual HA */
+    .ticker-wrap{position:relative;height:14px;overflow:hidden;margin-top:3px;}
+    .ticker-item{
+      position:absolute;inset-x:0;top:0;
+      display:flex;align-items:center;gap:6px;
+      font-size:10px;font-weight:500;color:var(--muted);
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .ticker-dot{width:4px;height:4px;border-radius:9999px;background:var(--accent);flex-shrink:0;}
+    .ticker-item:nth-child(1){animation:tick 9s linear infinite;}
+    .ticker-item:nth-child(2){animation:tick 9s linear infinite;animation-delay:-6s;}
+    .ticker-item:nth-child(3){animation:tick 9s linear infinite;animation-delay:-3s;}
+    @keyframes tick{
+      0%  {transform:translateY(100%);opacity:0;}
+      8%  {transform:translateY(0);   opacity:1;}
+      28% {transform:translateY(0);   opacity:1;}
+      36% {transform:translateY(-100%);opacity:0;}
+      100%{transform:translateY(-100%);opacity:0;}
+    }
+
+    /* ── social icons ── */
+    .social-row{
+      margin-top:16px;
+      overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none;
+    }
+    .social-row::-webkit-scrollbar{display:none;}
+    .social-inner{
+      display:inline-flex;flex-wrap:nowrap;align-items:center;
+      justify-content:center;gap:0;width:100%;
+    }
+    .social-link{
+      display:inline-flex;align-items:center;justify-content:center;
+      padding:8px;opacity:0.8;color:var(--text);text-decoration:none;
+      border-radius:9999px;transition:opacity .2s,transform .2s;flex-shrink:0;
+    }
+    .social-link:hover{opacity:1;transform:translateY(-2px);}
+    .social-link svg{width:22px;height:22px;}
+
+    /* ── cards ── */
+    .cards{margin-top:20px;display:flex;flex-direction:column;gap:12px;}
+    .banner{position:relative;display:block;border-radius:16px;overflow:hidden;text-decoration:none;aspect-ratio:2.04/1;}
+    .banner--primary{box-shadow:var(--shadow-primary);}
+    .banner--secondary{box-shadow:var(--shadow-secondary);}
+    .banner-bg{position:absolute;inset:0;}
+    .banner-bg--tg{background:linear-gradient(135deg,#1a1f2e 0%,#EC6227 100%);}
+    .banner-bg--dc{background:linear-gradient(135deg,#1a1f2e 0%,#5865f2 100%);}
+    .banner-icon-bg{position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);opacity:0.12;color:#fff;}
+    .banner-icon-bg svg{width:80px;height:80px;}
+    .banner-fade{position:absolute;inset-x:0;bottom:0;height:45%;background:linear-gradient(transparent,rgba(0,0,0,0.28));pointer-events:none;}
+    .banner-footer{position:absolute;inset-x:0;bottom:0;z-index:10;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:16px;}
+    .banner-label{font-size:11.5px;font-weight:500;color:rgba(255,255,255,0.95);text-shadow:0 1px 4px rgba(0,0,0,0.18);flex:1;line-height:1.35;}
+    .banner-arrow{width:36px;height:36px;border-radius:9999px;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.32);backdrop-filter:blur(10px);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .5s;}
+    .banner:hover .banner-arrow{transform:rotate(45deg);}
+
+    footer{margin-top:40px;text-align:center;font-size:10px;color:rgba(30,34,41,0.38);}
   </style>
   ${pixelScript}
 </head>
@@ -678,36 +719,73 @@ function buildLinksPage(db, config) {
     <rect width="100%" height="100%" fill="url(#g)"/>
   </svg>
 </div>
+
 <main>
+  <!-- Header horizontal — identical to Human Academy layout -->
   <section class="header">
     <div class="logo-mark">
-      <svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="12" rx="10" ry="6.5" stroke="white" stroke-width="1.5"/><circle cx="12" cy="12" r="2.5" fill="white"/></svg>
+      <svg viewBox="0 0 24 24" fill="none">
+        <ellipse cx="12" cy="12" rx="10" ry="6.5" stroke="white" stroke-width="1.5"/>
+        <circle cx="12" cy="12" r="2.5" fill="white"/>
+      </svg>
     </div>
-    <h1 class="brand-name">TDO <span>LINKS</span></h1>
-    <div class="ticker-wrap" aria-hidden="true">
-      <div class="ticker-item"><span class="ticker-dot"></span><span>Curadoria real de tech premium</span></div>
-      <div class="ticker-item"><span class="ticker-dot"></span><span>Descontos verificados · Marcas consolidadas</span></div>
-      <div class="ticker-item"><span class="ticker-dot"></span><span>Só o que realmente vale comprar</span></div>
-    </div>
-    <div class="social-row">
-      <a href="${telegramUrl}" target="_blank" rel="noopener" aria-label="Telegram" class="social-link" ${pixelId ? `onclick="fbq('track','Lead')"` : ""}>${tgIcon}</a>
-      ${discordUrl ? `<a href="${discordUrl}" target="_blank" rel="noopener" aria-label="Discord" class="social-link">${dcIcon}</a>` : ""}
-      ${xUrl ? `<a href="${xUrl}" target="_blank" rel="noopener" aria-label="X" class="social-link">${xIcon}</a>` : ""}
+    <div class="divider" aria-hidden="true"></div>
+    <div class="header-text">
+      <h1 class="brand-name">TDO <span>LINKS</span></h1>
+      <div class="ticker-wrap" aria-hidden="true">
+        <div class="ticker-item"><span class="ticker-dot"></span><span>Curadoria real de tech premium</span></div>
+        <div class="ticker-item"><span class="ticker-dot"></span><span>Descontos verificados · Marcas consolidadas</span></div>
+        <div class="ticker-item"><span class="ticker-dot"></span><span>Só o que realmente vale comprar</span></div>
+      </div>
     </div>
   </section>
+
+  <!-- Social icons: Instagram, Telegram, Discord, X, Facebook -->
+  <div class="social-row">
+    <div class="social-inner">
+      <!-- Instagram -->
+      <a href="#" target="_blank" rel="noopener" aria-label="Instagram" class="social-link">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2.163c3.204 0 3.584.012 4.849.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.849.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zm0 10.162a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+      </a>
+      <!-- Telegram -->
+      <a href="${telegramUrl}" target="_blank" rel="noopener" aria-label="Telegram" class="social-link" ${pixelId ? `onclick="fbq('track','Lead')"` : ""}>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+      </a>
+      <!-- Discord -->
+      ${discordUrl ? `<a href="${discordUrl}" target="_blank" rel="noopener" aria-label="Discord" class="social-link">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.034.054a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+      </a>` : `<a href="#" aria-label="Discord" class="social-link">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.034.054a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+      </a>`}
+      <!-- X / Twitter -->
+      ${xUrl ? `<a href="${xUrl}" target="_blank" rel="noopener" aria-label="X" class="social-link">` : `<a href="#" aria-label="X" class="social-link">`}
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.749l7.73-8.835L1.254 2.25H8.08l4.261 5.628L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/></svg>
+      </a>
+      <!-- Facebook -->
+      <a href="#" target="_blank" rel="noopener" aria-label="Facebook" class="social-link">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- 2 cards stacked -->
   <div class="cards">
     <a href="${telegramUrl}" target="_blank" rel="noopener" class="banner banner--primary" ${pixelId ? `onclick="fbq('track','Lead')"` : ""}>
-      <div class="banner-bg banner-bg--telegram"></div>
-      <div class="banner-icon-bg">${tgIcon}</div>
+      <div class="banner-bg banner-bg--tg"></div>
+      <div class="banner-icon-bg">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+      </div>
       <div class="banner-fade"></div>
       <div class="banner-footer">
         <p class="banner-label">Canal do Telegram · Deals em tempo real</p>
         <span class="banner-arrow">${arrow}</span>
       </div>
     </a>
-    <a href="${discordUrl || telegramUrl}" target="_blank" rel="noopener" class="banner banner--secondary">
-      <div class="banner-bg banner-bg--discord"></div>
-      <div class="banner-icon-bg">${dcIcon}</div>
+    <a href="${discordUrl || "#"}" target="_blank" rel="noopener" class="banner banner--secondary">
+      <div class="banner-bg banner-bg--dc"></div>
+      <div class="banner-icon-bg">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.034.054a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+      </div>
       <div class="banner-fade"></div>
       <div class="banner-footer">
         <p class="banner-label">Comunidade no Discord · Discussão e novidades</p>
@@ -715,12 +793,12 @@ function buildLinksPage(db, config) {
       </div>
     </a>
   </div>
+
   <footer>© TDO Links ${new Date().getFullYear()} · Tô de Olho em tech pra você</footer>
 </main>
 </body>
 </html>`;
 }
-
 
 
 function hasAdminAuth(req, config) {
