@@ -34,6 +34,11 @@ export function createApp({ db, config, publicDir }) {
         await handleRedirect(req, res, url, db, config);
         return;
       }
+      if (url.pathname === "/links") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(buildLinksPage(db, config));
+        return;
+      }
       await serveStatic(res, publicDir, url.pathname === "/" ? "/index.html" : url.pathname);
     } catch (error) {
       sendJson(res, 500, { error: "internal_error", detail: error.message });
@@ -62,6 +67,29 @@ async function handleApi(req, res, url, db, config) {
     } catch {
       sendJson(res, 404, { error: "image_file_not_found" });
     }
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/api/recent-deals") {
+    const published = (db.state.publishLog || [])
+      .filter(e => e.channel === "telegram" && e.result?.ok === true)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 3)
+      .map(e => {
+        const offer = (db.state.offers || []).find(o => o.id === e.offerId);
+        if (!offer) return null;
+        return {
+          title: offer.title,
+          currentPrice: offer.currentPrice,
+          previousPrice: offer.previousPrice,
+          discountPercent: offer.discountPercent,
+          store: offer.store,
+          imageUrl: offer.imageUrl || offer.imageUrls?.[0] || null,
+          publishedAt: e.createdAt
+        };
+      })
+      .filter(Boolean);
+    res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+    res.end(JSON.stringify({ ok: true, deals: published }));
     return;
   }
   if (req.method === "GET" && url.pathname === "/api/state") {
@@ -554,6 +582,100 @@ function sendJson(res, status, payload) {
 
 function requiresAdminAuth(req, config) {
   return Boolean(config.adminToken) && ["POST", "PUT", "PATCH", "DELETE"].includes(req.method);
+}
+
+function buildLinksPage(db, config) {
+  const published = (db.state.publishLog || [])
+    .filter(e => e.channel === "telegram" && e.result?.ok === true)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 3)
+    .map(e => {
+      const offer = (db.state.offers || []).find(o => o.id === e.offerId);
+      return offer || null;
+    })
+    .filter(Boolean);
+
+  const dealsHtml = published.map(offer => {
+    const discount = offer.discountPercent ? `${Math.round(offer.discountPercent)}% OFF` : "";
+    const price = offer.currentPrice ? `R$ ${Number(offer.currentPrice).toFixed(2).replace(".", ",")}` : "";
+    const title = String(offer.title || "").slice(0, 60);
+    const img = offer.imageUrl || offer.imageUrls?.[0] || "";
+    return `<div class="deal">
+      ${img ? `<img src="${img}" alt="${title}" loading="lazy">` : ""}
+      <div class="deal-info">
+        <p class="deal-title">${title}</p>
+        <p class="deal-price">${price}${discount ? ` <span class="badge">${discount}</span>` : ""}</p>
+      </div>
+    </div>`;
+  }).join("");
+
+  const telegramUrl = config.telegramChannelUrl || "https://t.me/tdolinks";
+  const discordUrl = config.discordInviteUrl || "#";
+  const xUrl = config.xProfileUrl || "#";
+  const pixelId = config.metaPixelId || "";
+
+  const pixelScript = pixelId ? `
+    <script>
+      !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+      n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+      document,'script','https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '${pixelId}');
+      fbq('track', 'ViewContent');
+    </script>
+    <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=${pixelId}&ev=ViewContent&noscript=1"/></noscript>` : "";
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TDO Links — Melhores deals de tech</title>
+  <meta name="description" content="Os melhores deals de tecnologia do Brasil. Curadoria real, desconto de verdade.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 32px 16px 48px; }
+    .logo { font-size: 28px; font-weight: 800; letter-spacing: -1px; margin-bottom: 6px; }
+    .logo span { color: #f97316; }
+    .tagline { font-size: 14px; color: #888; margin-bottom: 32px; text-align: center; }
+    .links { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 400px; }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 16px 24px; border-radius: 12px; font-size: 16px; font-weight: 600; text-decoration: none; transition: opacity 0.15s, transform 0.15s; cursor: pointer; }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary { background: #2563eb; color: #fff; font-size: 18px; padding: 20px; }
+    .btn-discord { background: #5865f2; color: #fff; }
+    .btn-x { background: #1a1a1a; color: #fff; border: 1px solid #333; }
+    .deals { margin-top: 40px; width: 100%; max-width: 400px; }
+    .deals-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #555; margin-bottom: 14px; }
+    .deal { display: flex; gap: 12px; align-items: center; padding: 12px; background: #141414; border-radius: 10px; margin-bottom: 10px; }
+    .deal img { width: 56px; height: 56px; object-fit: contain; border-radius: 6px; background: #fff; flex-shrink: 0; }
+    .deal-title { font-size: 13px; color: #ccc; line-height: 1.3; }
+    .deal-price { font-size: 14px; font-weight: 700; color: #f97316; margin-top: 3px; }
+    .badge { background: #16a34a; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; vertical-align: middle; }
+    .footer { margin-top: 40px; font-size: 11px; color: #444; text-align: center; }
+  </style>
+  ${pixelScript}
+</head>
+<body>
+  <div class="logo">TDO <span>Links</span></div>
+  <p class="tagline">Curadoria real de tech. Desconto de verdade.</p>
+
+  <div class="links">
+    <a href="${telegramUrl}" class="btn btn-primary" onclick="${pixelId ? "fbq('track','Lead')" : ""}">
+      📲 Entrar no canal Telegram
+    </a>
+    ${discordUrl !== "#" ? `<a href="${discordUrl}" class="btn btn-discord">💬 Comunidade no Discord</a>` : ""}
+    ${xUrl !== "#" ? `<a href="${xUrl}" class="btn btn-x">𝕏 Seguir no X (Twitter)</a>` : ""}
+  </div>
+
+  ${published.length ? `<div class="deals">
+    <p class="deals-title">Últimas ofertas</p>
+    ${dealsHtml}
+  </div>` : ""}
+
+  <p class="footer">Link de afiliado: posso receber comissão pelas compras.</p>
+</body>
+</html>`;
 }
 
 function hasAdminAuth(req, config) {

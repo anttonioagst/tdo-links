@@ -100,7 +100,8 @@ export function loadConfig(env = process.env) {
     databaseUrl: env.DATABASE_URL || "",
     redisUrl: env.REDIS_URL || "",
     braveSearchApiKey: env.BRAVE_SEARCH_API_KEY || "",
-    serpApiKey: env.SERP_API_KEY || ""
+    serpApiKey: env.SERP_API_KEY || "",
+    metaPixelId: env.META_PIXEL_ID || ""
   };
 }
 

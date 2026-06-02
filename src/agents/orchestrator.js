@@ -5,6 +5,8 @@ import { createContent } from "./creative.js";
 import { publishTelegram } from "../publishers/telegram.js";
 import { publishDiscord } from "../publishers/discord.js";
 import { publishDiscordDeal } from "../discord/deals.js";
+import { publishXAcquisition } from "../publishers/x.js";
+import { xCopy } from "../copywriter.js";
 import { buildAffiliateUrl } from "../links.js";
 import { hasRealPromotion } from "../deals.js";
 import { extractPremiumBrand } from "../premium-curation.js";
@@ -401,6 +403,7 @@ export async function toolArchive(ctx, offerId, reason) {
 
 async function publishSecondary(ctx, offer, content, affiliateUrl) {
   const { db, config } = ctx;
+
   if (!wasAlreadyPublished(db.state, offer.id, "discord")) {
     try {
       const draft = { text: resolveCopy(content.copy.discord, affiliateUrl) };
@@ -408,6 +411,15 @@ async function publishSecondary(ctx, offer, content, affiliateUrl) {
       const result = await publishDiscord(draft, config, offerForDiscord);
       savePublishResult(db, offer.id, "discord", result);
       if (result.ok) await publishDiscordDeal(db, config, offerForDiscord).catch(() => {});
+    } catch { /* secondary channel is best-effort */ }
+  }
+
+  if (!wasAlreadyPublished(db.state, offer.id, "x")) {
+    try {
+      const xUrl = buildAffiliateUrl(offer, config, "x");
+      const xText = xCopy(offer, xUrl);
+      const result = await publishXAcquisition(xText, config, db.state.publishLog || []);
+      savePublishResult(db, offer.id, "x", result);
     } catch { /* secondary channel is best-effort */ }
   }
 }
