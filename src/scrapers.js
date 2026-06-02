@@ -92,9 +92,16 @@ export async function scrapeDeals(config = {}) {
       return offers;
     }
 
-    // Amazon search blocked — try deal feeds (Pelando/Promobit) which extract
-    // ASINs and verify via /dp/ product pages (not blocked by Amazon)
-    console.log("scraper_amazon_blocked_trying_feeds");
+    // Amazon search blocked — try Goldbox (Lightning Deals page, not blocked)
+    console.log("scraper_amazon_blocked_trying_goldbox");
+    const goldboxOffers = await scrapeGoldboxDeals(config);
+    if (goldboxOffers.length) {
+      lastScrapeMeta = { source: "goldbox", found: goldboxOffers.length, errors: [] };
+      return goldboxOffers;
+    }
+
+    // Last resort: deal feeds (Pelando/Promobit)
+    console.log("scraper_trying_feeds");
     const feedOffers = await scrapeVerifiedFeedDeals(config);
     if (feedOffers.length) {
       lastScrapeMeta = { source: "feeds", found: feedOffers.length, errors: [] };
@@ -563,4 +570,50 @@ export async function scrapeVerifiedFeedDeals(config) {
   }
   console.log("feed_verified_offers", JSON.stringify({ found: feedItems.length, withAsin: withAsin.length, verified: verified.length }));
   return verified;
+}
+
+// Scrapes Amazon Goldbox (Lightning Deals) page — not blocked unlike search pages.
+// Extracts ASINs then verifies each via /dp/ product page to get real prices.
+export async function scrapeGoldboxDeals(config) {
+  const GOLDBOX_URL = "https://www.amazon.com.br/gp/goldbox";
+  try {
+    const html = await fetchText(GOLDBOX_URL, config);
+    const asinMatches = [...html.matchAll(/\/dp\/([A-Z0-9]{10})/gi)];
+    const asins = [...new Set(asinMatches.map(m => m[1].toUpperCase()))].slice(0, 30);
+    console.log("goldbox_asins_found", JSON.stringify({ count: asins.length }));
+
+    const verified = [];
+    for (const asin of asins) {
+      try {
+        const product = await verifyAmazonProduct(asin, config);
+        if (!product.currentPrice) continue;
+        if (!product.previousPrice || product.previousPrice <= product.currentPrice) continue;
+        const discountPct = Math.round(((product.previousPrice - product.currentPrice) / product.previousPrice) * 100);
+        if (discountPct < 10) continue;
+        verified.push(normalizeOffers([{
+          store: "amazon",
+          title: product.title || "",
+          currentPrice: product.currentPrice,
+          previousPrice: product.previousPrice,
+          discountPercent: discountPct,
+          originalUrl: `https://www.amazon.com.br/dp/${asin}`,
+          imageUrl: product.imageUrl || null,
+          imageUrls: product.imageUrls || [],
+          asin,
+          rating: product.rating ?? null,
+          reviewCount: product.reviewCount ?? null,
+          category: "tech",
+          source: "goldbox",
+          inStock: true,
+          storeReputation: "high"
+        }])[0]);
+        await sleep(600);
+      } catch { /* produto indisponível */ }
+    }
+    console.log("goldbox_verified", JSON.stringify({ asins: asins.length, verified: verified.length }));
+    return verified;
+  } catch (err) {
+    console.log("goldbox_failed", JSON.stringify({ error: err.message }));
+    return [];
+  }
 }
