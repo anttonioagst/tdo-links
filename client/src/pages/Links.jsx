@@ -197,7 +197,8 @@ export default function Links() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/links-config")
+    const base = import.meta.env.VITE_API_URL || "";
+    fetch(`${base}/api/links-config`)
       .then(r => r.json())
       .then(d => setCfg(prev => ({ ...prev, ...d })))
       .catch(() => {});

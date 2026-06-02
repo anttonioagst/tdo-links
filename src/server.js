@@ -26,6 +26,13 @@ export function createApp({ db, config, publicDir }) {
   return createServer(async (req, res) => {
     try {
       const url = new URL(req.url, config.publicBaseUrl);
+
+      // CORS for public API endpoints (called from Vercel frontend)
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Token");
+      if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
+
       if (url.pathname.startsWith("/api/")) {
         await handleApi(req, res, url, db, config);
         return;
