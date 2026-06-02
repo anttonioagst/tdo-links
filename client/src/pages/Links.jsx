@@ -185,6 +185,17 @@ export default function Links() {
     discordUrl: "", xUrl: "", instagramUrl: "", facebookUrl: "", metaPixelId: "",
   });
 
+  // Force white background — overrides admin dashboard's global bg-zinc-950
+  useEffect(() => {
+    const prev = document.body.style.background;
+    document.body.style.background = "#ffffff";
+    document.documentElement.style.background = "#ffffff";
+    return () => {
+      document.body.style.background = prev;
+      document.documentElement.style.background = "";
+    };
+  }, []);
+
   useEffect(() => {
     fetch("/api/links-config")
       .then(r => r.json())
