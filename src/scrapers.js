@@ -85,16 +85,27 @@ const CURATED_PROMOTION_SEARCH_URLS = [
 
 export async function scrapeDeals(config = {}) {
   if (config.scraperMode === "amazon") {
+    // Try Amazon search pages first; fall through to feed scraping if blocked (503)
     const offers = await scrapeAmazonDeals(config);
     if (offers.length) {
       lastScrapeMeta = { source: "amazon", found: offers.length, errors: [] };
       return offers;
     }
+
+    // Amazon search blocked — try deal feeds (Pelando/Promobit) which extract
+    // ASINs and verify via /dp/ product pages (not blocked by Amazon)
+    console.log("scraper_amazon_blocked_trying_feeds");
+    const feedOffers = await scrapeVerifiedFeedDeals(config);
+    if (feedOffers.length) {
+      lastScrapeMeta = { source: "feeds", found: feedOffers.length, errors: [] };
+      return feedOffers;
+    }
+
     if (!config.scraperFallbackMock) {
-      lastScrapeMeta = { source: "empty", found: 0, errors: ["Amazon returned no parseable products."] };
+      lastScrapeMeta = { source: "empty", found: 0, errors: ["Amazon search blocked and feeds returned nothing."] };
       return [];
     }
-    lastScrapeMeta = { source: "mock_fallback", found: sampleOffers.length, errors: ["Amazon returned no parseable products; using mock fallback."] };
+    lastScrapeMeta = { source: "mock_fallback", found: sampleOffers.length, errors: ["Amazon blocked; using mock fallback."] };
   }
   if (config.scraperMode !== "amazon") {
     lastScrapeMeta = { source: "mock", found: sampleOffers.length, errors: [] };
@@ -505,4 +516,51 @@ export async function scrapeFeedDeals(config) {
     }
   }
   return results;
+}
+
+function extractAsin(url) {
+  const match = String(url || "").match(/\/dp\/([A-Z0-9]{10})\b/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+// Scrapes Pelando/Promobit feeds, extracts Amazon ASINs, and verifies each via the
+// product page (/dp/ASIN) — which is NOT blocked by Amazon's search-page 503 wall.
+export async function scrapeVerifiedFeedDeals(config) {
+  const feedItems = await scrapeFeedDeals(config);
+  const withAsin = feedItems
+    .map(item => ({ ...item, asin: extractAsin(item.url) }))
+    .filter(item => item.asin);
+
+  const verified = [];
+  for (const item of withAsin.slice(0, 10)) {
+    try {
+      const product = await verifyAmazonProduct(item.asin, config);
+      if (!product.currentPrice) continue;
+      const hasPromo = product.previousPrice && product.previousPrice > product.currentPrice;
+      if (!hasPromo) continue;
+      const discountPct = Math.round(((product.previousPrice - product.currentPrice) / product.previousPrice) * 100);
+      verified.push(normalizeOffers([{
+        store: "amazon",
+        title: product.title || item.title,
+        currentPrice: product.currentPrice,
+        previousPrice: product.previousPrice,
+        discountPercent: discountPct,
+        originalUrl: `https://www.amazon.com.br/dp/${item.asin}`,
+        imageUrl: product.imageUrl || null,
+        imageUrls: product.imageUrls || [],
+        asin: item.asin,
+        rating: product.rating ?? item.rating ?? null,
+        reviewCount: product.reviewCount ?? item.reviewCount ?? null,
+        category: item.category || "tech",
+        source: "feed_verified",
+        inStock: true,
+        storeReputation: "high"
+      }])[0]);
+      await sleep(800);
+    } catch {
+      // produto indisponível — segue para próximo
+    }
+  }
+  console.log("feed_verified_offers", JSON.stringify({ found: feedItems.length, withAsin: withAsin.length, verified: verified.length }));
+  return verified;
 }
