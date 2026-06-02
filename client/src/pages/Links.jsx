@@ -230,9 +230,6 @@ export default function Links() {
   return (
     <>
       <style>{`
-        @keyframes da { to { transform: translate(24px,16px) scale(1.05); } }
-        @keyframes db { to { transform: translate(-18px,22px) scale(0.97); } }
-        @keyframes dc { to { transform: translate(12px,-20px) scale(1.03); } }
         @keyframes tick {
           0%   { transform: translateY(100%); opacity: 0; }
           8%   { transform: translateY(0);    opacity: 1; }
@@ -241,15 +238,36 @@ export default function Links() {
           100% { transform: translateY(-100%); opacity: 0; }
         }
         .links-page * { box-sizing: border-box; margin: 0; padding: 0; }
-        .links-page { background: #fff; color: #1e2229; font-family: 'Satoshi','Inter',ui-sans-serif,sans-serif; -webkit-font-smoothing: antialiased; min-height: 100svh; }
+        .links-page {
+          background: #fff;
+          color: #1e2229;
+          font-family: 'Satoshi','Inter',ui-sans-serif,sans-serif;
+          -webkit-font-smoothing: antialiased;
+          min-height: 100svh;
+        }
+        /* Mobile: static gradient, no blur — prevents phone heating and slow load */
+        @media (max-width: 768px) {
+          .links-bg { background: radial-gradient(ellipse 80% 50% at 0% 20%, hsl(28 60% 92% / 0.7) 0%, transparent 60%),
+                                  radial-gradient(ellipse 70% 50% at 100% 80%, hsl(210 20% 94% / 0.7) 0%, transparent 60%); }
+          .links-orb { display: none !important; }
+        }
+        /* Desktop: animated orbs with blur */
+        @media (min-width: 769px) {
+          @keyframes da { to { transform: translate(24px,16px) scale(1.05); } }
+          @keyframes db { to { transform: translate(-18px,22px) scale(0.97); } }
+          @keyframes dc { to { transform: translate(12px,-20px) scale(1.03); } }
+          .links-orb-a { width:360px;height:360px;left:-96px;top:40px;background:hsl(28 60% 88%/0.6);filter:blur(110px);animation:da 12s ease-in-out infinite alternate; }
+          .links-orb-b { width:300px;height:300px;right:-60px;top:42%;background:hsl(210 18% 91%/0.75);filter:blur(120px);animation:db 16s ease-in-out infinite alternate; }
+          .links-orb-c { width:380px;height:380px;left:18%;bottom:-120px;background:hsl(32 28% 90%/0.55);filter:blur(130px);animation:dc 14s ease-in-out infinite alternate; }
+        }
       `}</style>
 
       <div className="links-page">
-        {/* Background */}
-        <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden" }}>
-          <div style={{ position: "absolute", width: 360, height: 360, borderRadius: 9999, left: -96, top: 40, background: "hsl(28 60% 88% / 0.6)", filter: "blur(110px)", animation: "da 12s ease-in-out infinite alternate" }} />
-          <div style={{ position: "absolute", width: 300, height: 300, borderRadius: 9999, right: -60, top: "42%", background: "hsl(210 18% 91% / 0.75)", filter: "blur(120px)", animation: "db 16s ease-in-out infinite alternate" }} />
-          <div style={{ position: "absolute", width: 380, height: 380, borderRadius: 9999, left: "18%", bottom: -120, background: "hsl(32 28% 90% / 0.55)", filter: "blur(130px)", animation: "dc 14s ease-in-out infinite alternate" }} />
+        {/* Background — static gradient on mobile, animated orbs on desktop */}
+        <div className="links-bg" style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden" }}>
+          <div className="links-orb links-orb-a" style={{ position: "absolute", borderRadius: 9999 }} />
+          <div className="links-orb links-orb-b" style={{ position: "absolute", borderRadius: 9999 }} />
+          <div className="links-orb links-orb-c" style={{ position: "absolute", borderRadius: 9999 }} />
           <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", color: "#1e2229", opacity: 0.035 }} xmlns="http://www.w3.org/2000/svg">
             <defs>
               <pattern id="links-grid" width="40" height="40" patternUnits="userSpaceOnUse">
