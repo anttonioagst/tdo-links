@@ -112,7 +112,7 @@ function TickerItem({ text, delay }) {
       animationDelay: delay,
     }}>
       <span style={{ width: 4, height: 4, borderRadius: 9999, background: "#EC6227", flexShrink: 0 }} />
-      <span>{text}</span>
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</span>
     </div>
   );
 }
@@ -296,13 +296,7 @@ export default function Links() {
               </svg>
             </div>
 
-            {/* Vertical divider */}
-            <div style={{
-              width: 1, height: 40, flexShrink: 0,
-              background: "linear-gradient(180deg, transparent, rgba(236,98,39,0.5), rgba(236,98,39,0.25), transparent)",
-            }} />
-
-            {/* Name + ticker */}
+            {/* Name + ticker — no divider */}
             <div style={{ minWidth: 0 }}>
               <h1 style={{
                 fontWeight: 600,
@@ -311,7 +305,7 @@ export default function Links() {
                 lineHeight: 1.1,
                 color: "#1e2229",
               }}>
-                TDO <span style={{ color: "#EC6227" }}>LINKS</span>
+                TDO LINKS
               </h1>
               <div style={{ position: "relative", height: 14, overflow: "hidden", marginTop: 3 }}>
                 <TickerItem text="Curadoria real de tech premium" delay="0s" />
@@ -373,7 +367,7 @@ export default function Links() {
                 onMouseEnter={e => { e.currentTarget.style.opacity = "0.88"; e.currentTarget.style.transform = "translateY(-1px)"; }}
                 onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateY(0)"; }}
               >
-                {ICONS.telegram}
+                <span style={{ color: "rgba(255,255,255,0.9)", display: "flex" }}>{ICONS.telegram}</span>
                 <span style={{ fontSize: 14, fontWeight: 500, letterSpacing: "-0.005em", color: "rgba(255,255,255,0.92)" }}>
                   Ver todos os deals no canal
                 </span>
