@@ -52,8 +52,10 @@ export async function runWatchdogCheck(db, config) {
   if (recovered) return { ok: true, silent: false, recovered: true, silenceMinutes };
 
   // --- STEP 2: recovery failed — alert admin ---
+  // Only alert if an explicit admin chat is configured — never fall back to the public channel.
   if (!config.telegramBotToken || !config.telegramAdminChatId) {
-    return { ok: true, silent: true, silenceMinutes, alertSkipped: "no_credentials" };
+    console.log("watchdog_alert_skipped", JSON.stringify({ reason: "TELEGRAM_ADMIN_CHAT_ID_not_set", silenceMinutes }));
+    return { ok: true, silent: true, silenceMinutes, alertSkipped: "TELEGRAM_ADMIN_CHAT_ID not configured" };
   }
 
   if (lastAlertSentAt && now - lastAlertSentAt < ALERT_COOLDOWN_MS) {
