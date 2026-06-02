@@ -198,10 +198,14 @@ export default function Links() {
 
   useEffect(() => {
     const base = import.meta.env.VITE_API_URL || "";
-    fetch(`${base}/api/links-config`)
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 4000); // 4s timeout — never block the page
+    fetch(`${base}/api/links-config`, { signal: ctrl.signal })
       .then(r => r.json())
       .then(d => setCfg(prev => ({ ...prev, ...d })))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => clearTimeout(t));
+    return () => { ctrl.abort(); clearTimeout(t); };
   }, []);
 
   // Meta Pixel
@@ -225,10 +229,6 @@ export default function Links() {
 
   return (
     <>
-      {/* font */}
-      <link rel="preconnect" href="https://api.fontshare.com" crossOrigin="" />
-      <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,600,700,900&display=swap" rel="stylesheet" />
-
       <style>{`
         @keyframes da { to { transform: translate(24px,16px) scale(1.05); } }
         @keyframes db { to { transform: translate(-18px,22px) scale(0.97); } }
