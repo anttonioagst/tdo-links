@@ -361,6 +361,71 @@ export default function Links() {
             />
           </div>
 
+          {/* Bot personalizado CTA card */}
+          <a
+            className="fade-up"
+            href="https://t.me/tdolinks_bot"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              "--d": "0.4s",
+              display: "block", marginTop: 12, borderRadius: 16, overflow: "hidden",
+              textDecoration: "none",
+              background: "#13161d",
+              border: "1px solid rgba(236,98,39,0.2)",
+              padding: "20px 20px 18px",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(236,98,39,0.5)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(236,98,39,0.2)"; }}
+          >
+            {/* header row */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "#EC6227", textTransform: "uppercase", marginBottom: 6 }}>Exclusivo</p>
+                <h2 style={{ fontSize: "clamp(1rem, 4vw, 1.15rem)", fontWeight: 700, color: "#fff", letterSpacing: "-0.02em", lineHeight: 1.25 }}>
+                  Quer receber ofertas do seu interesse?
+                </h2>
+                <p style={{ marginTop: 6, fontSize: 12.5, color: "rgba(255,255,255,0.55)", lineHeight: 1.45 }}>
+                  Diga ao bot o que você quer — teclado, monitor, fone — e receba só o que importa, no privado.
+                </p>
+              </div>
+              <div style={{
+                width: 36, height: 36, borderRadius: 9999, flexShrink: 0,
+                background: "rgba(236,98,39,0.15)", border: "1px solid rgba(236,98,39,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center", color: "#EC6227"
+              }}>
+                {ICONS.telegram}
+              </div>
+            </div>
+
+            {/* steps */}
+            <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+              {[
+                ["1", "Abra o bot no Telegram"],
+                ["2", "Diga o que você quer receber"],
+                ["3", "Receba só o que combina com você"],
+              ].map(([n, text]) => (
+                <div key={n} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{
+                    width: 20, height: 20, borderRadius: 9999, flexShrink: 0,
+                    background: "rgba(236,98,39,0.15)", color: "#EC6227",
+                    fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center"
+                  }}>{n}</span>
+                  <span style={{ fontSize: 12.5, color: "rgba(255,255,255,0.7)" }}>{text}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* CTA pill */}
+            <div style={{
+              marginTop: 16, display: "inline-flex", alignItems: "center", gap: 7,
+              background: "#EC6227", borderRadius: 9999, padding: "8px 16px",
+            }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: "#fff" }}>Ativar alertas personalizados</span>
+              {ARROW}
+            </div>
+          </a>
+
           {/* Mini cards bento grid */}
           <div className="fade-up" style={{
             "--d": "0.44s",
