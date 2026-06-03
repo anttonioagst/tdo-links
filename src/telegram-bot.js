@@ -70,7 +70,43 @@ function buildStatusMessage(user) {
   return `*Suas preferências atuais:*\n\n${lines.join("\n")}\n\nUse /editar para mudar ou /parar para pausar.`;
 }
 
+export async function handleNewChatMember(member, chatId, config) {
+  const firstName = member.first_name || "você";
+  const username = member.username ? `@${member.username}` : firstName;
+  const botUsername = config.telegramBotUsername || "TDOLinksBot";
+
+  const text =
+    `👋 Bem-vindo(a), ${username}!\n\n` +
+    `Além das promoções do canal, você pode receber *só o que te interessa* no privado — teclados, monitores, fones, notebooks, o que quiser.\n\n` +
+    `É grátis. Basta clicar abaixo e me dizer o que você quer receber 👇`;
+
+  await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [[{
+          text: "🔔 Quero receber deals personalizados",
+          url: `https://t.me/${botUsername}?start=welcome`
+        }]]
+      }
+    })
+  }).catch(() => {});
+}
+
 export async function handleTelegramUpdate(update, db, config) {
+  // New member joining the group
+  if (update.message?.new_chat_members?.length) {
+    for (const member of update.message.new_chat_members) {
+      if (member.is_bot) continue;
+      await handleNewChatMember(member, update.message.chat.id, config);
+    }
+    return;
+  }
+
   const message = update.message || update.edited_message;
   if (!message) return;
 
