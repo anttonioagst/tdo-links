@@ -410,11 +410,18 @@ async function publishSecondary(ctx, offer, content, affiliateUrl) {
 
   if (!wasAlreadyPublished(db.state, offer.id, "discord")) {
     try {
-      const draft = { text: resolveCopy(content.copy.discord, affiliateUrl) };
       const offerForDiscord = { ...offer, affiliateUrl };
-      const result = await publishDiscord(draft, config, offerForDiscord);
-      savePublishResult(db, offer.id, "discord", result);
-      if (result.ok) await publishDiscordDeal(db, config, offerForDiscord).catch(() => {});
+      // Try bot first (needs BOT_TOKEN + GUILD_ID), fall back to webhook
+      const botResult = await publishDiscordDeal(db, config, offerForDiscord).catch(() => null);
+      if (botResult?.ok) {
+        savePublishResult(db, offer.id, "discord", botResult);
+      } else if (config.discordWebhookUrl) {
+        const draft = { text: resolveCopy(content.copy.discord, affiliateUrl) };
+        const result = await publishDiscord(draft, config, offerForDiscord);
+        savePublishResult(db, offer.id, "discord", result);
+      } else {
+        savePublishResult(db, offer.id, "discord", { ok: false, detail: "no_discord_method_configured" });
+      }
     } catch { /* secondary channel is best-effort */ }
   }
 
