@@ -35,13 +35,14 @@ const ICONS = {
   ),
 };
 
-function BannerCard({ href, bgClass, icon, label, primary }) {
+function BannerCard({ href, bgClass, bgImage, icon, label, primary, internal }) {
   const [hovered, setHovered] = useState(false);
+  const linkProps = internal
+    ? { href: href || "#" }
+    : { href: href || "#", target: "_blank", rel: "noopener noreferrer" };
   return (
     <a
-      href={href || "#"}
-      target="_blank"
-      rel="noopener noreferrer"
+      {...linkProps}
       style={{
         position: "relative",
         display: "block",
@@ -56,16 +57,19 @@ function BannerCard({ href, bgClass, icon, label, primary }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* gradient background */}
-      <div style={{ position: "absolute", inset: 0, background: bgClass }} />
-      {/* icon watermark */}
-      <div style={{
+      {/* background — image or gradient */}
+      {bgImage
+        ? <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${bgImage})`, backgroundSize: "cover", backgroundPosition: "center", transition: "transform 0.6s", transform: hovered ? "scale(1.03)" : "scale(1)" }} />
+        : <div style={{ position: "absolute", inset: 0, background: bgClass }} />
+      }
+      {/* icon watermark — only when no image */}
+      {!bgImage && <div style={{
         position: "absolute", top: "50%", left: "50%",
         transform: "translate(-50%, -60%)", opacity: 0.12, color: "#fff",
         width: 80, height: 80,
       }}>
         {icon}
-      </div>
+      </div>}
       {/* bottom fade */}
       <div style={{
         position: "absolute", insetInline: 0, bottom: 0, height: "45%",
@@ -345,13 +349,14 @@ export default function Links() {
 
           {/* Banner cards */}
           <div className="fade-up" style={{ "--d": "0.32s", marginTop: 20, display: "flex", flexDirection: "column", gap: 12 }}>
-            {/* Bot personalizado — primeiro card */}
+            {/* TDO Premium — primeiro card */}
             <BannerCard
               href="/bot"
-              bgClass="linear-gradient(135deg, #0d0f14 0%, #2a1206 60%, #EC6227 100%)"
+              bgImage="/bot-card.jpg"
               icon={ICONS.telegram}
-              label="Deals exclusivos do seu interesse · Ativar alertas"
+              label="TDO Premium · Deals do seu interesse no privado"
               primary
+              internal
             />
             <BannerCard
               href={cfg.discordUrl}
