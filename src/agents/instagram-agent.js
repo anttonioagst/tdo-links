@@ -329,7 +329,10 @@ Categoria: ${offer.category || "tech"}`
 }
 
 function defaultCaption(offer, brand) {
-  return `${offer.title?.slice(0, 80)} — produto ${brand || "tech"} bem avaliado.\n\nSaiba mais na bio · @tdolinks\nPost informativo. Não somos loja.`;
+  const specs = extractKeySpecs(offer.title);
+  const idealFor = inferIdealFor(offer.title, offer.category);
+  const name = cleanProductName(offer.title, brand);
+  return `${brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : "Tech"} ${name} — ${specs ? specs + "." : "produto bem avaliado."}\n\n${idealFor}\n\nSaiba mais na bio · @tdolinks\nPost informativo. Não somos loja.`;
 }
 
 // ---------------------------------------------------------------------------
