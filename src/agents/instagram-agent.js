@@ -125,39 +125,44 @@ async function researchOfficialPost(offer, config) {
 
   if (config.braveSearchApiKey) {
     try {
-      // Search for brand official Instagram post about this product
-      const query = `site:instagram.com "${brand}" "${productShort}"`;
-      const results = await braveSearch(query, config.braveSearchApiKey);
-
-      for (const r of results.slice(0, 5)) {
-        const url = r.url || "";
-        if (url.includes("instagram.com")) {
-          officialUrl = url;
-          // Detect format from URL pattern
-          if (url.includes("/reel/")) {
-            contentType = "reel";
-          } else if (url.includes("/p/")) {
-            // Carousel vs single: try to detect from description
-            const desc = (r.description || "").toLowerCase();
-            if (desc.includes("swipe") || desc.includes("carousel") || desc.includes("deslize") || desc.includes("imagens")) {
-              contentType = "carousel";
-            } else {
-              contentType = "single";
+      // 1. Search for brand official Instagram post — try both model name and full product name
+      const queries = [
+        `site:instagram.com ${brand} ${productShort}`,
+        `site:instagram.com "${brand}" headset OR mouse OR keyboard OR monitor OR tablet`,
+      ];
+      for (const query of queries) {
+        const results = await braveSearch(query, config.braveSearchApiKey);
+        for (const r of results.slice(0, 5)) {
+          const url = r.url || "";
+          if (url.includes("instagram.com")) {
+            officialUrl = url;
+            if (url.includes("/reel/")) {
+              contentType = "reel";
+            } else if (url.includes("/p/")) {
+              const desc = (r.description || "").toLowerCase();
+              contentType = (desc.includes("swipe") || desc.includes("deslize") || desc.includes("tap") || desc.includes("carousel")) ? "carousel" : "single";
             }
+            officialContext = r.description || r.title || "";
+            break;
           }
-          officialContext = r.description || r.title || "";
-          break;
         }
+        if (officialUrl) break;
       }
 
-      // Also search general product context
-      if (!officialContext) {
-        const ctxQuery = `"${brand}" "${productShort}" review caracteristicas`;
-        const ctxResults = await braveSearch(ctxQuery, config.braveSearchApiKey);
-        officialContext = ctxResults.slice(0, 2).map(r => r.description || r.title).join(" ").slice(0, 400);
-      }
+      // 2. Always fetch product editorial context from web (review sites, brand site)
+      const ctxQuery = `${brand} ${productShort} review especificações características`;
+      const ctxResults = await braveSearch(ctxQuery, config.braveSearchApiKey);
+      const webContext = ctxResults
+        .filter(r => !r.url?.includes("amazon.com"))
+        .slice(0, 3)
+        .map(r => r.description || r.title || "")
+        .join(" ")
+        .slice(0, 500);
+
+      if (webContext) officialContext = (officialContext + " " + webContext).trim().slice(0, 500);
+
     } catch {
-      // Search failed — use default single format
+      // Search failed — use default
     }
   }
 
@@ -542,12 +547,19 @@ function extractBrandFromTitle(title = "") {
 }
 
 function cleanProductName(title = "", brand = "") {
-  return title
+  // Try to extract the model name — text before the first colon/dash/comma or last 4 words
+  let clean = title
     .replace(new RegExp(brand, "gi"), "")
-    .replace(/\b(com|para|de|e|sem|fio|cabo|adaptador|versão|GB|TB|MHz|GHz|Hz)\b/gi, " ")
+    .replace(/Fone de ouvido para jogos|Fone de ouvido|Headset Gamer|Mouse Gamer|Teclado Gamer|Tablet|Smart TV|Notebook/gi, "")
+    .split(/[:\-–,]/)[0]  // take only first segment before any colon/dash
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 60);
+    .trim();
+
+  // If still too long, take first 3-4 meaningful words
+  const words = clean.split(" ").filter(w => w.length > 1);
+  if (words.length > 5) clean = words.slice(0, 4).join(" ");
+
+  return clean.slice(0, 40) || title.slice(0, 40);
 }
 
 function extractKeySpecs(title = "", detailed = false) {
