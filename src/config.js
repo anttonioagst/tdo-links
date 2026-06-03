@@ -60,7 +60,7 @@ export function loadConfig(env = process.env) {
     xAccessToken: env.X_ACCESS_TOKEN || "",
     xAccessSecret: env.X_ACCESS_SECRET || "",
     discordWebhookUrl: env.DISCORD_WEBHOOK_URL || "",
-    discordDryRun: env.DISCORD_DRY_RUN !== "false",
+    discordDryRun: env.DISCORD_DRY_RUN ? env.DISCORD_DRY_RUN !== "false" : !hasDiscordBot,
     discordBotToken: env.DISCORD_BOT_TOKEN || "",
     discordGuildId: env.DISCORD_GUILD_ID || "",
     discordAdminRoleName: env.DISCORD_ADMIN_ROLE_NAME || "Admin TDO",
