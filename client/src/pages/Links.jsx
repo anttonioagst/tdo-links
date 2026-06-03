@@ -287,12 +287,15 @@ export default function Links() {
             <img
               src="/tdo-logo.png"
               alt="TDO Links"
-              width={48}
-              height={48}
-              style={{ borderRadius: 12, flexShrink: 0, display: "block" }}
+              width={40}
+              height={40}
+              style={{ borderRadius: 9999, flexShrink: 0, display: "block" }}
             />
 
-            {/* Name + ticker — no divider */}
+            {/* Vertical divider */}
+            <div style={{ width: 1, height: 32, background: "rgba(30,34,41,0.12)", flexShrink: 0 }} />
+
+            {/* Name + ticker */}
             <div style={{ minWidth: 0 }}>
               <h1 style={{
                 fontWeight: 600,
