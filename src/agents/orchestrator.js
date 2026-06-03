@@ -33,6 +33,10 @@ export async function runOrchestratorCycle(db, config, options = {}) {
   const purged = await purgeNonPremiumAutoReady(db);
   if (purged > 0) console.log("orchestrator_purge", JSON.stringify({ archived: purged, reason: "non_premium_brand_gate" }));
 
+  // Clear stale rejected offers (>48h) so Amazon deals can be re-evaluated as prices change.
+  const staleRejected = await clearStaleRejected(db, now, 48);
+  if (staleRejected > 0) console.log("orchestrator_clear_stale_rejected", JSON.stringify({ cleared: staleRejected }));
+
   const cadence = telegramPublicationStatus(db.state.publishLog || [], config, now);
   const stale = isTelegramStale(db.state.publishLog || [], config, now);
   const pending = (db.state.offers || []).filter((o) => PENDING_STATUSES.includes(o.status));
@@ -460,6 +464,19 @@ async function purgeNonPremiumAutoReady(db) {
   }
   await db.save();
   return toArchive.length;
+}
+
+async function clearStaleRejected(db, now, maxAgeHours = 48) {
+  const cutoff = new Date(now.getTime() - maxAgeHours * 60 * 60 * 1000);
+  const before = db.state.offers.length;
+  db.state.offers = db.state.offers.filter((o) => {
+    if (o.status !== "rejected") return true;
+    const ts = new Date(o.updatedAt || o.createdAt || 0);
+    return ts > cutoff;
+  });
+  const cleared = before - db.state.offers.length;
+  if (cleared > 0) await db.save();
+  return cleared;
 }
 
 function isAlreadyKnown(state, offer) {
