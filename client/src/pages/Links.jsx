@@ -237,6 +237,21 @@ export default function Links() {
           36%  { transform: translateY(-100%); opacity: 0; }
           100% { transform: translateY(-100%); opacity: 0; }
         }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(18px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up {
+          opacity: 0;
+          animation: fadeUp 0.52s cubic-bezier(0.22,1,0.36,1) forwards;
+          animation-delay: var(--d, 0s);
+        }
+        .links-divider {
+          display: none;
+          height: 1px;
+          background: rgba(30,34,41,0.07);
+          border-radius: 1px;
+        }
         .links-page * { box-sizing: border-box; margin: 0; padding: 0; }
         .links-page {
           background: #fff;
@@ -251,8 +266,9 @@ export default function Links() {
                                   radial-gradient(ellipse 70% 50% at 100% 80%, hsl(210 20% 94% / 0.7) 0%, transparent 60%); }
           .links-orb { display: none !important; }
         }
-        /* Desktop: animated orbs with blur */
+        /* Desktop: animated orbs + dividers */
         @media (min-width: 769px) {
+          .links-divider { display: block; }
           @keyframes da { to { transform: translate(24px,16px) scale(1.05); } }
           @keyframes db { to { transform: translate(-18px,22px) scale(0.97); } }
           @keyframes dc { to { transform: translate(12px,-20px) scale(1.03); } }
@@ -282,7 +298,7 @@ export default function Links() {
         <main style={{ position: "relative", zIndex: 10, margin: "0 auto", width: "100%", maxWidth: 540, padding: "20px 20px 96px" }}>
 
           {/* Header — horizontal, centered on page */}
-          <section style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 16, padding: 10, width: "fit-content", margin: "0 auto" }}>
+          <section className="fade-up" style={{ "--d": "0.05s", display: "flex", alignItems: "center", gap: 10, borderRadius: 16, padding: 10, width: "fit-content", margin: "0 auto" }}>
             {/* Logo mark */}
             <img
               src="/tdo-logo.png"
@@ -314,21 +330,19 @@ export default function Links() {
             </div>
           </section>
 
-          {/* Divider */}
-          <div style={{ marginTop: 16, height: 1, background: "rgba(30,34,41,0.07)", borderRadius: 1 }} />
+          <div className="links-divider fade-up" style={{ "--d": "0.15s", marginTop: 16 }} />
 
           {/* Social icons */}
-          <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "nowrap", gap: 0 }}>
+          <div className="fade-up" style={{ "--d": "0.18s", marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "nowrap", gap: 0 }}>
             {socialLinks.map(({ key, href, label, onClick }) => (
               <SocialLink key={key} href={href} icon={ICONS[key]} label={label} onClick={onClick} />
             ))}
           </div>
 
-          {/* Divider */}
-          <div style={{ marginTop: 16, height: 1, background: "rgba(30,34,41,0.07)", borderRadius: 1 }} />
+          <div className="links-divider fade-up" style={{ "--d": "0.28s", marginTop: 16 }} />
 
           {/* 2 Banner cards */}
-          <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="fade-up" style={{ "--d": "0.32s", marginTop: 20, display: "flex", flexDirection: "column", gap: 12 }}>
             <BannerCard
               href={cfg.telegramUrl}
               bgClass="linear-gradient(135deg, #1a1f2e 0%, #EC6227 100%)"
@@ -346,7 +360,8 @@ export default function Links() {
           </div>
 
           {/* Mini cards bento grid */}
-          <div style={{
+          <div className="fade-up" style={{
+            "--d": "0.44s",
             marginTop: 12,
             display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12,
           }}>
@@ -380,10 +395,9 @@ export default function Links() {
             </div>
           </div>
 
-          {/* Divider */}
-          <div style={{ marginTop: 28, height: 1, background: "rgba(30,34,41,0.07)", borderRadius: 1 }} />
+          <div className="links-divider fade-up" style={{ "--d": "0.56s", marginTop: 28 }} />
 
-          <footer style={{ marginTop: 20, textAlign: "center", fontSize: 10, color: "rgba(30,34,41,0.38)" }}>
+          <footer className="fade-up" style={{ "--d": "0.6s", marginTop: 20, textAlign: "center", fontSize: 10, color: "rgba(30,34,41,0.38)" }}>
             © TDO Links {new Date().getFullYear()} · Tô de Olho em tech pra você
           </footer>
         </main>
