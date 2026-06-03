@@ -98,7 +98,6 @@ export function loadConfig(env = process.env) {
     watchdogAlertAfterMinutes: Number(env.WATCHDOG_ALERT_AFTER_MINUTES || 60),
     telegramAdminChatId: env.TELEGRAM_ADMIN_CHAT_ID || "",
     telegramWebhookSecret: env.TELEGRAM_WEBHOOK_SECRET || "",
-    telegramBotUsername: env.TELEGRAM_BOT_USERNAME || "",
     databaseUrl: env.DATABASE_URL || "",
     redisUrl: env.REDIS_URL || "",
     braveSearchApiKey: env.BRAVE_SEARCH_API_KEY || "",
