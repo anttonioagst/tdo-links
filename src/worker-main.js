@@ -8,6 +8,7 @@ import { runDiscovery } from "./agents/discovery.js";
 import { runSupervisorCheck } from "./agents/supervisor.js";
 import { runOrchestratorCycle } from "./agents/orchestrator.js";
 import { runWatchdogCheck } from "./agents/watchdog.js";
+import { runDailyInstagramBatch } from "./agents/instagram-agent.js";
 import { enqueuePendingTelegramOffers } from "./publication-recovery.js";
 import cron from "node-cron";
 
@@ -77,6 +78,16 @@ if (config.orchestratorEnabled) {
     }, watchdogMs);
     console.log("watchdog_active", JSON.stringify({ intervalMinutes: config.watchdogIntervalMinutes, alertAfterMinutes: config.watchdogAlertAfterMinutes }));
   }
+
+  // Instagram batch — top 2-3 deals of the day at 13h and 20h (UTC-3 = 16h and 23h UTC)
+  cron.schedule("0 16,23 * * *", async () => {
+    try {
+      const maxPosts = Number(process.env.INSTAGRAM_MAX_POSTS_PER_BATCH || 3);
+      await runDailyInstagramBatch(db, config, maxPosts);
+    } catch (err) {
+      console.error("instagram_batch_failed", JSON.stringify({ error: err.message }));
+    }
+  });
 
   console.log("worker_ready — orquestrador autônomo ativo", JSON.stringify({ intervalMinutes: interval, model: config.orchestratorModel }));
 } else {

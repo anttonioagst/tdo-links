@@ -441,8 +441,7 @@ async function publishSecondary(ctx, offer, content, affiliateUrl) {
     await publishPersonalized(db, config, offer, content);
   } catch { /* personalized delivery is best-effort */ }
 
-  // Instagram content generation — research brand posts → generate in same format
-  generateInstagramContent(db, config, offer, content, affiliateUrl).catch(() => {});
+  // Instagram content is batched (top deals of the day) — see worker-main.js cron
 }
 
 async function safeScrape(db, config) {

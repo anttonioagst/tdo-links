@@ -12,7 +12,66 @@ const LOGO_PATH = resolve("/Users/antonio/Projects/TDO LINKS/Logo/Logo 01/Group 
 const OUTPUT_BASE = resolve(process.env.HOME || "/tmp", "Documents/human-output/instagram");
 
 // ---------------------------------------------------------------------------
-// Entry point — called from publishSecondary(), best-effort
+// Daily batch — selects top N deals of the day and generates Instagram posts
+// ---------------------------------------------------------------------------
+
+export async function runDailyInstagramBatch(db, config, maxPosts = 3) {
+  if (!config.anthropicApiKey) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const topDeals = selectTopDealsOfDay(db, today, maxPosts);
+
+  if (!topDeals.length) {
+    console.log("instagram_batch_skip", JSON.stringify({ reason: "no_deals_today", date: today }));
+    return;
+  }
+
+  console.log("instagram_batch_start", JSON.stringify({ date: today, count: topDeals.length, titles: topDeals.map(d => d.title?.slice(0, 40)) }));
+
+  for (const offer of topDeals) {
+    await generateInstagramContent(db, config, offer, { imageUrls: offer.imageUrls }, null).catch(err =>
+      console.log("instagram_batch_error", JSON.stringify({ offerId: offer.id, error: err.message }))
+    );
+  }
+}
+
+export function selectTopDealsOfDay(db, date, maxCount = 3) {
+  const published = (db.state.publishLog || [])
+    .filter(e => e.channel === "telegram" && e.result?.ok === true && e.createdAt?.startsWith(date))
+    .map(e => (db.state.offers || []).find(o => o.id === e.offerId))
+    .filter(Boolean);
+
+  if (!published.length) return [];
+
+  // Score each deal: discount % (50%) + rating (30%) + brand tier (20%)
+  const scored = published.map(offer => {
+    const discount = Number(offer.discountPercent || 0);
+    const rating = Number(offer.rating || 0);
+    const brand = extractPremiumBrand(offer, {});
+    const brandScore = brand.tier === "premium" ? 20 : 0;
+    const score = (discount * 0.5) + (rating * 6) + brandScore;
+    return { offer, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+
+  // Dedupe by brand — max 1 per brand in the top selection
+  const seen = new Set();
+  const top = [];
+  for (const { offer } of scored) {
+    const brand = extractPremiumBrand(offer, {}).name || "unknown";
+    if (!seen.has(brand)) {
+      seen.add(brand);
+      top.push(offer);
+    }
+    if (top.length >= maxCount) break;
+  }
+
+  return top;
+}
+
+// ---------------------------------------------------------------------------
+// Per-deal entry point (can also be called manually)
 // ---------------------------------------------------------------------------
 
 export async function generateInstagramContent(db, config, offer, content, affiliateUrl) {
