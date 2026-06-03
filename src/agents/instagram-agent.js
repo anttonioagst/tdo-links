@@ -33,6 +33,34 @@ function getBrandPalette(brand = "") {
   return BRAND_PALETTE[brand.toLowerCase()] || { bg: "#0a0a0a", glow: "#FFFFFF", glowName: "white" };
 }
 
+// Detect background style from product title — light/pastel colors get white bg
+function detectBackground(title = "", brand = "") {
+  const t = title.toLowerCase();
+  const lightColors = ["rosa", "rose", "quartz", "pink", "branco", "white", "prata", "silver", "cream", "bege", "nude", "champagne", "areia", "glacier", "phantom"];
+  if (lightColors.some(c => t.includes(c))) {
+    return { bg: "#ffffff", glow: "none", glowName: "none", style: "white", textStyle: "dark" };
+  }
+  return { ...getBrandPalette(brand), style: "dark", textStyle: "light" };
+}
+
+// Extract color description from title for accurate product rendering
+function extractProductColor(title = "") {
+  const t = title.toLowerCase();
+  const colorMap = [
+    { keys: ["quartzo rosa", "quartz", "rosa", "pink", "rose"], label: "quartz pink/rose color" },
+    { keys: ["branco", "white", "glacier"], label: "white" },
+    { keys: ["preto", "black"], label: "black" },
+    { keys: ["prata", "silver"], label: "silver" },
+    { keys: ["azul", "blue"], label: "blue" },
+    { keys: ["verde", "green"], label: "green" },
+    { keys: ["vermelho", "red"], label: "red" },
+  ];
+  for (const { keys, label } of colorMap) {
+    if (keys.some(k => t.includes(k))) return label;
+  }
+  return "";
+}
+
 // ---------------------------------------------------------------------------
 // Daily batch — selects top N deals of the day and generates Instagram posts
 // ---------------------------------------------------------------------------
@@ -258,7 +286,7 @@ async function generateCarousel(offer, content, research, outDir, logoWatermark,
 async function generateSinglePost(offer, content, research, outDir, logoWatermark, config) {
   const { brand, productShort, officialContext } = research;
   const imageUrl = getBestImageUrl(offer, content);
-  const palette = getBrandPalette(brand);
+  const palette = detectBackground(offer.title, brand);
 
   let productUuid = null;
   if (imageUrl) {
@@ -276,9 +304,10 @@ async function generateSinglePost(offer, content, research, outDir, logoWatermar
 
   // Slide 1: product hero WITH text overlay (SDM style — bold headline at bottom)
   const prompt1 = buildSlide1WithText(offer, brand, productShort, palette, headline);
-  // Slides 2 and 3: clean product shots from different angles
-  const prompt2 = buildCleanAnglePrompt(brand, productShort, palette, "left side angle, product slightly rotated, dramatic side lighting");
-  const prompt3 = buildCleanAnglePrompt(brand, productShort, palette, "close-up detail shot of the product's most distinctive feature, extreme close-up, shallow depth of field");
+  // Slide 2: three-quarter back-left angle — shows depth and form differently from slide 1
+  const prompt2 = buildCleanAnglePrompt(offer, brand, productShort, palette, "three-quarter view from above-left (45° elevation, 45° horizontal), showing the product's top and left side simultaneously, revealing depth and form");
+  // Slide 3: extreme close-up of the most iconic branded detail
+  const prompt3 = buildCleanAnglePrompt(offer, brand, productShort, palette, "extreme macro close-up of the most iconic detail or branded element of the product, shallow depth of field, background blurred");
 
   // Launch all 3 in parallel
   const [job1, job2, job3] = await Promise.all([
@@ -489,37 +518,60 @@ function buildSlidePrompt(slide, visualBrief, brand) {
 }
 
 function buildSinglePostPrompt(offer, brand, productShort, officialContext) {
-  const palette = getBrandPalette(brand);
-  return buildCleanAnglePrompt(brand, productShort, palette, "centered, slight upward angle, floating in space");
+  const palette = detectBackground(offer.title, brand);
+  return buildCleanAnglePrompt(offer, brand, productShort, palette, "centered, slight upward angle, floating in space");
 }
 
-function buildCleanAnglePrompt(brand, productShort, palette, angleDesc) {
-  return `A portrait Instagram product post, aspect ratio 4:5. Premium product photography. NO TEXT, NO LOGOS, NO WATERMARKS anywhere in the image.
+function buildCleanAnglePrompt(offer, brand, productShort, palette, angleDesc) {
+  const color = extractProductColor(offer.title || "");
+  const isWhiteBg = palette.style === "white";
+  const bgDesc = isWhiteBg
+    ? "Pure clean white background (#ffffff), professional product catalog style"
+    : `Pure dark background ${palette.bg}`;
+  const lightingDesc = isWhiteBg
+    ? "Soft even studio lighting, slight shadow underneath product, clean catalog lighting"
+    : `Dramatic ${palette.glowName} rim light (${palette.glow}) from camera-right. Deep chiaroscuro. ${palette.glowName} glow halo`;
 
-Subject: The ${productShort} by ${brand}. ${angleDesc}.
-Background: Pure dark background ${palette.bg}.
-Lighting: Dramatic ${palette.glowName} rim light (${palette.glow}) from camera-right, wrapping product edges. Deep chiaroscuro. ${palette.glowName} glow halo around product.
-Style: Official ${brand} marketing photography quality. Razor-sharp product focus.
-NO text, NO overlays, NO logos, NO badges, NO watermarks in the image.`;
+  return `A portrait Instagram product post, aspect ratio 3:4. Premium product photography. NO TEXT, NO PRICE TAGS, NO WATERMARKS anywhere in the image.
+
+Subject: The ${productShort} by ${brand}${color ? `, in ${color}` : ""}. ${angleDesc}.
+CRITICAL: The ${brand} brand logo/symbol must be clearly visible on the product itself — it is part of the product design.
+Background: ${bgDesc}.
+Lighting: ${lightingDesc}.
+Style: Official ${brand} marketing photography quality. Sharp product.
+NO text overlays, NO price tags, NO watermarks, NO extra badges in image.`;
 }
 
 function buildSlide1WithText(offer, brand, productShort, palette, headline) {
-  return `A portrait Instagram carousel first slide, aspect ratio 4:5. SDM Links editorial style — product hero with bold text overlay at bottom.
+  const color = extractProductColor(offer.title || "");
+  const isWhiteBg = palette.style === "white";
+  const bgDesc = isWhiteBg
+    ? "Pure clean white background (#ffffff)"
+    : `Dark background ${palette.bg}`;
+  const lightingDesc = isWhiteBg
+    ? "Soft even studio lighting, slight shadow underneath, clean catalog style"
+    : `Dramatic ${palette.glowName} rim light (${palette.glow}) wrapping edges`;
+  const gradientDesc = isWhiteBg
+    ? "light-to-transparent gradient overlay at the bottom (white fading to transparent from bottom up) to ensure dark text legibility"
+    : "dark gradient overlay at the bottom (transparent at mid-frame, solid dark at bottom) for white text legibility";
+  const textColor = isWhiteBg ? "dark #1a1a1a bold" : "white bold";
+  const subtitleColor = isWhiteBg ? "dark #444 regular" : "white 80% regular";
 
-Subject: The ${productShort} by ${brand}. Centered, dramatic, premium.
-Background: Dark ${palette.bg}.
-Lighting: Dramatic ${palette.glowName} rim light (${palette.glow}) wrapping edges, deep shadows.
-Style: Official ${brand} marketing photography. Sharp product, dark moody atmosphere.
+  return `A portrait Instagram carousel first slide, aspect ratio 3:4. SDM Links editorial style — product hero with bold text overlay at bottom.
 
-COMPOSITION: Product occupies upper 60% of frame. Lower 40% has a dark gradient overlay (transparent at mid-frame, solid dark at bottom) to ensure text legibility.
+Subject: The ${productShort} by ${brand}${color ? `, in ${color}` : ""}. Centered, hero composition.
+CRITICAL: The ${brand} brand logo must be clearly visible on the product.
+Background: ${bgDesc}.
+Lighting: ${lightingDesc}. Sharp product focus.
 
-TEXT OVERLAY at bottom of image (render as crisp white bold typography):
-- Headline (bold, heavy weight, ~28px, white, 2 lines max): "${headline.headline}"
-- Subtitle (regular weight, ~15px, white 80% opacity, 1 line): "${headline.subtitle}"
+COMPOSITION: Product occupies upper 60% of frame. Lower 40% has ${gradientDesc}.
 
-Text is LEFT-ALIGNED with 32px left margin. Headline comes first, subtitle below it. Both within the lower 35% of the frame over the dark gradient.
+TEXT OVERLAY (render as crisp legible typography inside the image):
+- Headline (${textColor}, heavy condensed, ~30px, 2 lines max, left-aligned, 32px left margin): "${headline.headline}"
+- Subtitle (${subtitleColor}, ~16px, 1 line, left-aligned, 32px left margin, below headline): "${headline.subtitle}"
+Both in the lower 35% of the frame over the gradient.
 
-NO logos, NO watermarks, NO brand badges in the image — those will be added separately.`;
+NO watermarks, NO brand logos outside product itself in the image.`;
 }
 
 async function generateHeadline(offer, brand, productShort, config) {
