@@ -8,8 +8,30 @@ import { extractPremiumBrand } from "../premium-curation.js";
 
 const exec = promisify(execFile);
 
-const LOGO_PATH = resolve("/Users/antonio/Projects/TDO LINKS/Logo/Logo 01/Group 6.png");
+const LOGO_SVG_PATH = resolve("/Users/antonio/Projects/TDO LINKS/Logo/Logo 01/Group 3.svg");
+const LOGO_PNG_FALLBACK = resolve("/Users/antonio/Projects/TDO LINKS/Logo/Logo 01/Group 6.png");
 const OUTPUT_BASE = resolve(process.env.HOME || "/tmp", "Documents/human-output/instagram");
+
+// Brand color palettes — mirrors how each brand lights their product posts
+const BRAND_PALETTE = {
+  razer:      { bg: "#0a0a0a", glow: "#00D060", glowName: "green"   },
+  logitech:   { bg: "#0e1421", glow: "#0082FC", glowName: "blue"    },
+  hyperx:     { bg: "#0d0d0d", glow: "#DF0000", glowName: "red"     },
+  samsung:    { bg: "#0f0f1a", glow: "#1428A0", glowName: "blue"    },
+  apple:      { bg: "#1d1d1f", glow: "#86868b", glowName: "silver"  },
+  sony:       { bg: "#0a0a12", glow: "#0060A9", glowName: "blue"    },
+  jbl:        { bg: "#111111", glow: "#FF6B00", glowName: "orange"  },
+  lg:         { bg: "#0d0d0d", glow: "#A50034", glowName: "red"     },
+  anker:      { bg: "#0d1117", glow: "#0070E0", glowName: "blue"    },
+  soundcore:  { bg: "#0d1117", glow: "#0070E0", glowName: "blue"    },
+  asus:       { bg: "#0d0d12", glow: "#FF6600", glowName: "orange"  },
+  corsair:    { bg: "#0a0a0a", glow: "#FFD700", glowName: "gold"    },
+  steelseries:{ bg: "#0d0d0d", glow: "#F85020", glowName: "orange"  },
+};
+
+function getBrandPalette(brand = "") {
+  return BRAND_PALETTE[brand.toLowerCase()] || { bg: "#0a0a0a", glow: "#FFFFFF", glowName: "white" };
+}
 
 // ---------------------------------------------------------------------------
 // Daily batch — selects top N deals of the day and generates Instagram posts
@@ -91,14 +113,17 @@ export async function generateInstagramContent(db, config, offer, content, affil
     // 2. Save brief for transparency
     await writeFile(join(outDir, "brief.json"), JSON.stringify({ offer: { id: offer.id, title: offer.title, brand: research.brand, asin: offer.asin }, research }, null, 2));
 
-    // 3. Generate content in the same format the brand used
+    // 3. Render logo watermark (SVG → transparent PNG)
+    const logoWatermark = await renderLogoWatermark(outDir);
+
+    // 4. Generate content in the same format the brand used
     let slideCount = 0;
     if (research.contentType === "reel") {
-      slideCount = await generateProductReel(offer, content, research, outDir, config);
+      slideCount = await generateProductReel(offer, content, research, outDir, logoWatermark, config);
     } else if (research.contentType === "carousel") {
-      slideCount = await generateCarousel(offer, content, research, outDir, config);
+      slideCount = await generateCarousel(offer, content, research, outDir, logoWatermark, config);
     } else {
-      slideCount = await generateSinglePost(offer, content, research, outDir, config);
+      slideCount = await generateSinglePost(offer, content, research, outDir, logoWatermark, config);
     }
 
     // 4. Caption
@@ -173,7 +198,7 @@ async function researchOfficialPost(offer, config) {
 // Carousel (9 slides) — mirrors carousel brand posts
 // ---------------------------------------------------------------------------
 
-async function generateCarousel(offer, content, research, outDir, config) {
+async function generateCarousel(offer, content, research, outDir, logoWatermark, config) {
   const { brand, productShort, officialContext } = research;
   const imageUrl = getBestImageUrl(offer, content);
 
@@ -188,7 +213,7 @@ async function generateCarousel(offer, content, research, outDir, config) {
   }
 
   // Upload logo
-  const logoUuid = existsSync(LOGO_PATH) ? await higgsUpload(LOGO_PATH).catch(() => null) : null;
+  const logoUuid = existsSync(LOGO_PNG_FALLBACK) ? await higgsUpload(LOGO_PNG_FALLBACK).catch(() => null) : null;
 
   const visualBrief = buildVisualBrief();
   const slides = buildCarouselSlides(offer, brand, productShort, officialContext);
@@ -219,10 +244,10 @@ async function generateCarousel(offer, content, research, outDir, config) {
       const padded = String(n).padStart(2, "0");
       const slidePath = join(outDir, "slides", `slide-${padded}.png`);
       await downloadFile(url, slidePath);
-      await applyWatermark(slidePath);
+      await applyWatermark(slidePath, logoWatermark);
     } catch { /* skip failed slides */ }
   }
-  await applyWatermark(coverPath);
+  await applyWatermark(coverPath, logoWatermark);
   return slides.length;
 }
 
@@ -230,7 +255,7 @@ async function generateCarousel(offer, content, research, outDir, config) {
 // Single post — mirrors single image brand posts
 // ---------------------------------------------------------------------------
 
-async function generateSinglePost(offer, content, research, outDir, config) {
+async function generateSinglePost(offer, content, research, outDir, logoWatermark, config) {
   const { brand, productShort, officialContext } = research;
   const imageUrl = getBestImageUrl(offer, content);
 
@@ -242,14 +267,14 @@ async function generateSinglePost(offer, content, research, outDir, config) {
       productUuid = await higgsUpload(tmpImg);
     } catch { /* best-effort */ }
   }
-  const logoUuid = existsSync(LOGO_PATH) ? await higgsUpload(LOGO_PATH).catch(() => null) : null;
+  const logoUuid = existsSync(LOGO_PNG_FALLBACK) ? await higgsUpload(LOGO_PNG_FALLBACK).catch(() => null) : null;
 
   const prompt = buildSinglePostPrompt(offer, brand, productShort, officialContext);
   const job = await higgsGenerate(prompt, "4:5", [logoUuid, productUuid].filter(Boolean), "nano_banana_2");
   const url = await higgsWait(job);
   const outPath = join(outDir, "slides", "post-01.png");
   await downloadFile(url, outPath);
-  await applyWatermark(outPath);
+  await applyWatermark(outPath, logoWatermark);
   return 1;
 }
 
@@ -257,7 +282,7 @@ async function generateSinglePost(offer, content, research, outDir, config) {
 // Reel (product showcase video) — mirrors reel brand posts
 // ---------------------------------------------------------------------------
 
-async function generateProductReel(offer, content, research, outDir, config) {
+async function generateProductReel(offer, content, research, outDir, logoWatermark, config) {
   const { brand, productShort, officialContext } = research;
   const imageUrl = getBestImageUrl(offer, content);
 
@@ -271,13 +296,13 @@ async function generateProductReel(offer, content, research, outDir, config) {
   }
 
   // Generate a hero still first (for reel thumbnail + reference)
-  const logoUuid = existsSync(LOGO_PATH) ? await higgsUpload(LOGO_PATH).catch(() => null) : null;
+  const logoUuid = existsSync(LOGO_PNG_FALLBACK) ? await higgsUpload(LOGO_PNG_FALLBACK).catch(() => null) : null;
   const stillPrompt = buildSinglePostPrompt(offer, brand, productShort, officialContext);
   const stillJob = await higgsGenerate(stillPrompt, "9:16", [logoUuid, productUuid].filter(Boolean), "nano_banana_2");
   const stillUrl = await higgsWait(stillJob);
   const stillPath = join(outDir, "slides", "reel-still.png");
   await downloadFile(stillUrl, stillPath);
-  await applyWatermark(stillPath);
+  await applyWatermark(stillPath, logoWatermark);
 
   // Generate the video from the still
   const stillUuid = await higgsUpload(stillPath).catch(() => null);
@@ -438,22 +463,16 @@ function buildSlidePrompt(slide, visualBrief, brand) {
 }
 
 function buildSinglePostPrompt(offer, brand, productShort, officialContext) {
-  return `A portrait Instagram post, aspect ratio 4:5. This is a cinematic product hero shot.
+  const palette = getBrandPalette(brand);
+  return `A portrait Instagram product post, aspect ratio 4:5. Official brand-quality product hero shot. NO TEXT, NO LOGOS, NO WATERMARKS in the image — pure product visual only.
 
-${buildVisualBrief()}
-
-Subject: The ${productShort} by ${brand}. Single hero product against dramatic dark #0d0f14 background.
-Lighting: Rim light in orange #EC6227 from camera-right, chiaroscuro, deep shadows, product focus sharp.
-Composition: Product occupies 65% of frame, left-aligned at rule of thirds, text in lower-right.
-Style: Editorial product photography, cinematic, no people, no lifestyle.
-
-═══ TEXT CONTENT ═══
-Brand bar (top, white 45% opacity, small): "TDO LINKS  |  @tdolinks  |  2026"
-Headline (bold condensed uppercase white): "${productShort.toUpperCase()}"
-Subhead (white 70%, small): "${brand} · Saiba mais na bio"
-Detail signature (bottom): "2026 · @tdolinks"
-
-NO emojis, NO prices, NO numbers except year in brand bar.`;
+Subject: The ${productShort} by ${brand}. Single product, perfectly centered, floating on a deep dark background ${palette.bg}.
+Background: Solid dark background ${palette.bg}, no texture, no gradients.
+Lighting: Dramatic ${palette.glowName} rim light (${palette.glow}) from camera-right, wrapping the product edges. Secondary soft fill from camera-left at 20% intensity. Deep chiaroscuro shadows. The ${palette.glowName} glow creates a halo effect on the product edges and the background immediately behind it.
+Composition: Product centered, occupying 65-70% of frame height. Slight upward angle. Clean negative space above and below.
+Style: Cinematic editorial product photography. Premium brand catalog quality. Like an official ${brand} marketing image.
+Focus: Razor-sharp on the product, background falls into darkness.
+NO text, NO overlays, NO brand logos, NO price tags, NO watermarks, NO badges anywhere in the image.`;
 }
 
 function buildReelVideoPrompt(offer, brand, productShort) {
@@ -502,19 +521,48 @@ async function higgsWait(jobId, timeoutMs = 300000) {
 // Watermark (Python Pillow) — 100% opacity, bottom-right corner
 // ---------------------------------------------------------------------------
 
-async function applyWatermark(imagePath) {
-  if (!existsSync(LOGO_PATH)) return;
+async function renderLogoWatermark(outDir) {
+  // Convert SVG (white/transparent) to PNG using resvg-js if available
+  const pngPath = join(outDir, "logo-watermark.png");
+  try {
+    const script = `
+const {Resvg} = require('/tmp/node_modules/@resvg/resvg-js');
+const fs = require('fs');
+const svg = fs.readFileSync(process.argv[1]);
+const r = new Resvg(svg, { fitTo: { mode: 'width', value: 220 } });
+fs.writeFileSync(process.argv[2], r.render().asPng());
+`;
+    await exec("node", ["-e", script, LOGO_SVG_PATH, pngPath], { timeout: 15000 });
+    return pngPath;
+  } catch {
+    // Fallback: use PNG version and remove orange background
+    if (existsSync(LOGO_PNG_FALLBACK)) return LOGO_PNG_FALLBACK;
+    return null;
+  }
+}
+
+async function applyWatermark(imagePath, logoPath) {
+  if (!logoPath || !existsSync(logoPath)) return;
+  const isOrangeBg = logoPath.includes("Group 5") || logoPath.includes("Group 6");
   const script = `
 from PIL import Image
 import sys
-base_path, logo_path = sys.argv[1], sys.argv[2]
+base_path, logo_path, remove_bg = sys.argv[1], sys.argv[2], sys.argv[3] == '1'
 base = Image.open(base_path).convert("RGBA")
 logo = Image.open(logo_path).convert("RGBA")
-# 7% of base width
-w = max(40, int(base.width * 0.07))
+if remove_bg:
+    # Remove orange background, keep white text
+    data = logo.load()
+    for y in range(logo.height):
+        for x in range(logo.width):
+            r,g,b,a = data[x,y]
+            if r > 150 and g < 120 and b < 80:  # orange pixel
+                data[x,y] = (r,g,b,0)
+# 10% of base width — bottom-right corner
+w = max(60, int(base.width * 0.10))
 h = int(logo.height * (w / logo.width))
 logo = logo.resize((w, h), Image.LANCZOS)
-margin = int(base.width * 0.04)
+margin = int(base.width * 0.035)
 x = base.width - w - margin
 y = base.height - h - margin
 out = Image.new("RGBA", base.size)
@@ -522,7 +570,7 @@ out.paste(base, (0,0))
 out.paste(logo, (x, y), logo)
 out.convert("RGB").save(base_path, quality=95)
 `;
-  await exec("python3", ["-c", script, imagePath, LOGO_PATH], { timeout: 30000 });
+  await exec("python3", ["-c", script, imagePath, logoPath, isOrangeBg ? "1" : "0"], { timeout: 30000 });
 }
 
 // ---------------------------------------------------------------------------
