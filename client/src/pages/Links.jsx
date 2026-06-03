@@ -252,6 +252,7 @@ export default function Links() {
           background: rgba(30,34,41,0.07);
           border-radius: 1px;
         }
+        .links-vdivider { display: none; }
         .links-page * { box-sizing: border-box; margin: 0; padding: 0; }
         .links-page {
           background: #fff;
@@ -269,6 +270,7 @@ export default function Links() {
         /* Desktop: animated orbs + dividers */
         @media (min-width: 769px) {
           .links-divider { display: block; }
+          .links-vdivider { display: block; }
           @keyframes da { to { transform: translate(24px,16px) scale(1.05); } }
           @keyframes db { to { transform: translate(-18px,22px) scale(0.97); } }
           @keyframes dc { to { transform: translate(12px,-20px) scale(1.03); } }
@@ -308,8 +310,8 @@ export default function Links() {
               style={{ borderRadius: 9999, flexShrink: 0, display: "block" }}
             />
 
-            {/* Vertical divider */}
-            <div style={{ width: 1, height: 32, background: "rgba(30,34,41,0.12)", flexShrink: 0 }} />
+            {/* Vertical divider — desktop only */}
+            <div className="links-vdivider" style={{ width: 1, height: 32, background: "rgba(30,34,41,0.12)", flexShrink: 0 }} />
 
             {/* Name + ticker */}
             <div style={{ minWidth: 0 }}>
