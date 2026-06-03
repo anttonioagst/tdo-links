@@ -53,6 +53,31 @@ CREATE TABLE IF NOT EXISTS offer_images (
   created_at timestamptz DEFAULT now(),
   PRIMARY KEY (offer_id, angle)
 );
+CREATE TABLE IF NOT EXISTS telegram_users (
+  telegram_user_id text PRIMARY KEY,
+  telegram_chat_id text NOT NULL,
+  first_name text,
+  username text,
+  subscribed boolean DEFAULT true,
+  onboarding_done boolean DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS telegram_user_preferences (
+  user_id text PRIMARY KEY REFERENCES telegram_users(telegram_user_id),
+  categories jsonb DEFAULT '[]',
+  brands jsonb DEFAULT '[]',
+  max_price_brl numeric DEFAULT NULL,
+  min_discount_pct integer DEFAULT 15,
+  raw_preference_text text,
+  updated_at timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS telegram_notification_log (
+  id text PRIMARY KEY,
+  user_id text REFERENCES telegram_users(telegram_user_id),
+  offer_id text,
+  sent_at timestamptz DEFAULT now()
+);
 `;
 
 const OFFER_COLS = [
@@ -329,5 +354,100 @@ export class PgDb {
 
   nextId(prefix) {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  async saveUser({ telegramUserId, telegramChatId, firstName, username }) {
+    await this.pool.query(`
+      INSERT INTO telegram_users (telegram_user_id, telegram_chat_id, first_name, username, updated_at)
+      VALUES ($1, $2, $3, $4, now())
+      ON CONFLICT (telegram_user_id) DO UPDATE SET
+        telegram_chat_id = excluded.telegram_chat_id,
+        first_name = excluded.first_name,
+        username = excluded.username,
+        updated_at = now()
+    `, [telegramUserId, telegramChatId, firstName || null, username || null]);
+  }
+
+  async setUserSubscribed(telegramUserId, subscribed) {
+    await this.pool.query(
+      `UPDATE telegram_users SET subscribed = $2, updated_at = now() WHERE telegram_user_id = $1`,
+      [telegramUserId, subscribed]
+    );
+  }
+
+  async setOnboardingDone(telegramUserId) {
+    await this.pool.query(
+      `UPDATE telegram_users SET onboarding_done = true, updated_at = now() WHERE telegram_user_id = $1`,
+      [telegramUserId]
+    );
+  }
+
+  async getUser(telegramUserId) {
+    const { rows } = await this.pool.query(
+      `SELECT u.*, p.categories, p.brands, p.max_price_brl, p.min_discount_pct, p.raw_preference_text
+       FROM telegram_users u
+       LEFT JOIN telegram_user_preferences p ON p.user_id = u.telegram_user_id
+       WHERE u.telegram_user_id = $1`,
+      [telegramUserId]
+    );
+    return rows[0] || null;
+  }
+
+  async savePreferences(telegramUserId, { categories, brands, maxPriceBrl, minDiscountPct, rawText }) {
+    await this.pool.query(`
+      INSERT INTO telegram_user_preferences (user_id, categories, brands, max_price_brl, min_discount_pct, raw_preference_text, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, now())
+      ON CONFLICT (user_id) DO UPDATE SET
+        categories = excluded.categories,
+        brands = excluded.brands,
+        max_price_brl = excluded.max_price_brl,
+        min_discount_pct = excluded.min_discount_pct,
+        raw_preference_text = excluded.raw_preference_text,
+        updated_at = now()
+    `, [
+      telegramUserId,
+      JSON.stringify(categories || []),
+      JSON.stringify(brands || []),
+      maxPriceBrl || null,
+      minDiscountPct || 15,
+      rawText || null
+    ]);
+  }
+
+  async getSubscribedUsers() {
+    const { rows } = await this.pool.query(`
+      SELECT u.telegram_user_id, u.telegram_chat_id, u.first_name,
+             p.categories, p.brands, p.max_price_brl, p.min_discount_pct
+      FROM telegram_users u
+      LEFT JOIN telegram_user_preferences p ON p.user_id = u.telegram_user_id
+      WHERE u.subscribed = true AND u.onboarding_done = true
+    `);
+    return rows.map(r => ({
+      telegramUserId: r.telegram_user_id,
+      telegramChatId: r.telegram_chat_id,
+      firstName: r.first_name,
+      preferences: {
+        categories: Array.isArray(r.categories) ? r.categories : JSON.parse(r.categories || "[]"),
+        brands: Array.isArray(r.brands) ? r.brands : JSON.parse(r.brands || "[]"),
+        maxPriceBrl: r.max_price_brl ? Number(r.max_price_brl) : null,
+        minDiscountPct: r.min_discount_pct || 15
+      }
+    }));
+  }
+
+  async logNotification(telegramUserId, offerId) {
+    const id = this.nextId("notif");
+    await this.pool.query(
+      `INSERT INTO telegram_notification_log (id, user_id, offer_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      [id, telegramUserId, offerId]
+    );
+  }
+
+  async wasNotified(telegramUserId, offerId) {
+    const { rows } = await this.pool.query(
+      `SELECT 1 FROM telegram_notification_log WHERE user_id = $1 AND offer_id = $2 LIMIT 1`,
+      [telegramUserId, offerId]
+    );
+    return rows.length > 0;
   }
 }

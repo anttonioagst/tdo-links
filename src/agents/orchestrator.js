@@ -13,6 +13,7 @@ import { extractPremiumBrand } from "../premium-curation.js";
 import { offerIdentityKeys, offerFamilyKey } from "../publication-dedupe.js";
 import { telegramPublicationStatus } from "../publication-policy.js";
 import { reportAgentEvent } from "../discord/reporter.js";
+import { publishPersonalized } from "../telegram-personalizer.js";
 
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 const PENDING_STATUSES = ["new", "queued", "validated", "auto_ready"];
@@ -433,6 +434,11 @@ async function publishSecondary(ctx, offer, content, affiliateUrl) {
       savePublishResult(db, offer.id, "x", result);
     } catch { /* secondary channel is best-effort */ }
   }
+
+  // Personalized delivery — send to subscribers that match this offer
+  try {
+    await publishPersonalized(db, config, offer, content);
+  } catch { /* personalized delivery is best-effort */ }
 }
 
 async function safeScrape(db, config) {

@@ -13,6 +13,7 @@ import { selectImmediatePublishOffer } from "./immediate-publish.js";
 import { buildAffiliateUrl } from "./links.js";
 import { testDiscord } from "./publishers/discord.js";
 import { testTelegram } from "./publishers/telegram.js";
+import { handleTelegramUpdate } from "./telegram-bot.js";
 import { enqueueScrape, enqueuePublish, enqueueImagegen } from "./queues/producers.js";
 import { buildRecommendations } from "./recommendations.js";
 
@@ -86,6 +87,17 @@ async function handleApi(req, res, url, db, config) {
       facebookUrl:  config.facebookUrl        || "",
       metaPixelId:  config.metaPixelId        || ""
     }));
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/telegram/webhook") {
+    const secret = req.headers["x-telegram-bot-api-secret-token"] || "";
+    if (config.telegramWebhookSecret && secret !== config.telegramWebhookSecret) {
+      sendJson(res, 403, { error: "forbidden" });
+      return;
+    }
+    const update = await readJson(req).catch(() => null);
+    if (update) handleTelegramUpdate(update, db, config).catch(err => console.error("telegram_bot_error", err.message));
+    sendJson(res, 200, { ok: true });
     return;
   }
   if (req.method === "GET" && url.pathname === "/api/recent-deals") {
