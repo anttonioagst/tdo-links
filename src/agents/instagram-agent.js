@@ -252,12 +252,13 @@ async function generateCarousel(offer, content, research, outDir, logoWatermark,
 }
 
 // ---------------------------------------------------------------------------
-// Single post — mirrors single image brand posts
+// 3-image carousel — SDM style: text only on first, clean angles on 2 and 3
 // ---------------------------------------------------------------------------
 
 async function generateSinglePost(offer, content, research, outDir, logoWatermark, config) {
   const { brand, productShort, officialContext } = research;
   const imageUrl = getBestImageUrl(offer, content);
+  const palette = getBrandPalette(brand);
 
   let productUuid = null;
   if (imageUrl) {
@@ -268,14 +269,39 @@ async function generateSinglePost(offer, content, research, outDir, logoWatermar
     } catch { /* best-effort */ }
   }
   const logoUuid = existsSync(LOGO_PNG_FALLBACK) ? await higgsUpload(LOGO_PNG_FALLBACK).catch(() => null) : null;
+  const refs = [logoUuid, productUuid].filter(Boolean);
 
-  const prompt = buildSinglePostPrompt(offer, brand, productShort, officialContext);
-  const job = await higgsGenerate(prompt, "4:5", [logoUuid, productUuid].filter(Boolean), "nano_banana_2");
-  const url = await higgsWait(job);
-  const outPath = join(outDir, "slides", "post-01.png");
-  await downloadFile(url, outPath);
-  await applyWatermark(outPath, logoWatermark);
-  return 1;
+  // Generate headline for slide 1 via Claude Haiku
+  const headline = await generateHeadline(offer, brand, productShort, config);
+
+  // Slide 1: product hero WITH text overlay (SDM style — bold headline at bottom)
+  const prompt1 = buildSlide1WithText(offer, brand, productShort, palette, headline);
+  // Slides 2 and 3: clean product shots from different angles
+  const prompt2 = buildCleanAnglePrompt(brand, productShort, palette, "left side angle, product slightly rotated, dramatic side lighting");
+  const prompt3 = buildCleanAnglePrompt(brand, productShort, palette, "close-up detail shot of the product's most distinctive feature, extreme close-up, shallow depth of field");
+
+  // Launch all 3 in parallel
+  const [job1, job2, job3] = await Promise.all([
+    higgsGenerate(prompt1, "3:4", refs, "gpt_image_2"),
+    higgsGenerate(prompt2, "3:4", refs, "gpt_image_2"),
+    higgsGenerate(prompt3, "3:4", refs, "gpt_image_2"),
+  ]);
+
+  const urls = await Promise.all([
+    higgsWait(job1),
+    higgsWait(job2).catch(() => null),
+    higgsWait(job3).catch(() => null),
+  ]);
+
+  let count = 0;
+  for (let i = 0; i < urls.length; i++) {
+    if (!urls[i]) continue;
+    const p = join(outDir, "slides", `slide-0${i + 1}.png`);
+    await downloadFile(urls[i], p);
+    await applyWatermark(p, logoWatermark);
+    count++;
+  }
+  return count;
 }
 
 // ---------------------------------------------------------------------------
@@ -464,15 +490,77 @@ function buildSlidePrompt(slide, visualBrief, brand) {
 
 function buildSinglePostPrompt(offer, brand, productShort, officialContext) {
   const palette = getBrandPalette(brand);
-  return `A portrait Instagram product post, aspect ratio 4:5. Official brand-quality product hero shot. NO TEXT, NO LOGOS, NO WATERMARKS in the image — pure product visual only.
+  return buildCleanAnglePrompt(brand, productShort, palette, "centered, slight upward angle, floating in space");
+}
 
-Subject: The ${productShort} by ${brand}. Single product, perfectly centered, floating on a deep dark background ${palette.bg}.
-Background: Solid dark background ${palette.bg}, no texture, no gradients.
-Lighting: Dramatic ${palette.glowName} rim light (${palette.glow}) from camera-right, wrapping the product edges. Secondary soft fill from camera-left at 20% intensity. Deep chiaroscuro shadows. The ${palette.glowName} glow creates a halo effect on the product edges and the background immediately behind it.
-Composition: Product centered, occupying 65-70% of frame height. Slight upward angle. Clean negative space above and below.
-Style: Cinematic editorial product photography. Premium brand catalog quality. Like an official ${brand} marketing image.
-Focus: Razor-sharp on the product, background falls into darkness.
-NO text, NO overlays, NO brand logos, NO price tags, NO watermarks, NO badges anywhere in the image.`;
+function buildCleanAnglePrompt(brand, productShort, palette, angleDesc) {
+  return `A portrait Instagram product post, aspect ratio 4:5. Premium product photography. NO TEXT, NO LOGOS, NO WATERMARKS anywhere in the image.
+
+Subject: The ${productShort} by ${brand}. ${angleDesc}.
+Background: Pure dark background ${palette.bg}.
+Lighting: Dramatic ${palette.glowName} rim light (${palette.glow}) from camera-right, wrapping product edges. Deep chiaroscuro. ${palette.glowName} glow halo around product.
+Style: Official ${brand} marketing photography quality. Razor-sharp product focus.
+NO text, NO overlays, NO logos, NO badges, NO watermarks in the image.`;
+}
+
+function buildSlide1WithText(offer, brand, productShort, palette, headline) {
+  return `A portrait Instagram carousel first slide, aspect ratio 4:5. SDM Links editorial style — product hero with bold text overlay at bottom.
+
+Subject: The ${productShort} by ${brand}. Centered, dramatic, premium.
+Background: Dark ${palette.bg}.
+Lighting: Dramatic ${palette.glowName} rim light (${palette.glow}) wrapping edges, deep shadows.
+Style: Official ${brand} marketing photography. Sharp product, dark moody atmosphere.
+
+COMPOSITION: Product occupies upper 60% of frame. Lower 40% has a dark gradient overlay (transparent at mid-frame, solid dark at bottom) to ensure text legibility.
+
+TEXT OVERLAY at bottom of image (render as crisp white bold typography):
+- Headline (bold, heavy weight, ~28px, white, 2 lines max): "${headline.headline}"
+- Subtitle (regular weight, ~15px, white 80% opacity, 1 line): "${headline.subtitle}"
+
+Text is LEFT-ALIGNED with 32px left margin. Headline comes first, subtitle below it. Both within the lower 35% of the frame over the dark gradient.
+
+NO logos, NO watermarks, NO brand badges in the image — those will be added separately.`;
+}
+
+async function generateHeadline(offer, brand, productShort, config) {
+  const defaultHeadline = {
+    headline: `${brand.charAt(0).toUpperCase() + brand.slice(1)} ${productShort} em promoção`,
+    subtitle: "Disponível em link na bio."
+  };
+
+  if (!config.anthropicApiKey) return defaultHeadline;
+
+  try {
+    const client = new Anthropic({ apiKey: config.anthropicApiKey });
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 120,
+      messages: [{
+        role: "user",
+        content: `Crie um headline estilo SDM Links para um post de Instagram sobre este produto em promoção.
+Produto: ${offer.title?.slice(0, 100)}
+Marca: ${brand}
+Desconto: ${offer.discountPercent}%
+
+Retorne SOMENTE JSON:
+{"headline": "até 60 chars, bold, direto, como notícia ou statement forte", "subtitle": "até 45 chars, 1 linha, encerra com 'Disponível em link na bio.'"}
+
+Exemplos de tom:
+- "O headset da Razer mais recomendado está em promoção"
+- "Mouse profissional da Logitech com desconto real"
+Sem emojis no JSON.`
+      }]
+    });
+    const raw = msg.content?.[0]?.text || "{}";
+    const match = raw.match(/\{[\s\S]*\}/);
+    const parsed = match ? JSON.parse(match[0]) : {};
+    return {
+      headline: parsed.headline || defaultHeadline.headline,
+      subtitle: parsed.subtitle || defaultHeadline.subtitle,
+    };
+  } catch {
+    return defaultHeadline;
+  }
 }
 
 function buildReelVideoPrompt(offer, brand, productShort) {
@@ -556,15 +644,15 @@ if remove_bg:
     for y in range(logo.height):
         for x in range(logo.width):
             r,g,b,a = data[x,y]
-            if r > 150 and g < 120 and b < 80:  # orange pixel
+            if r > 150 and g < 120 and b < 80:
                 data[x,y] = (r,g,b,0)
-# 10% of base width — bottom-right corner
-w = max(60, int(base.width * 0.10))
+# 9% of base width — upper-right corner with 30px padding from edges
+w = max(55, int(base.width * 0.09))
 h = int(logo.height * (w / logo.width))
 logo = logo.resize((w, h), Image.LANCZOS)
-margin = int(base.width * 0.035)
-x = base.width - w - margin
-y = base.height - h - margin
+padding = 30
+x = base.width - w - padding   # right edge - logo width - 30px
+y = padding                     # 30px from top
 out = Image.new("RGBA", base.size)
 out.paste(base, (0,0))
 out.paste(logo, (x, y), logo)
