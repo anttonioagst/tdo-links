@@ -444,6 +444,25 @@ async function safeScrape(db, config) {
       db.state.offers.unshift(queued);
       inserted.push({ id: queued.id, titulo: (queued.title || "").slice(0, 60) });
     }
+    // If Amazon returned results but all were already known, supplement with Goldbox
+    // so fresh Lightning Deals break the stalemate without waiting for price rotation.
+    if (inserted.length === 0 && raw.length > 0 && config.scraperMode === "amazon") {
+      const { scrapeGoldboxDeals } = await import("../scrapers.js");
+      console.log("orchestrator_scrape_trying_goldbox_supplement");
+      const goldbox = await scrapeGoldboxDeals(config).catch(() => []);
+      for (const offer of goldbox) {
+        if (isAlreadyKnown(db.state, offer)) continue;
+        const queued = {
+          id: db.nextId ? db.nextId("offer") : `offer_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          ...offer,
+          status: "new",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        db.state.offers.unshift(queued);
+        inserted.push({ id: queued.id, titulo: (queued.title || "").slice(0, 60) });
+      }
+    }
     if (inserted.length) await db.save();
     return { inserted: inserted.length, offers: inserted };
   } catch (err) {
