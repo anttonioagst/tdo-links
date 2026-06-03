@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Links from "./pages/Links.jsx";
+import Bot from "./pages/Bot.jsx";
 import "./styles.css";
 
 // Lazy-load the admin dashboard — keeps the /links bundle lean
@@ -13,6 +14,7 @@ createRoot(document.getElementById("root")).render(
       <Routes>
         <Route path="/" element={<Links />} />
         <Route path="/links" element={<Links />} />
+        <Route path="/bot" element={<Bot />} />
         <Route path="/admin/*" element={
           <Suspense fallback={null}>
             <App />
