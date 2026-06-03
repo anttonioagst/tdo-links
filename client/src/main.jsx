@@ -11,8 +11,9 @@ createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<Links />} />
         <Route path="/links" element={<Links />} />
-        <Route path="/*" element={
+        <Route path="/admin/*" element={
           <Suspense fallback={null}>
             <App />
           </Suspense>
