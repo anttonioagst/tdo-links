@@ -284,17 +284,13 @@ export default function Links() {
           {/* Header — horizontal, centered on page */}
           <section style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 16, padding: 10, width: "fit-content", margin: "0 auto" }}>
             {/* Logo mark */}
-            <div style={{
-              width: 40, height: 40, borderRadius: 9999,
-              background: "#EC6227",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0,
-            }}>
-              <svg viewBox="0 0 24 24" fill="none" width="22" height="22">
-                <ellipse cx="12" cy="12" rx="10" ry="6.5" stroke="white" strokeWidth="1.5" />
-                <circle cx="12" cy="12" r="2.5" fill="white" />
-              </svg>
-            </div>
+            <img
+              src="/tdo-logo.png"
+              alt="TDO Links"
+              width={48}
+              height={48}
+              style={{ borderRadius: 12, flexShrink: 0, display: "block" }}
+            />
 
             {/* Name + ticker — no divider */}
             <div style={{ minWidth: 0 }}>
@@ -315,12 +311,18 @@ export default function Links() {
             </div>
           </section>
 
+          {/* Divider */}
+          <div style={{ marginTop: 16, height: 1, background: "rgba(30,34,41,0.07)", borderRadius: 1 }} />
+
           {/* Social icons */}
           <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "nowrap", gap: 0 }}>
             {socialLinks.map(({ key, href, label, onClick }) => (
               <SocialLink key={key} href={href} icon={ICONS[key]} label={label} onClick={onClick} />
             ))}
           </div>
+
+          {/* Divider */}
+          <div style={{ marginTop: 16, height: 1, background: "rgba(30,34,41,0.07)", borderRadius: 1 }} />
 
           {/* 2 Banner cards */}
           <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -375,7 +377,10 @@ export default function Links() {
             </div>
           </div>
 
-          <footer style={{ marginTop: 40, textAlign: "center", fontSize: 10, color: "rgba(30,34,41,0.38)" }}>
+          {/* Divider */}
+          <div style={{ marginTop: 28, height: 1, background: "rgba(30,34,41,0.07)", borderRadius: 1 }} />
+
+          <footer style={{ marginTop: 20, textAlign: "center", fontSize: 10, color: "rgba(30,34,41,0.38)" }}>
             © TDO Links {new Date().getFullYear()} · Tô de Olho em tech pra você
           </footer>
         </main>
