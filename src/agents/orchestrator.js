@@ -14,6 +14,7 @@ import { offerIdentityKeys, offerFamilyKey } from "../publication-dedupe.js";
 import { telegramPublicationStatus } from "../publication-policy.js";
 import { reportAgentEvent } from "../discord/reporter.js";
 import { publishPersonalized } from "../telegram-personalizer.js";
+import { generateInstagramContent } from "./instagram-agent.js";
 
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 const PENDING_STATUSES = ["new", "queued", "validated", "auto_ready"];
@@ -439,6 +440,9 @@ async function publishSecondary(ctx, offer, content, affiliateUrl) {
   try {
     await publishPersonalized(db, config, offer, content);
   } catch { /* personalized delivery is best-effort */ }
+
+  // Instagram content generation — research brand posts → generate in same format
+  generateInstagramContent(db, config, offer, content, affiliateUrl).catch(() => {});
 }
 
 async function safeScrape(db, config) {
