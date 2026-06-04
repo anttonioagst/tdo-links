@@ -82,20 +82,41 @@ function htmlToDiscordMarkdown(text = "") {
     .replace(/&#39;/g, "'");
 }
 
+const DAILY_CHANNEL = "ofertas-do-dia";
+
 export async function publishDiscordDeal(db, config, offer, options = {}) {
   if (!config.discordPublicDealsEnabled) return { ok: true, skipped: true, reason: "discord_public_deals_disabled" };
-  const channelName = discordDealChannelForOffer(offer);
-  let channelId = db.state.discord?.channels?.[channelName];
-  if (!channelId) {
-    const setup = await ensureDiscordChannel(db, config, channelName, options);
-    channelId = db.state.discord?.channels?.[channelName];
-    if (!channelId) {
-      return { ok: false, skipped: true, reason: "discord_channel_missing", channel: channelName, setupError: setup?.error || null };
-    }
-  }
+
+  // Always post to the daily feed, plus the product's category channel (deduped).
+  const categoryName = discordDealChannelForOffer(offer);
+  const targets = [...new Set([DAILY_CHANNEL, categoryName])];
+
   const client = options.client || createDiscordClient(config, options);
-  await client.createMessage(channelId, buildDiscordDealMessage(offer, options.text || ""));
-  return { ok: true, channel: channelName };
+  const message = buildDiscordDealMessage(offer, options.text || "");
+
+  const posted = [];
+  const missing = [];
+  let lastSetupError = null;
+
+  for (const channelName of targets) {
+    let channelId = db.state.discord?.channels?.[channelName];
+    if (!channelId) {
+      const setup = await ensureDiscordChannel(db, config, channelName, options);
+      channelId = db.state.discord?.channels?.[channelName];
+      if (!channelId) {
+        missing.push(channelName);
+        lastSetupError = setup?.error || lastSetupError;
+        continue;
+      }
+    }
+    await client.createMessage(channelId, message);
+    posted.push(channelName);
+  }
+
+  if (!posted.length) {
+    return { ok: false, skipped: true, reason: "discord_channel_missing", channels: missing, setupError: lastSetupError };
+  }
+  return { ok: true, channels: posted, channel: posted[0], skippedChannels: missing.length ? missing : undefined };
 }
 
 function money(value) {

@@ -2243,9 +2243,10 @@ test("publishDiscordDeal auto-provisiona canais ausentes e publica no canal da c
   const result = await publishDiscordDeal(db, config, offer, { client: fakeClient });
 
   assert.equal(result.ok, true);
-  assert.equal(result.channel, "audio-headsets");
-  assert.equal(messages.length, 1);
-  assert.equal(messages[0].channelId, "id_audio-headsets");
+  // Posts to the daily feed AND the category channel.
+  assert.deepEqual(result.channels, ["ofertas-do-dia", "audio-headsets"]);
+  assert.equal(messages.length, 2);
+  assert.deepEqual(messages.map((m) => m.channelId).sort(), ["id_audio-headsets", "id_ofertas-do-dia"]);
   assert.equal(db.state.discord.channels["audio-headsets"], "id_audio-headsets");
 });
 
