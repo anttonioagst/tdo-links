@@ -5,6 +5,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import Anthropic from "@anthropic-ai/sdk";
 import { extractPremiumBrand } from "../premium-curation.js";
+import { composeCover, composeInternalSlide } from "../instagram-compositor.js";
 
 const exec = promisify(execFile);
 
@@ -283,8 +284,8 @@ async function generateCarousel(offer, content, research, outDir, logoWatermark,
 // 3-image carousel — SDM style: text only on first, clean angles on 2 and 3
 // ---------------------------------------------------------------------------
 
-async function generateSinglePost(offer, content, research, outDir, logoWatermark, config) {
-  const { brand, productShort, officialContext } = research;
+async function generateSinglePost(offer, content, research, outDir, _logoWatermark, config) {
+  const { brand, productShort } = research;
   const imageUrl = getBestImageUrl(offer, content);
   const palette = detectBackground(offer.title, brand);
 
@@ -296,20 +297,14 @@ async function generateSinglePost(offer, content, research, outDir, logoWatermar
       productUuid = await higgsUpload(tmpImg);
     } catch { /* best-effort */ }
   }
-  const logoUuid = existsSync(LOGO_PNG_FALLBACK) ? await higgsUpload(LOGO_PNG_FALLBACK).catch(() => null) : null;
-  const refs = [logoUuid, productUuid].filter(Boolean);
 
-  // Generate headline for slide 1 via Claude Haiku
-  const headline = await generateHeadline(offer, brand, productShort, config);
+  const refs = [productUuid].filter(Boolean);
 
-  // Slide 1: product hero WITH text overlay (SDM style — bold headline at bottom)
-  const prompt1 = buildSlide1WithText(offer, brand, productShort, palette, headline);
-  // Slide 2: three-quarter back-left angle — shows depth and form differently from slide 1
-  const prompt2 = buildCleanAnglePrompt(offer, brand, productShort, palette, "three-quarter view from above-left (45° elevation, 45° horizontal), showing the product's top and left side simultaneously, revealing depth and form");
-  // Slide 3: extreme close-up of the most iconic branded detail
-  const prompt3 = buildCleanAnglePrompt(offer, brand, productShort, palette, "extreme macro close-up of the most iconic detail or branded element of the product, shallow depth of field, background blurred");
+  // Prompts limpos — zero texto, zero watermark. O compositor aplica o template Figma.
+  const prompt1 = buildCleanProductPhoto(offer, brand, productShort, palette, "centered hero, product fills 70% of frame, slight elevation");
+  const prompt2 = buildCleanProductPhoto(offer, brand, productShort, palette, "three-quarter view from above-left (45° elevation, 45° horizontal), showing depth and form");
+  const prompt3 = buildCleanProductPhoto(offer, brand, productShort, palette, "extreme macro close-up of the most iconic detail or branded element, shallow depth of field");
 
-  // Launch all 3 in parallel
   const [job1, job2, job3] = await Promise.all([
     higgsGenerate(prompt1, "3:4", refs, "gpt_image_2"),
     higgsGenerate(prompt2, "3:4", refs, "gpt_image_2"),
@@ -322,12 +317,20 @@ async function generateSinglePost(offer, content, research, outDir, logoWatermar
     higgsWait(job3).catch(() => null),
   ]);
 
+  // Slide 1 → capa (template Figma: texto + logos)
+  // Slides 2-3 → slides internos (template Figma: logos + seta)
   let count = 0;
   for (let i = 0; i < urls.length; i++) {
     if (!urls[i]) continue;
-    const p = join(outDir, "slides", `slide-0${i + 1}.png`);
-    await downloadFile(urls[i], p);
-    await applyWatermark(p, logoWatermark);
+    const rawPath = join(outDir, "slides", `raw-0${i + 1}.jpg`);
+    const outPath = join(outDir, "slides", `slide-0${i + 1}.jpg`);
+    await downloadFile(urls[i], rawPath);
+
+    if (i === 0) {
+      await composeCover(rawPath, { productLine: productShort, brandName: brand, outPath });
+    } else {
+      await composeInternalSlide(rawPath, { outPath });
+    }
     count++;
   }
   return count;
@@ -517,12 +520,7 @@ function buildSlidePrompt(slide, visualBrief, brand) {
   return txt;
 }
 
-function buildSinglePostPrompt(offer, brand, productShort, officialContext) {
-  const palette = detectBackground(offer.title, brand);
-  return buildCleanAnglePrompt(offer, brand, productShort, palette, "centered, slight upward angle, floating in space");
-}
-
-function buildCleanAnglePrompt(offer, brand, productShort, palette, angleDesc) {
+function buildCleanProductPhoto(offer, brand, productShort, palette, angleDesc) {
   const color = extractProductColor(offer.title || "");
   const isWhiteBg = palette.style === "white";
   const bgDesc = isWhiteBg
@@ -532,88 +530,15 @@ function buildCleanAnglePrompt(offer, brand, productShort, palette, angleDesc) {
     ? "Soft even studio lighting, slight shadow underneath product, clean catalog lighting"
     : `Dramatic ${palette.glowName} rim light (${palette.glow}) from camera-right. Deep chiaroscuro. ${palette.glowName} glow halo`;
 
-  return `A portrait Instagram product post, aspect ratio 3:4. Premium product photography. NO TEXT, NO PRICE TAGS, NO WATERMARKS anywhere in the image.
+  return `Premium product photography, portrait 3:4.
 
 Subject: The ${productShort} by ${brand}${color ? `, in ${color}` : ""}. ${angleDesc}.
-CRITICAL: The ${brand} brand logo/symbol must be clearly visible on the product itself — it is part of the product design.
+CRITICAL: The ${brand} brand logo/symbol must be clearly visible on the product itself.
 Background: ${bgDesc}.
-Lighting: ${lightingDesc}.
-Style: Official ${brand} marketing photography quality. Sharp product.
-NO text overlays, NO price tags, NO watermarks, NO extra badges in image.`;
+Lighting: ${lightingDesc}. Sharp product, professional quality.
+ABSOLUTE RULES: NO text, NO price tags, NO watermarks, NO badges, NO extra objects anywhere in the image. Clean product only.`;
 }
 
-function buildSlide1WithText(offer, brand, productShort, palette, headline) {
-  const color = extractProductColor(offer.title || "");
-  const isWhiteBg = palette.style === "white";
-  const bgDesc = isWhiteBg
-    ? "Pure clean white background (#ffffff)"
-    : `Dark background ${palette.bg}`;
-  const lightingDesc = isWhiteBg
-    ? "Soft even studio lighting, slight shadow underneath, clean catalog style"
-    : `Dramatic ${palette.glowName} rim light (${palette.glow}) wrapping edges`;
-  const gradientDesc = isWhiteBg
-    ? "light-to-transparent gradient overlay at the bottom (white fading to transparent from bottom up) to ensure dark text legibility"
-    : "dark gradient overlay at the bottom (transparent at mid-frame, solid dark at bottom) for white text legibility";
-  const textColor = isWhiteBg ? "dark #1a1a1a bold" : "white bold";
-  const subtitleColor = isWhiteBg ? "dark #444 regular" : "white 80% regular";
-
-  return `A portrait Instagram carousel first slide, aspect ratio 3:4. SDM Links editorial style — product hero with bold text overlay at bottom.
-
-Subject: The ${productShort} by ${brand}${color ? `, in ${color}` : ""}. Centered, hero composition.
-CRITICAL: The ${brand} brand logo must be clearly visible on the product.
-Background: ${bgDesc}.
-Lighting: ${lightingDesc}. Sharp product focus.
-
-COMPOSITION: Product occupies upper 60% of frame. Lower 40% has ${gradientDesc}.
-
-TEXT OVERLAY (render as crisp legible typography inside the image):
-- Headline (${textColor}, heavy condensed, ~30px, 2 lines max, left-aligned, 32px left margin): "${headline.headline}"
-- Subtitle (${subtitleColor}, ~16px, 1 line, left-aligned, 32px left margin, below headline): "${headline.subtitle}"
-Both in the lower 35% of the frame over the gradient.
-
-NO watermarks, NO brand logos outside product itself in the image.`;
-}
-
-async function generateHeadline(offer, brand, productShort, config) {
-  const defaultHeadline = {
-    headline: `${brand.charAt(0).toUpperCase() + brand.slice(1)} ${productShort} em promoção`,
-    subtitle: "Disponível em link na bio."
-  };
-
-  if (!config.anthropicApiKey) return defaultHeadline;
-
-  try {
-    const client = new Anthropic({ apiKey: config.anthropicApiKey });
-    const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 120,
-      messages: [{
-        role: "user",
-        content: `Crie um headline estilo SDM Links para um post de Instagram sobre este produto em promoção.
-Produto: ${offer.title?.slice(0, 100)}
-Marca: ${brand}
-Desconto: ${offer.discountPercent}%
-
-Retorne SOMENTE JSON:
-{"headline": "até 60 chars, bold, direto, como notícia ou statement forte", "subtitle": "até 45 chars, 1 linha, encerra com 'Disponível em link na bio.'"}
-
-Exemplos de tom:
-- "O headset da Razer mais recomendado está em promoção"
-- "Mouse profissional da Logitech com desconto real"
-Sem emojis no JSON.`
-      }]
-    });
-    const raw = msg.content?.[0]?.text || "{}";
-    const match = raw.match(/\{[\s\S]*\}/);
-    const parsed = match ? JSON.parse(match[0]) : {};
-    return {
-      headline: parsed.headline || defaultHeadline.headline,
-      subtitle: parsed.subtitle || defaultHeadline.subtitle,
-    };
-  } catch {
-    return defaultHeadline;
-  }
-}
 
 function buildReelVideoPrompt(offer, brand, productShort) {
   return `Cinematic product reveal video. ${productShort} by ${brand}. Slow 360 rotation on dark background with orange rim lighting. Premium product showcase. No text overlay. No music. No people. Duration 15 seconds.`;
