@@ -10,7 +10,9 @@ const blockedPatterns = [
 export function validatePost(text, disclosure, offer = null) {
   const errors = [];
   const warnings = [];
-  if (!text.includes(disclosure)) errors.push("missing_disclosure");
+  // Disclosure is surfaced at the channel level (Telegram bio / Discord topic),
+  // so a missing inline disclosure is a warning, not a hard block.
+  if (disclosure && !text.includes(disclosure)) warnings.push("missing_disclosure");
   if (!/R\$\s?\d/.test(text)) errors.push("missing_price");
   if (!/https?:\/\//.test(text)) errors.push("missing_link");
   for (const pattern of blockedPatterns) {

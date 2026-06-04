@@ -141,26 +141,38 @@ export async function publishDeal(offer, content, config, db) {
   if (!wasAlreadyPublished(db, offer.id, "discord")) {
     channels.push(async () => {
       try {
-        const draft = { text: resolveCopy(copy.discord, affiliateUrl) };
         const offerForDiscord = { ...offerWithImage, affiliateUrl };
-        const result = await publishDiscord(draft, config, offerForDiscord);
+        // Mirror Telegram on Discord: same copy + same image.
+        const discordText = resolveCopy(copy.telegram, affiliateUrl);
+        // Prefer the bot posting to category channels (self-provisions channels
+        // when missing). Fall back to the webhook only when it can actually send.
+        const botResult = await publishDiscordDeal(db, config, offerForDiscord, { text: discordText }).catch((error) => ({
+          ok: false,
+          detail: error?.message || String(error)
+        }));
+        let result;
+        if (botResult?.ok) {
+          result = botResult;
+        } else if (config.discordWebhookUrl && !config.discordDryRun) {
+          const draft = { text: resolveCopy(copy.discord, affiliateUrl) };
+          result = await publishDiscord(draft, config, offerForDiscord);
+        } else {
+          // Surface the real bot reason instead of a misleading webhook dry-run "ok".
+          result = botResult || { ok: false, detail: "no_discord_method_configured" };
+        }
         results.discord = result;
         savePublishResult(db, offer.id, "discord", result);
-        if (result.ok) {
-          const publicResult = await publishDiscordDeal(db, config, offerForDiscord).catch((error) => ({
-            ok: false,
-            detail: error?.message || String(error)
-          }));
-          results.discordPublic = publicResult;
-        }
+        const skipped = result.skipped === true;
         await safeReport(db, config, {
           agent: "publisher",
-          severity: result.ok ? "info" : "warning",
-          title: result.ok ? "Discord processado" : "Falha no Discord",
-          message: result.ok ? "Oferta processada no Discord." : result.detail || result.error || "Falha ao publicar no Discord.",
-          data: { offerId: offer.id, detail: result.detail || "" }
+          severity: result.ok ? "info" : (skipped ? "info" : "warning"),
+          title: result.ok ? "Discord publicado" : (skipped ? "Discord ignorado" : "Falha no Discord"),
+          message: result.ok
+            ? "Oferta publicada no Discord."
+            : (result.reason || result.detail || result.error || "Falha ao publicar no Discord."),
+          data: { offerId: offer.id, channel: result.channel || "", detail: result.detail || result.reason || "" }
         });
-        console.log("agent_event", JSON.stringify({ agent: "publisher", event: "discord_done", offerId: offer.id, ok: result.ok }));
+        console.log("agent_event", JSON.stringify({ agent: "publisher", event: "discord_done", offerId: offer.id, ok: result.ok, reason: result.reason || result.detail || "" }));
       } catch (err) {
         results.discord = { ok: false, error: err.message };
         console.log("agent_event", JSON.stringify({ agent: "publisher", event: "discord_error", offerId: offer.id, error: err.message }));

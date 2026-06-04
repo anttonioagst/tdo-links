@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import sharp from "sharp";
 import { createDraftsForOffer, createAnalyticsReport, runPublishPipeline, runScrapePipeline } from "../src/agents.js";
 import { publishDiscord, testDiscord } from "../src/publishers/discord.js";
+import { publishDiscordDeal } from "../src/discord/deals.js";
 import { publishXAcquisition } from "../src/publishers/x.js";
 import { validateAmazonLink } from "../src/validation.js";
 import { validatePost, validateXAcquisitionPost } from "../src/compliance.js";
@@ -95,11 +96,12 @@ test("accepts compliant Telegram affiliate copy", () => {
   assert.equal(result.ok, true);
 });
 
-test("blocks posts without disclosure", () => {
+test("warns about posts without inline disclosure but does not block", () => {
   const disclosure = "Link de afiliado: posso receber comissão pela compra.";
   const result = validatePost("Oferta tech\nR$ 99,90\nhttps://x.test/go/abc", disclosure);
-  assert.equal(result.ok, false);
-  assert.ok(result.errors.includes("missing_disclosure"));
+  // Inline disclosure is optional (lives in channel bio/topic); flagged as a warning.
+  assert.equal(result.ok, true);
+  assert.ok(result.warnings.includes("missing_disclosure"));
 });
 
 test("accepts X deal copy with price and tracked link", () => {
@@ -171,20 +173,19 @@ test("manual affiliate Telegram copy keeps direct affiliate link", () => {
   assert.doesNotMatch(copy, /tdo-links-production\.up\.railway\.app\/go\/short_test/);
 });
 
-test("Telegram copy keeps product specs concise and skimmable", () => {
+test("Telegram copy stays clean without spec bullets", () => {
   const copy = telegramCopy({
     title: "Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth",
     currentPrice: 1499,
     previousPrice: 2199,
     discountPercent: 32,
     store: "amazon"
-  }, "https://www.amazon.com.br/dp/B09XS7JWHH?tag=tdolinks-20", "");
+  }, "https://www.amazon.com.br/dp/B09XS7JWHH?tag=tdolinks-20");
   const specLines = copy.split("\n").filter((line) => line.startsWith("• "));
 
-  assert.ok(specLines.length > 0);
-  assert.ok(specLines.length <= 2);
-  assert.match(copy, /• Cancelamento de ruído/);
-  assert.match(copy, /• Bluetooth/);
+  // Clean template (since "remove specs and disclosure") carries no spec bullets.
+  assert.equal(specLines.length, 0);
+  assert.match(copy, /Aproveite esta oferta exclusiva na Amazon antes que acabe!/);
 });
 
 test("Telegram copy refuses automatic promotion format without previous price", () => {
@@ -359,8 +360,6 @@ test("creative fallback keeps Telegram promotion format with strikethrough and b
 
   assert.match(result.copy.telegram, /🔥 De <s>R\$\s?2\.199,00<\/s> por <b>R\$\s?1\.499,00<\/b> \(32% OFF\)/);
   assert.match(result.copy.telegram, /📌 <b>Fone de Ouvido Sony WH-1000XM5 Noise Cancelling Bluetooth<\/b>/);
-  assert.match(result.copy.telegram, /• Cancelamento de ruído/);
-  assert.match(result.copy.telegram, /• Bluetooth/);
   assert.doesNotMatch(result.copy.telegram, /🔥 Por <b>R\$/);
 });
 
@@ -2220,6 +2219,57 @@ test("testDiscord sem webhookUrl retorna ok false", async () => {
   const result = await testDiscord({ discordWebhookUrl: "", discordDryRun: false });
   assert.equal(result.ok, false);
   assert.match(result.detail, /DISCORD_WEBHOOK_URL/);
+});
+
+test("publishDiscordDeal pula quando deals públicos estão desabilitados", async () => {
+  const db = { state: { discord: { channels: {} } } };
+  const result = await publishDiscordDeal(db, { discordPublicDealsEnabled: false }, { title: "Headset X", category: "headset" });
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, "discord_public_deals_disabled");
+});
+
+test("publishDiscordDeal auto-provisiona canais ausentes e publica no canal da categoria", async () => {
+  const messages = [];
+  const fakeClient = {
+    listGuildChannels: async () => [],
+    createGuildChannel: async (_guildId, body) => ({ id: `id_${body.name}`, name: body.name }),
+    createMessage: async (channelId, body) => { messages.push({ channelId, body }); }
+  };
+  const db = { state: { discord: { channels: {} } }, save: async () => {} };
+  const config = { discordPublicDealsEnabled: true, discordBotToken: "token", discordGuildId: "guild" };
+  const offer = { title: "Headset HyperX Cloud III", category: "headset", currentPrice: 399, imageUrls: ["https://img/headset.jpg"], affiliateUrl: "https://x" };
+
+  const result = await publishDiscordDeal(db, config, offer, { client: fakeClient });
+
+  assert.equal(result.ok, true);
+  // Posts to the daily feed AND the category channel.
+  assert.deepEqual(result.channels, ["ofertas-do-dia", "audio-headsets"]);
+  assert.equal(messages.length, 2);
+  assert.deepEqual(messages.map((m) => m.channelId).sort(), ["id_audio-headsets", "id_ofertas-do-dia"]);
+  assert.equal(db.state.discord.channels["audio-headsets"], "id_audio-headsets");
+});
+
+test("publishDiscordDeal espelha a copy e a imagem do Telegram", async () => {
+  const messages = [];
+  const fakeClient = {
+    createMessage: async (channelId, body) => { messages.push({ channelId, body }); }
+  };
+  const db = { state: { discord: { channels: { "audio-headsets": "chan_audio" } } }, save: async () => {} };
+  const config = { discordPublicDealsEnabled: true, discordBotToken: "token", discordGuildId: "guild" };
+  const offer = { title: "Headset Sony", category: "headset", imageUrls: ["https://img/sony.jpg"] };
+  const telegramText = "📌 <b>Headset Sony</b>\n\n🔥 De <s>R$ 999,00</s> por <b>R$ 699,00</b> (30% OFF)\n\nhttps://amzn.to/abc";
+
+  const result = await publishDiscordDeal(db, config, offer, { client: fakeClient, text: telegramText });
+
+  assert.equal(result.ok, true);
+  const embed = messages[0].body.embeds[0];
+  // Same copy, HTML converted to Discord markdown.
+  assert.match(embed.description, /📌 \*\*Headset Sony\*\*/);
+  assert.match(embed.description, /🔥 De ~~R\$ 999,00~~ por \*\*R\$ 699,00\*\* \(30% OFF\)/);
+  assert.match(embed.description, /https:\/\/amzn\.to\/abc/);
+  // Same image.
+  assert.equal(embed.image.url, "https://img/sony.jpg");
 });
 
 test("buildEmbed inclui título e desconto do offer", async () => {
