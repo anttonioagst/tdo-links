@@ -32,7 +32,21 @@ export function discordDealChannelForOffer(offer = {}) {
   return "ofertas-do-dia";
 }
 
-export function buildDiscordDealMessage(offer = {}, affiliateUrl = "") {
+export function buildDiscordDealMessage(offer = {}, copyText = "") {
+  const image = bestImage(offer);
+  // Mirror Telegram: same caption + same product image in a single embed.
+  // Telegram copy uses HTML (<b>, <s>); convert it to Discord markdown.
+  if (copyText) {
+    return {
+      embeds: [{
+        description: htmlToDiscordMarkdown(copyText).slice(0, 4096),
+        color: 0x22c55e,
+        image: image ? { url: image } : undefined,
+        timestamp: new Date().toISOString()
+      }]
+    };
+  }
+  // Legacy fallback (no Telegram copy available): structured embed.
   const current = money(offer.currentPrice);
   const previous = money(offer.previousPrice);
   const discount = offer.discountPercent ? ` (${Math.round(offer.discountPercent)}% OFF)` : "";
@@ -44,12 +58,28 @@ export function buildDiscordDealMessage(offer = {}, affiliateUrl = "") {
         ? `De ~~${previous}~~ por **${current}**${discount}`
         : `Por **${current}**${discount}`,
       color: 0x22c55e,
-      url: affiliateUrl || offer.affiliateUrl || offer.originalUrl || offer.url || undefined,
-      image: bestImage(offer) ? { url: bestImage(offer) } : undefined,
+      url: offer.affiliateUrl || offer.originalUrl || offer.url || undefined,
+      image: image ? { url: image } : undefined,
       fields: specs.map((spec) => ({ name: spec.name, value: spec.value, inline: true })),
       timestamp: new Date().toISOString()
     }]
   };
+}
+
+// Telegram caption is HTML; Discord renders markdown. Keep the text identical,
+// only swap the formatting tags.
+function htmlToDiscordMarkdown(text = "") {
+  return String(text)
+    .replace(/<\/?(b|strong)>/gi, "**")
+    .replace(/<\/?(s|strike|del)>/gi, "~~")
+    .replace(/<\/?(i|em)>/gi, "*")
+    .replace(/<br\s*\/?>(?:\n)?/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
 }
 
 export async function publishDiscordDeal(db, config, offer, options = {}) {
@@ -64,7 +94,7 @@ export async function publishDiscordDeal(db, config, offer, options = {}) {
     }
   }
   const client = options.client || createDiscordClient(config, options);
-  await client.createMessage(channelId, buildDiscordDealMessage(offer, offer.affiliateUrl));
+  await client.createMessage(channelId, buildDiscordDealMessage(offer, options.text || ""));
   return { ok: true, channel: channelName };
 }
 

@@ -413,8 +413,10 @@ async function publishSecondary(ctx, offer, content, affiliateUrl) {
   if (!wasAlreadyPublished(db.state, offer.id, "discord")) {
     try {
       const offerForDiscord = { ...offer, affiliateUrl };
+      // Mirror Telegram on Discord: same copy + same image.
+      const discordText = resolveCopy(content.copy.telegram, affiliateUrl);
       // Try bot first (needs BOT_TOKEN + GUILD_ID), fall back to webhook
-      const botResult = await publishDiscordDeal(db, config, offerForDiscord).catch(() => null);
+      const botResult = await publishDiscordDeal(db, config, offerForDiscord, { text: discordText }).catch(() => null);
       if (botResult?.ok) {
         savePublishResult(db, offer.id, "discord", botResult);
       } else if (config.discordWebhookUrl) {

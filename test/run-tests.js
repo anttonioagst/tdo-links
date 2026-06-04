@@ -2238,7 +2238,7 @@ test("publishDiscordDeal auto-provisiona canais ausentes e publica no canal da c
   };
   const db = { state: { discord: { channels: {} } }, save: async () => {} };
   const config = { discordPublicDealsEnabled: true, discordBotToken: "token", discordGuildId: "guild" };
-  const offer = { title: "Headset HyperX Cloud III", category: "headset", currentPrice: 399, affiliateUrl: "https://x" };
+  const offer = { title: "Headset HyperX Cloud III", category: "headset", currentPrice: 399, imageUrls: ["https://img/headset.jpg"], affiliateUrl: "https://x" };
 
   const result = await publishDiscordDeal(db, config, offer, { client: fakeClient });
 
@@ -2247,6 +2247,28 @@ test("publishDiscordDeal auto-provisiona canais ausentes e publica no canal da c
   assert.equal(messages.length, 1);
   assert.equal(messages[0].channelId, "id_audio-headsets");
   assert.equal(db.state.discord.channels["audio-headsets"], "id_audio-headsets");
+});
+
+test("publishDiscordDeal espelha a copy e a imagem do Telegram", async () => {
+  const messages = [];
+  const fakeClient = {
+    createMessage: async (channelId, body) => { messages.push({ channelId, body }); }
+  };
+  const db = { state: { discord: { channels: { "audio-headsets": "chan_audio" } } }, save: async () => {} };
+  const config = { discordPublicDealsEnabled: true, discordBotToken: "token", discordGuildId: "guild" };
+  const offer = { title: "Headset Sony", category: "headset", imageUrls: ["https://img/sony.jpg"] };
+  const telegramText = "📌 <b>Headset Sony</b>\n\n🔥 De <s>R$ 999,00</s> por <b>R$ 699,00</b> (30% OFF)\n\nhttps://amzn.to/abc";
+
+  const result = await publishDiscordDeal(db, config, offer, { client: fakeClient, text: telegramText });
+
+  assert.equal(result.ok, true);
+  const embed = messages[0].body.embeds[0];
+  // Same copy, HTML converted to Discord markdown.
+  assert.match(embed.description, /📌 \*\*Headset Sony\*\*/);
+  assert.match(embed.description, /🔥 De ~~R\$ 999,00~~ por \*\*R\$ 699,00\*\* \(30% OFF\)/);
+  assert.match(embed.description, /https:\/\/amzn\.to\/abc/);
+  // Same image.
+  assert.equal(embed.image.url, "https://img/sony.jpg");
 });
 
 test("buildEmbed inclui título e desconto do offer", async () => {

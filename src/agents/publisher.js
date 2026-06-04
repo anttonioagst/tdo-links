@@ -142,9 +142,11 @@ export async function publishDeal(offer, content, config, db) {
     channels.push(async () => {
       try {
         const offerForDiscord = { ...offerWithImage, affiliateUrl };
+        // Mirror Telegram on Discord: same copy + same image.
+        const discordText = resolveCopy(copy.telegram, affiliateUrl);
         // Prefer the bot posting to category channels (self-provisions channels
         // when missing). Fall back to the webhook only when it can actually send.
-        const botResult = await publishDiscordDeal(db, config, offerForDiscord).catch((error) => ({
+        const botResult = await publishDiscordDeal(db, config, offerForDiscord, { text: discordText }).catch((error) => ({
           ok: false,
           detail: error?.message || String(error)
         }));
