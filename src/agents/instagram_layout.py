@@ -1,88 +1,90 @@
 #!/usr/bin/env python3
 """TDO Links — Instagram slide compositor.
 
-Deterministic vector-style overlay applied on top of an AI-generated product
-photo. Mirrors the editorial pattern the brand follows:
-
-  - Eye watermark (small) in the upper-right corner of EVERY slide.
-  - On the COVER only: a bottom band with the headline, the eye logo at the
-    lower-left, and up to three dynamic badges stacked at the lower-right,
-    over a dark gradient that guarantees legibility.
+Layout mirrors the editorial style from the reference:
+  - Top bar: two small metadata labels on the left + small eye watermark top-right
+  - Bottom footer row (space-between, vertically centered):
+      LEFT  → eye logo mark
+      CENTER → bold headline
+      RIGHT  → 3 small stacked labels (dynamic per offer)
+  - Slides 2/3: only the top-right watermark, no bottom elements.
 
 Usage:
   python3 instagram_layout.py <spec.json>
 
-spec.json:
-  {
-    "base":      "/path/product.png",   # AI product photo (any size)
-    "out":       "/path/slide-01.png",
-    "logo":      "/path/tdo-eye-white.png",
-    "mode":      "cover" | "slide",
-    "headline":  ["LINHA 1", "LINHA 2"],  # cover only
-    "badges":    ["50% OFF", "EM PROMOÇÃO", "LINK NA BIO"],  # cover only
-    "textColor": "light" | "dark"          # adapts to bg luminance
-  }
+spec.json fields:
+  base        path to AI product photo
+  out         output path
+  logo        path to tdo-eye-white.png
+  mode        "cover" | "slide"
+  headline    string or list[str] — cover only
+  labels      list[str] (3 items) — cover only, dynamic per offer
+  textColor   "light" (default) | "dark"
 """
+
 import json
 import sys
+import textwrap
 from PIL import Image, ImageDraw, ImageFont
 
-# --- canvas -----------------------------------------------------------------
-W, H = 1080, 1440  # 3:4 portrait feed
-MARGIN = 64
-ACCENT = (236, 98, 39)  # #EC6227 TDO orange
+# ── canvas ──────────────────────────────────────────────────────────────────
+W, H = 1080, 1440  # 3:4 portrait
 
-FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-FONT_MONO = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
+ORANGE = (236, 98, 39)
+
+# Inter variable font — clean humanist sans matching the reference aesthetic
+FONT_PATH  = "/tmp/fonts/InterVariable.ttf"
+FONT_BOLD  = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+FONT_REG   = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
 
 
-def load_font(path, size):
+def font(size, bold=False):
     try:
-        return ImageFont.truetype(path, size)
+        return ImageFont.truetype(FONT_PATH, size)
     except Exception:
-        return ImageFont.load_default()
+        path = FONT_BOLD if bold else FONT_REG
+        return ImageFont.truetype(path, size)
 
 
-def fit_base(path):
-    """Cover-crop the product photo into the 3:4 canvas."""
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def fit_crop(path, w=W, h=H):
     img = Image.open(path).convert("RGBA")
-    scale = max(W / img.width, H / img.height)
+    scale = max(w / img.width, h / img.height)
     img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
-    left = (img.width - W) // 2
-    top = (img.height - H) // 2
-    return img.crop((left, top, left + W, top + H))
+    ox, oy = (img.width - w) // 2, (img.height - h) // 2
+    return img.crop((ox, oy, ox + w, oy + h))
 
 
-def paste_logo(base, logo_path, box_w, x, y):
-    logo = Image.open(logo_path).convert("RGBA")
-    bbox = logo.split()[3].getbbox()
-    if bbox:
-        logo = logo.crop(bbox)
-    h = round(logo.height * (box_w / logo.width))
-    logo = logo.resize((box_w, h), Image.LANCZOS)
-    base.alpha_composite(logo, (x, y))
-    return box_w, h
+def load_logo(path, target_w):
+    logo = Image.open(path).convert("RGBA")
+    bb = logo.split()[3].getbbox()
+    if bb:
+        logo = logo.crop(bb)
+    scale = target_w / logo.width
+    return logo.resize((target_w, round(logo.height * scale)), Image.LANCZOS)
 
 
-def bottom_gradient(base):
-    """Dark gradient on the lower portion for text legibility."""
-    grad = Image.new("L", (1, H), 0)
-    start = int(H * 0.48)
-    for y in range(start, H):
-        t = (y - start) / (H - start)
-        grad.putpixel((0, y), int(225 * (t ** 1.4)))
-    alpha = grad.resize((W, H))
-    black = Image.new("RGBA", (W, H), (8, 8, 10, 0))
-    black.putalpha(alpha)
-    base.alpha_composite(black)
+def dark_gradient(base, start_y_frac=0.50, max_alpha=220):
+    """Vertical dark gradient from start_y_frac to bottom."""
+    ow, oh = base.size
+    start = int(oh * start_y_frac)
+    overlay = Image.new("RGBA", (ow, oh), (0, 0, 0, 0))
+    d = ImageDraw.Draw(overlay)
+    for y in range(start, oh):
+        t = (y - start) / (oh - start)
+        a = int(max_alpha * (t ** 1.2))
+        d.line([(0, y), (ow, y)], fill=(8, 8, 10, a))
+    base.alpha_composite(overlay)
 
 
-def wrap(draw, text, font, max_w):
+def text_lines(draw, text, f, max_w):
+    """Wrap text to fit max_w, return list of lines."""
     words = text.split()
     lines, cur = [], ""
     for w in words:
         trial = (cur + " " + w).strip()
-        if draw.textlength(trial, font=font) <= max_w or not cur:
+        if draw.textlength(trial, font=f) <= max_w or not cur:
             cur = trial
         else:
             lines.append(cur)
@@ -92,57 +94,101 @@ def wrap(draw, text, font, max_w):
     return lines
 
 
+# ── main ─────────────────────────────────────────────────────────────────────
+
 def render(spec):
-    base = fit_base(spec["base"])
-    draw = ImageDraw.Draw(base)
-    is_dark = spec.get("textColor", "light") != "dark"
-    fg = (255, 255, 255) if is_dark else (20, 20, 22)
+    base   = fit_crop(spec["base"])
     logo_path = spec["logo"]
+    is_dark   = spec.get("textColor", "light") != "dark"
+    fg        = (255, 255, 255) if is_dark else (18, 18, 18)
+    fg_dim    = fg + (160,) if len(fg) == 3 else fg  # semi-transparent
+
+    PAD = 56  # outer padding
 
     if spec.get("mode") == "cover":
-        bottom_gradient(base)
-        draw = ImageDraw.Draw(base)
+        dark_gradient(base, start_y_frac=0.44, max_alpha=210)
 
-        # --- dynamic badges, lower-right, stacked, bottom-aligned ----------
-        badges = [b for b in spec.get("badges", []) if b][:3]
-        badge_font = load_font(FONT_MONO, 26)
-        line_h = 40
-        block_h = line_h * len(badges)
-        by = H - MARGIN - block_h
-        for i, b in enumerate(badges):
-            label = b.upper()
-            tw = draw.textlength(label, font=badge_font)
-            color = ACCENT if i == 0 else (fg + ())
-            draw.text((W - MARGIN - tw, by + i * line_h), label, font=badge_font,
-                      fill=(color if i == 0 else (fg[0], fg[1], fg[2], 230)))
+    draw = ImageDraw.Draw(base)
 
-        # --- eye logo, lower-left -----------------------------------------
-        logo_w = 150
-        _, logo_h = paste_logo(base, logo_path, logo_w, MARGIN, H - MARGIN - 96)
-        draw = ImageDraw.Draw(base)
+    # ── TOP BAR ─────────────────────────────────────────────────────────────
+    # Two small metadata labels, left-aligned, top
+    meta_font = font(22)
+    meta_y = PAD
+    meta_line_h = 28
+    meta = spec.get("meta", ["@tdolinks", "2026"])
+    for i, m in enumerate(meta[:2]):
+        draw.text((PAD, meta_y + i * meta_line_h), m.upper(), font=meta_font,
+                  fill=(fg[0], fg[1], fg[2], 140))
 
-        # --- headline, above the badge/logo row ---------------------------
-        lines = spec.get("headline", [])
-        if isinstance(lines, str):
-            lines = [lines]
-        head_font = load_font(FONT_BOLD, 62)
-        # wrap each provided line to canvas width
-        wrapped = []
-        max_w = W - 2 * MARGIN
-        for ln in lines:
-            wrapped.extend(wrap(draw, ln.upper(), head_font, max_w))
-        wrapped = wrapped[:4]
-        head_lh = 70
-        bottom_anchor = H - MARGIN - 96 - 36  # just above logo row
-        ty = bottom_anchor - head_lh * len(wrapped)
-        # thin accent bar above headline
-        draw.rectangle([MARGIN, ty - 26, MARGIN + 70, ty - 20], fill=ACCENT)
-        for i, ln in enumerate(wrapped):
-            draw.text((MARGIN, ty + i * head_lh), ln, font=head_font, fill=fg)
+    # Watermark: eye logo, upper-right, small — EVERY slide
+    wm_w = round(W * 0.082)   # ~89 px
+    wm = load_logo(logo_path, wm_w)
+    wm_x = W - wm_w - PAD
+    wm_y = PAD
+    # tint white logo to fg color
+    base.alpha_composite(wm, (wm_x, wm_y))
 
-    # --- watermark eye, upper-right, EVERY slide --------------------------
-    wm_w = max(72, round(W * 0.085))
-    paste_logo(base, logo_path, wm_w, W - wm_w - 40, 40)
+    # ── BOTTOM FOOTER (cover only) ───────────────────────────────────────────
+    if spec.get("mode") == "cover":
+        PAD_BOT = 72          # bottom margin
+        LOGO_W  = 100         # logo mark width (left column)
+        LBL_W   = 200         # reserved width for right-column labels
+
+        labels = [l for l in spec.get("labels", []) if l][:3]
+        headline_raw = spec.get("headline", "")
+        if isinstance(headline_raw, list):
+            headline_raw = " ".join(headline_raw)
+
+        # --- RIGHT: measure labels first so we know available headline width ---
+        lbl_font  = font(23)
+        lbl_line_h = 33
+        lbl_block_h = lbl_line_h * len(labels) if labels else 0
+        max_lbl_w = max((draw.textlength(l.upper(), font=lbl_font) for l in labels), default=0)
+        LBL_W = int(max_lbl_w) + 16
+
+        # --- CENTER: compute headline block ---
+        logo_right = PAD + LOGO_W + 36
+        lbl_left   = W - PAD - LBL_W - 20
+        avail_w    = lbl_left - logo_right - 24
+
+        head_size = 62
+        head_font = font(head_size)
+        lines = text_lines(draw, headline_raw, head_font, avail_w)
+        while len(lines) > 4 and head_size > 38:
+            head_size -= 4
+            head_font = font(head_size)
+            lines = text_lines(draw, headline_raw, head_font, avail_w)
+        lines = lines[:4]
+        lh = int(head_size * 1.20)
+        head_block_h = lh * len(lines)
+
+        # --- LEFT: logo dimensions ---
+        logo_img  = load_logo(logo_path, LOGO_W)
+        logo_h    = logo_img.height
+
+        # row height = tallest element
+        row_h = max(logo_h, lbl_block_h, head_block_h)
+
+        # bottom-anchor the row: bottom edge at H - PAD_BOT
+        row_top = H - PAD_BOT - row_h
+
+        # paste logo — vertically centered in row
+        lx = PAD
+        ly = row_top + (row_h - logo_h) // 2
+        base.alpha_composite(logo_img, (lx, ly))
+
+        # draw labels — vertically centered in row, right-aligned
+        l_y0 = row_top + (row_h - lbl_block_h) // 2
+        for i, lbl in enumerate(labels):
+            lw = draw.textlength(lbl.upper(), font=lbl_font)
+            lx2 = W - PAD - int(lw)
+            color = ORANGE if i == 0 else (fg[0], fg[1], fg[2], 200)
+            draw.text((lx2, l_y0 + i * lbl_line_h), lbl.upper(), font=lbl_font, fill=color)
+
+        # draw headline — vertically centered in row
+        hy = row_top + (row_h - head_block_h) // 2
+        for i, ln in enumerate(lines):
+            draw.text((logo_right, hy + i * lh), ln, font=head_font, fill=fg)
 
     base.convert("RGB").save(spec["out"], quality=95)
     print("layout_ok", spec["out"])
