@@ -140,14 +140,14 @@ def render(spec):
             headline_raw = " ".join(headline_raw)
 
         # --- RIGHT: measure labels first so we know available headline width ---
-        lbl_font  = font(23)
-        lbl_line_h = 33
+        lbl_font   = font(20)           # thinner / smaller
+        lbl_line_h = 46                 # gap between labels
         lbl_block_h = lbl_line_h * len(labels) if labels else 0
         max_lbl_w = max((draw.textlength(l.upper(), font=lbl_font) for l in labels), default=0)
         LBL_W = int(max_lbl_w) + 16
 
         # --- CENTER: compute headline block ---
-        logo_right = PAD + LOGO_W + 36
+        logo_right = PAD + LOGO_W + 56   # breathing room between logo and headline
         lbl_left   = W - PAD - LBL_W - 20
         avail_w    = lbl_left - logo_right - 24
 
