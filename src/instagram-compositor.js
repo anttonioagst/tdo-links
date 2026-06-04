@@ -162,18 +162,22 @@ export async function composeCover(productImagePath, { productLine, brandName, o
   const { semiBold, extraLight } = await getFonts();
   const fontDefs = fontFaceDefs(semiBold, extraLight);
 
-  // 1. Product image: fill top 1140px of canvas (leaves room for footer)
-  const productBuf = await sharp(productImagePath)
-    .resize(W, 1140, { fit: "cover", position: "top" })
-    .toBuffer();
-
-  // 2. Canvas: dark bg 1080x1440, product image in top area
-  const canvas = await sharp({
-    create: { width: W, height: H, channels: 4, background: BG },
-  })
-    .composite([{ input: productBuf, top: 0, left: 0 }])
+  // 1. Product image fullbleed — fills the entire canvas, logo and text float on top
+  const canvas = await sharp(productImagePath)
+    .resize(W, H, { fit: "cover", position: "center" })
     .png()
     .toBuffer();
+
+  // 2. Gradient overlay at the bottom for text legibility (~bottom 35% of canvas)
+  const gradientSVG = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${BG}" stop-opacity="0"/>
+        <stop offset="1" stop-color="${BG}" stop-opacity="0.92"/>
+      </linearGradient>
+    </defs>
+    <rect x="0" y="980" width="${W}" height="${H - 980}" fill="url(#g)"/>
+  </svg>`);
 
   // 3. Load PNG assets (Figma pixel-perfect positions)
   const [logoIcon, logoWordmark, bookmark, heart] = await Promise.all([
@@ -186,9 +190,11 @@ export async function composeCover(productImagePath, { productLine, brandName, o
   // 4. SVG text overlay
   const svgBuf = Buffer.from(makeCoverSVG(productLine, brandName, fontDefs));
 
-  // 5. Composite all layers in z-order
+  // 5. Composite all layers in z-order:
+  //    photo (base) → gradient → text SVG → PNG assets
   await sharp(canvas)
     .composite([
+      { input: gradientSVG,   top: 0,                    left: 0                    }, // footer fade
       { input: svgBuf,        top: 0,                    left: 0                    }, // text
       { input: logoIcon,      top: COVER.logoIcon.y,     left: COVER.logoIcon.x     },
       { input: logoWordmark,  top: COVER.logoWordmark.y, left: COVER.logoWordmark.x },
