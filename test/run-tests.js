@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import sharp from "sharp";
 import { createDraftsForOffer, createAnalyticsReport, runPublishPipeline, runScrapePipeline } from "../src/agents.js";
 import { publishDiscord, testDiscord } from "../src/publishers/discord.js";
+import { publishDiscordDeal } from "../src/discord/deals.js";
 import { publishXAcquisition } from "../src/publishers/x.js";
 import { validateAmazonLink } from "../src/validation.js";
 import { validatePost, validateXAcquisitionPost } from "../src/compliance.js";
@@ -2220,6 +2221,34 @@ test("testDiscord sem webhookUrl retorna ok false", async () => {
   const result = await testDiscord({ discordWebhookUrl: "", discordDryRun: false });
   assert.equal(result.ok, false);
   assert.match(result.detail, /DISCORD_WEBHOOK_URL/);
+});
+
+test("publishDiscordDeal pula quando deals públicos estão desabilitados", async () => {
+  const db = { state: { discord: { channels: {} } } };
+  const result = await publishDiscordDeal(db, { discordPublicDealsEnabled: false }, { title: "Headset X", category: "headset" });
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, "discord_public_deals_disabled");
+});
+
+test("publishDiscordDeal auto-provisiona canais ausentes e publica no canal da categoria", async () => {
+  const messages = [];
+  const fakeClient = {
+    listGuildChannels: async () => [],
+    createGuildChannel: async (_guildId, body) => ({ id: `id_${body.name}`, name: body.name }),
+    createMessage: async (channelId, body) => { messages.push({ channelId, body }); }
+  };
+  const db = { state: { discord: { channels: {} } }, save: async () => {} };
+  const config = { discordPublicDealsEnabled: true, discordBotToken: "token", discordGuildId: "guild" };
+  const offer = { title: "Headset HyperX Cloud III", category: "headset", currentPrice: 399, affiliateUrl: "https://x" };
+
+  const result = await publishDiscordDeal(db, config, offer, { client: fakeClient });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.channel, "audio-headsets");
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].channelId, "id_audio-headsets");
+  assert.equal(db.state.discord.channels["audio-headsets"], "id_audio-headsets");
 });
 
 test("buildEmbed inclui título e desconto do offer", async () => {

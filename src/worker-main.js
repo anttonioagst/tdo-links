@@ -10,6 +10,7 @@ import { runOrchestratorCycle } from "./agents/orchestrator.js";
 import { runWatchdogCheck } from "./agents/watchdog.js";
 import { runDailyInstagramBatch } from "./agents/instagram-agent.js";
 import { enqueuePendingTelegramOffers } from "./publication-recovery.js";
+import { setupDiscordServer } from "./discord/setup.js";
 import cron from "node-cron";
 
 await loadEnvFile(resolve(".env"));
@@ -21,6 +22,17 @@ const db = config.databaseUrl
 
 await db.load();
 console.log("worker_db_ready", JSON.stringify({ backend: config.databaseUrl ? "postgres" : "json" }));
+
+// Provision the Discord channel map on boot so ops logs and public deals can post
+// without a manual /api/discord/setup call. Best-effort and idempotent.
+if (config.discordBotToken && config.discordGuildId && !Object.keys(db.state.discord?.channels || {}).length) {
+  try {
+    const result = await setupDiscordServer(db, config);
+    console.log("discord_setup_boot", JSON.stringify({ ok: result.ok, channels: Object.keys(result.channels || {}).length, error: result.error || null }));
+  } catch (err) {
+    console.error("discord_setup_boot_failed", JSON.stringify({ error: err.message }));
+  }
+}
 
 const queuesReady = initQueues(config.redisUrl);
 // The autonomous orchestrator does not need Redis. Only the legacy queue pipeline does.

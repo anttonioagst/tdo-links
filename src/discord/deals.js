@@ -1,4 +1,25 @@
 import { createDiscordClient } from "./client.js";
+import { setupDiscordServer } from "./setup.js";
+
+// Avoid hammering the Discord API when provisioning keeps failing (e.g. missing
+// permissions). One auto-setup attempt per cooldown window is enough.
+const AUTO_SETUP_COOLDOWN_MS = 10 * 60 * 1000;
+let lastAutoSetupAttempt = 0;
+
+// Self-healing: if the target channel isn't mapped yet, provision the Discord
+// structure once so deals can post without a manual /api/discord/setup call.
+async function ensureDiscordChannel(db, config, channelName, options = {}) {
+  if (db.state.discord?.channels?.[channelName]) return { ok: true, cached: true };
+  if (!config.discordBotToken || !config.discordGuildId) {
+    return { ok: false, error: "discord_bot_not_configured" };
+  }
+  const now = Date.now();
+  if (now - lastAutoSetupAttempt < AUTO_SETUP_COOLDOWN_MS) {
+    return { ok: false, error: "auto_setup_cooldown" };
+  }
+  lastAutoSetupAttempt = now;
+  return setupDiscordServer(db, config, options);
+}
 
 export function discordDealChannelForOffer(offer = {}) {
   const text = `${offer.category || ""} ${offer.title || ""}`.toLowerCase();
@@ -34,8 +55,14 @@ export function buildDiscordDealMessage(offer = {}, affiliateUrl = "") {
 export async function publishDiscordDeal(db, config, offer, options = {}) {
   if (!config.discordPublicDealsEnabled) return { ok: true, skipped: true, reason: "discord_public_deals_disabled" };
   const channelName = discordDealChannelForOffer(offer);
-  const channelId = db.state.discord?.channels?.[channelName];
-  if (!channelId) return { ok: false, skipped: true, reason: "discord_channel_missing", channel: channelName };
+  let channelId = db.state.discord?.channels?.[channelName];
+  if (!channelId) {
+    const setup = await ensureDiscordChannel(db, config, channelName, options);
+    channelId = db.state.discord?.channels?.[channelName];
+    if (!channelId) {
+      return { ok: false, skipped: true, reason: "discord_channel_missing", channel: channelName, setupError: setup?.error || null };
+    }
+  }
   const client = options.client || createDiscordClient(config, options);
   await client.createMessage(channelId, buildDiscordDealMessage(offer, offer.affiliateUrl));
   return { ok: true, channel: channelName };
