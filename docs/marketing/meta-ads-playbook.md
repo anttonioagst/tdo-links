@@ -7,11 +7,11 @@ Modelo de trabalho: **Antonio cria os criativos** (post produto + informativo + 
 Antonio diz "campanha", "facebook ads", "meta ads", "anúncio", "impulsionar", "trazer usuários", ou entrega criativos novos pra rodar tráfego.
 
 ## Entradas necessárias
-1. Criativos prontos (pastas em `~/Documents/human-output/instagram/...`).
+1. Criativos prontos (pastas em `~/Documents/Work/Projects/TDO LINKS/human-output/instagram/...`).
 2. Produto/tema da campanha. 3. (Opcional) orçamento, praça, % desconto das ofertas.
 > Se faltar orçamento/praça, assumir: Brasil, 18–44, R$50/dia, e declarar no resumo.
 
-## Saída padrão (gerar em `~/Documents/human-output/ads/<aaaa-mm-slug>/`)
+## Saída padrão (gerar em `~/Documents/Work/Projects/TDO LINKS/human-output/ads/<aaaa-mm-slug>/`)
 - `CAMPANHA.md` — funil (TOF/MOF/BOF), objetivos, orçamento, KPIs, premissas.
 - `copy-pack.md` — texto principal + título + descrição + CTA por anúncio (PT-BR).
 - `publicos.md` — TOF frios (interesses), MOF retarget+LAL, BOF quente (Pixel).

@@ -11,7 +11,7 @@ const exec = promisify(execFile);
 
 const LOGO_SVG_PATH = resolve("/Users/antonio/Projects/TDO LINKS/Logo/Logo 01/Group 3.svg");
 const LOGO_PNG_FALLBACK = resolve("/Users/antonio/Projects/TDO LINKS/Logo/Logo 01/Group 6.png");
-const OUTPUT_BASE = resolve(process.env.HOME || "/tmp", "Documents/human-output/instagram");
+const OUTPUT_BASE = resolve(process.env.HOME || "/tmp", "Documents/Work/Projects/TDO LINKS/human-output/instagram");
 
 // Brand color palettes — mirrors how each brand lights their product posts
 const BRAND_PALETTE = {
