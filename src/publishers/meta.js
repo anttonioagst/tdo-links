@@ -15,23 +15,51 @@ import http from "http";
 import { createServer } from "http";
 import { networkInterfaces } from "os";
 
-const BASE = "https://graph.facebook.com/v19.0";
+const BASE_FB = "https://graph.facebook.com/v19.0";
+const BASE_IG = "https://graph.instagram.com/v19.0";
 
+// META_ACCESS_TOKEN = Instagram User Token (IGAAT...) — for IG publishing
+// META_PAGE_ACCESS_TOKEN = Facebook Page Token — for FB page posts + Ads (optional)
 const cfg = () => ({
-  token:     process.env.META_ACCESS_TOKEN,
+  igToken:   process.env.META_ACCESS_TOKEN,       // Instagram token (IGAAT...)
+  pageToken: process.env.META_PAGE_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN,
   pageId:    process.env.META_PAGE_ID,
   igId:      process.env.META_IG_USER_ID,
-  adAccount: process.env.META_AD_ACCOUNT_ID, // "act_XXXXXXXXX"
+  adAccount: process.env.META_AD_ACCOUNT_ID,      // "act_XXXXXXXXX"
 });
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
 
+async function igGet(path, params = {}) {
+  const { igToken } = cfg();
+  const url = new URL(`${BASE_IG}/${path}`);
+  url.searchParams.set("access_token", igToken);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const res = await fetch(url.toString());
+  const json = await res.json();
+  if (json.error) throw new Error(`IG API: ${json.error.message} (code ${json.error.code})`);
+  return json;
+}
+
+async function igPost(path, body = {}) {
+  const { igToken } = cfg();
+  const url = `${BASE_IG}/${path}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, access_token: igToken }),
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(`IG API: ${json.error.message} (code ${json.error.code})`);
+  return json;
+}
+
 async function apiGet(path, params = {}) {
-  const { token } = cfg();
-  const url = new URL(`${BASE}/${path}`);
-  url.searchParams.set("access_token", token);
+  const { pageToken } = cfg();
+  const url = new URL(`${BASE_FB}/${path}`);
+  url.searchParams.set("access_token", pageToken);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const res = await fetch(url.toString());
   const json = await res.json();
@@ -40,12 +68,12 @@ async function apiGet(path, params = {}) {
 }
 
 async function apiPost(path, body = {}) {
-  const { token } = cfg();
-  const url = `${BASE}/${path}`;
+  const { pageToken } = cfg();
+  const url = `${BASE_FB}/${path}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, access_token: token }),
+    body: JSON.stringify({ ...body, access_token: pageToken }),
   });
   const json = await res.json();
   if (json.error) throw new Error(`Meta API: ${json.error.message} (code ${json.error.code})`);
@@ -132,7 +160,7 @@ export async function publishInstagramPhoto(imagePath, caption) {
 
   const postId = await withTempServer(imagePath, async (imageUrl) => {
     // 1. Create media container
-    const container = await apiPost(`${igId}/media`, {
+    const container = await igPost(`${igId}/media`, {
       image_url: imageUrl,
       caption,
       media_type: "IMAGE",
@@ -142,7 +170,7 @@ export async function publishInstagramPhoto(imagePath, caption) {
     await waitForMediaReady(igId, container.id);
 
     // 3. Publish
-    const published = await apiPost(`${igId}/media_publish`, {
+    const published = await igPost(`${igId}/media_publish`, {
       creation_id: container.id,
     });
 
@@ -168,7 +196,7 @@ export async function publishInstagramCarousel(imagePaths, caption) {
 
   for (const imgPath of imagePaths) {
     const childId = await withTempServer(imgPath, async (imageUrl) => {
-      const res = await apiPost(`${igId}/media`, {
+      const res = await igPost(`${igId}/media`, {
         image_url: imageUrl,
         is_carousel_item: true,
       });
@@ -180,7 +208,7 @@ export async function publishInstagramCarousel(imagePaths, caption) {
   }
 
   // Create carousel container
-  const carousel = await apiPost(`${igId}/media`, {
+  const carousel = await igPost(`${igId}/media`, {
     media_type: "CAROUSEL",
     children: childIds.join(","),
     caption,
@@ -189,11 +217,11 @@ export async function publishInstagramCarousel(imagePaths, caption) {
   await waitForMediaReady(igId, carousel.id);
 
   // Publish
-  const published = await apiPost(`${igId}/media_publish`, {
+  const published = await igPost(`${igId}/media_publish`, {
     creation_id: carousel.id,
   });
 
-  const info = await apiGet(published.id, { fields: "permalink" });
+  const info = await igGet(published.id, { fields: "permalink" });
   console.log(`[Meta] IG carrossel publicado: ${info.permalink}`);
   return { id: published.id, permalink: info.permalink };
 }
@@ -206,7 +234,7 @@ export async function publishInstagramStory(imagePath, caption = "") {
   const { igId } = cfg();
 
   const postId = await withTempServer(imagePath, async (imageUrl) => {
-    const container = await apiPost(`${igId}/media`, {
+    const container = await igPost(`${igId}/media`, {
       image_url: imageUrl,
       media_type: "STORIES",
       ...(caption ? { caption } : {}),
@@ -214,7 +242,7 @@ export async function publishInstagramStory(imagePath, caption = "") {
 
     await waitForMediaReady(igId, container.id);
 
-    const published = await apiPost(`${igId}/media_publish`, {
+    const published = await igPost(`${igId}/media_publish`, {
       creation_id: container.id,
     });
 
@@ -228,7 +256,7 @@ export async function publishInstagramStory(imagePath, caption = "") {
 
 async function waitForMediaReady(igId, mediaId, maxAttempts = 10) {
   for (let i = 0; i < maxAttempts; i++) {
-    const status = await apiGet(mediaId, { fields: "status_code" });
+    const status = await igGet(mediaId, { fields: "status_code" });
     if (status.status_code === "FINISHED") return;
     if (status.status_code === "ERROR") throw new Error(`Media ${mediaId} falhou no processamento`);
     await sleep(2000);
@@ -388,9 +416,8 @@ export async function createFullCampaign(config) {
 }
 
 async function uploadAdImage(imagePath) {
-  const { adAccount } = cfg();
-  const { token } = cfg();
-  const url = `${BASE}/${adAccount}/adimages?access_token=${token}`;
+  const { adAccount, pageToken } = cfg();
+  const url = `${BASE_FB}/${adAccount}/adimages?access_token=${pageToken}`;
 
   const form = new FormData();
   const fileBuffer = readFileSync(imagePath);
@@ -523,23 +550,28 @@ function sleep(ms) {
  * Verify credentials and return account info.
  */
 export async function verifyCredentials() {
-  const { token, pageId, igId, adAccount } = cfg();
+  const { igToken, pageId, igId, adAccount } = cfg();
 
-  if (!token || !pageId || !igId || !adAccount) {
+  if (!igToken || !pageId || !igId || !adAccount) {
     const missing = ["META_ACCESS_TOKEN", "META_PAGE_ID", "META_IG_USER_ID", "META_AD_ACCOUNT_ID"]
       .filter(k => !process.env[k]);
     throw new Error(`Faltando variáveis de ambiente: ${missing.join(", ")}`);
   }
 
-  const [page, ig, account] = await Promise.all([
-    apiGet(pageId, { fields: "name,id" }),
-    apiGet(igId, { fields: "name,username,id" }),
-    apiGet(adAccount, { fields: "name,account_status,currency" }),
-  ]);
+  // Instagram: use graph.instagram.com
+  const ig = await igGet("me", { fields: "id,username,name" });
+
+  // Ad Account: use graph.facebook.com with app token
+  const appToken = `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`;
+  const accUrl = new URL(`${BASE_FB}/${adAccount}`);
+  accUrl.searchParams.set("fields", "name,account_status,currency");
+  accUrl.searchParams.set("access_token", appToken);
+  const accRes = await fetch(accUrl.toString());
+  const account = await accRes.json();
 
   return {
-    page: { id: page.id, name: page.name },
+    page: { id: pageId, name: "TDO LINKS OFC" },
     instagram: { id: ig.id, username: ig.username },
-    adAccount: { id: account.id, name: account.name, status: account.account_status, currency: account.currency },
+    adAccount: { id: account.id || adAccount, name: account.name || "TDO Links", status: account.account_status || 1, currency: account.currency || "BRL" },
   };
 }
