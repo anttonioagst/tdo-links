@@ -156,39 +156,21 @@ const BRAND_LOGOS = {
   ),
 };
 
-// Card de lançamento futuro — mostra logo da marca + "Em breve"
-function LaunchCard({ brand = "logitech", label, desc, span = 3 }) {
-  const [hovered, setHovered] = useState(false);
+// Card de lançamento — logo centralizada, sem texto extra
+function LaunchCard({ brand = "logitech", span = 3 }) {
   const logo = BRAND_LOGOS[brand.toLowerCase()];
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        gridColumn: `span ${span}`,
-        minHeight: 96,
-        display: "flex", flexDirection: "column", justifyContent: "space-between",
-        gap: 6, padding: "14px 14px 12px",
-        borderRadius: 16, color: "#1e2229",
-        background: "rgba(232,235,238,0.7)",
-        boxShadow: hovered
-          ? "rgba(255,255,255,0.9) 0 1px 0 0 inset, rgba(65,73,88,0.04) 0 -1px 0 0 inset, rgba(65,73,88,0.06) 0 8px 22px 0, 0 0 0 1px rgba(236,98,39,0.1)"
-          : "rgba(255,255,255,0.9) 0 1px 0 0 inset, rgba(65,73,88,0.04) 0 -1px 0 0 inset, rgba(65,73,88,0.06) 0 8px 22px 0",
-        transition: "box-shadow 0.2s",
-        cursor: "default",
-      }}
-    >
-      {/* Brand logo or name */}
-      <div style={{ color: "#1e2229", opacity: 0.72 }}>
-        {logo || <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>{brand}</span>}
-      </div>
-      {/* Bottom */}
-      <div>
-        {label && <p style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3 }}>{label}</p>}
-        <p style={{ fontSize: 10, color: "#6a707c", marginTop: 2, lineHeight: 1.3 }}>
-          {desc || "Lançamento em breve"}
-        </p>
-      </div>
+    <div style={{
+      gridColumn: `span ${span}`,
+      minHeight: 88,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      borderRadius: 16, color: "#1e2229",
+      background: "rgba(232,235,238,0.7)",
+      boxShadow: "rgba(255,255,255,0.9) 0 1px 0 0 inset, rgba(65,73,88,0.04) 0 -1px 0 0 inset, rgba(65,73,88,0.06) 0 8px 22px 0",
+      cursor: "default",
+      opacity: 0.72,
+    }}>
+      {logo || <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase" }}>{brand}</span>}
     </div>
   );
 }
@@ -438,18 +420,21 @@ export default function Links() {
             />
           </div>
 
-          {/* Launch cards bento grid — logos de marcas em destaque */}
+          {/* Launch cards — label + grid de logos */}
+          <p className="fade-up" style={{ "--d": "0.42s", marginTop: 20, fontSize: 11, fontWeight: 500, color: "#6a707c", letterSpacing: "0.01em" }}>
+            Lançamentos:
+          </p>
           <div className="fade-up" style={{
             "--d": "0.44s",
-            marginTop: 12,
-            display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12,
+            marginTop: 8,
+            display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10,
           }}>
-            <LaunchCard brand="apple"   label="MacBook Air M4"     desc="Oferta disponível agora"    span={3} />
-            <LaunchCard brand="logitech" label="MX Keys S"         desc="Em breve no canal"          span={3} />
-            <LaunchCard brand="samsung" label="Odyssey G5"         desc="Oferta verificada"          span={4} />
-            <LaunchCard brand="sony"    label="WH-1000XM5"         desc="Em breve no canal"          span={2} />
-            <LaunchCard brand="hyperx"  label="Cloud III Wireless" desc="Em breve no canal"          span={3} />
-            <LaunchCard brand="razer"   label="Blade 16"           desc="Em breve no canal"          span={3} />
+            <LaunchCard brand="apple"   span={3} />
+            <LaunchCard brand="logitech" span={3} />
+            <LaunchCard brand="samsung" span={4} />
+            <LaunchCard brand="sony"    span={2} />
+            <LaunchCard brand="hyperx"  span={3} />
+            <LaunchCard brand="razer"   span={3} />
 
             {/* Full-width dark pill CTA */}
             <div style={{ gridColumn: "span 6", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 4 }}>
