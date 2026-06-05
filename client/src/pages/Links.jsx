@@ -122,38 +122,18 @@ function TickerItem({ text, delay }) {
   );
 }
 
-// SVG logos inline — sem dependência externa
+// Logos das marcas — wordmarks estilizados + ícone Apple
 const BRAND_LOGOS = {
-  logitech: (
-    <svg viewBox="0 0 80 24" fill="none" xmlns="http://www.w3.org/2000/svg" height="16">
-      <text x="0" y="18" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="18" fill="currentColor">Logitech</text>
-    </svg>
-  ),
   apple: (
-    <svg viewBox="0 0 14 17" fill="currentColor" height="18">
+    <svg viewBox="0 0 14 17" fill="currentColor" width="28" height="28">
       <path d="M13.17 12.33c-.3.69-.65 1.32-1.05 1.91-.55.79-1 1.33-1.34 1.62-.54.49-1.11.74-1.72.75-.44 0-.97-.12-1.58-.38-.61-.25-1.17-.38-1.68-.38-.54 0-1.11.13-1.73.38-.62.26-1.12.39-1.5.4-.59.03-1.17-.23-1.74-.77-.37-.32-.84-.88-1.4-1.69C.42 13.31 0 12.32 0 11.29c0-1.09.24-2.03.71-2.82.37-.63.87-1.13 1.5-1.5.62-.37 1.29-.56 2.01-.57.44 0 1.02.14 1.74.41.72.27 1.18.41 1.38.41.15 0 .66-.16 1.52-.48.81-.3 1.5-.42 2.07-.38 1.53.12 2.67.72 3.43 1.8-1.37.83-2.04 1.99-2.03 3.47.01 1.16.43 2.12 1.27 2.89.38.36.8.63 1.27.82l-.7.49zM10.1.5c0 .91-.33 1.76-.99 2.54-.79.93-1.76 1.46-2.8 1.38-.01-.11-.02-.22-.02-.34 0-.87.38-1.8 1.05-2.56C7.71.86 8.21.5 8.81.22 9.41-.07 9.98-.21 10.1.5z"/>
     </svg>
   ),
-  hyperx: (
-    <svg viewBox="0 0 60 20" fill="none" xmlns="http://www.w3.org/2000/svg" height="14">
-      <text x="0" y="15" fontFamily="Arial,sans-serif" fontWeight="900" fontSize="15" fill="currentColor">HyperX</text>
-    </svg>
-  ),
-  razer: (
-    <svg viewBox="0 0 50 20" fill="none" xmlns="http://www.w3.org/2000/svg" height="14">
-      <text x="0" y="15" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="15" fill="currentColor">RAZER</text>
-    </svg>
-  ),
-  samsung: (
-    <svg viewBox="0 0 70 20" fill="none" xmlns="http://www.w3.org/2000/svg" height="14">
-      <text x="0" y="15" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="15" fill="currentColor">SAMSUNG</text>
-    </svg>
-  ),
-  sony: (
-    <svg viewBox="0 0 50 20" fill="none" xmlns="http://www.w3.org/2000/svg" height="14">
-      <text x="0" y="15" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="15" fill="currentColor">SONY</text>
-    </svg>
-  ),
+  logitech: <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em", fontFamily: "Arial,sans-serif" }}>Logitech</span>,
+  samsung:  <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.04em",  fontFamily: "Arial,sans-serif" }}>SAMSUNG</span>,
+  sony:     <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: "0.08em",  fontFamily: "Arial,sans-serif" }}>SONY</span>,
+  hyperx:   <span style={{ fontSize: 14, fontWeight: 900, letterSpacing: "0.02em",  fontFamily: "Arial,sans-serif" }}>HyperX</span>,
+  razer:    <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.06em",  fontFamily: "Arial,sans-serif" }}>RAZER</span>,
 };
 
 // Card de lançamento — logo centralizada, sem texto extra
