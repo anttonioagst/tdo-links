@@ -35,7 +35,7 @@ const ICONS = {
   ),
 };
 
-function BannerCard({ href, bgClass, bgImage, icon, label, primary, internal }) {
+function BannerCard({ href, bgClass, bgImage, icon, label, primary, internal, onClick }) {
   const [hovered, setHovered] = useState(false);
   const linkProps = internal
     ? { href: href || "#" }
@@ -43,6 +43,7 @@ function BannerCard({ href, bgClass, bgImage, icon, label, primary, internal }) 
   return (
     <a
       {...linkProps}
+      onClick={onClick}
       style={{
         position: "relative",
         display: "block",
@@ -117,6 +118,77 @@ function TickerItem({ text, delay }) {
     }}>
       <span style={{ width: 4, height: 4, borderRadius: 9999, background: "#EC6227", flexShrink: 0 }} />
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</span>
+    </div>
+  );
+}
+
+// SVG logos inline — sem dependência externa
+const BRAND_LOGOS = {
+  logitech: (
+    <svg viewBox="0 0 80 24" fill="none" xmlns="http://www.w3.org/2000/svg" height="16">
+      <text x="0" y="18" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="18" fill="currentColor">Logitech</text>
+    </svg>
+  ),
+  apple: (
+    <svg viewBox="0 0 14 17" fill="currentColor" height="18">
+      <path d="M13.17 12.33c-.3.69-.65 1.32-1.05 1.91-.55.79-1 1.33-1.34 1.62-.54.49-1.11.74-1.72.75-.44 0-.97-.12-1.58-.38-.61-.25-1.17-.38-1.68-.38-.54 0-1.11.13-1.73.38-.62.26-1.12.39-1.5.4-.59.03-1.17-.23-1.74-.77-.37-.32-.84-.88-1.4-1.69C.42 13.31 0 12.32 0 11.29c0-1.09.24-2.03.71-2.82.37-.63.87-1.13 1.5-1.5.62-.37 1.29-.56 2.01-.57.44 0 1.02.14 1.74.41.72.27 1.18.41 1.38.41.15 0 .66-.16 1.52-.48.81-.3 1.5-.42 2.07-.38 1.53.12 2.67.72 3.43 1.8-1.37.83-2.04 1.99-2.03 3.47.01 1.16.43 2.12 1.27 2.89.38.36.8.63 1.27.82l-.7.49zM10.1.5c0 .91-.33 1.76-.99 2.54-.79.93-1.76 1.46-2.8 1.38-.01-.11-.02-.22-.02-.34 0-.87.38-1.8 1.05-2.56C7.71.86 8.21.5 8.81.22 9.41-.07 9.98-.21 10.1.5z"/>
+    </svg>
+  ),
+  hyperx: (
+    <svg viewBox="0 0 60 20" fill="none" xmlns="http://www.w3.org/2000/svg" height="14">
+      <text x="0" y="15" fontFamily="Arial,sans-serif" fontWeight="900" fontSize="15" fill="currentColor">HyperX</text>
+    </svg>
+  ),
+  razer: (
+    <svg viewBox="0 0 50 20" fill="none" xmlns="http://www.w3.org/2000/svg" height="14">
+      <text x="0" y="15" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="15" fill="currentColor">RAZER</text>
+    </svg>
+  ),
+  samsung: (
+    <svg viewBox="0 0 70 20" fill="none" xmlns="http://www.w3.org/2000/svg" height="14">
+      <text x="0" y="15" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="15" fill="currentColor">SAMSUNG</text>
+    </svg>
+  ),
+  sony: (
+    <svg viewBox="0 0 50 20" fill="none" xmlns="http://www.w3.org/2000/svg" height="14">
+      <text x="0" y="15" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="15" fill="currentColor">SONY</text>
+    </svg>
+  ),
+};
+
+// Card de lançamento futuro — mostra logo da marca + "Em breve"
+function LaunchCard({ brand = "logitech", label, desc, span = 3 }) {
+  const [hovered, setHovered] = useState(false);
+  const logo = BRAND_LOGOS[brand.toLowerCase()];
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        gridColumn: `span ${span}`,
+        minHeight: 96,
+        display: "flex", flexDirection: "column", justifyContent: "space-between",
+        gap: 6, padding: "14px 14px 12px",
+        borderRadius: 16, color: "#1e2229",
+        background: "rgba(232,235,238,0.7)",
+        boxShadow: hovered
+          ? "rgba(255,255,255,0.9) 0 1px 0 0 inset, rgba(65,73,88,0.04) 0 -1px 0 0 inset, rgba(65,73,88,0.06) 0 8px 22px 0, 0 0 0 1px rgba(236,98,39,0.1)"
+          : "rgba(255,255,255,0.9) 0 1px 0 0 inset, rgba(65,73,88,0.04) 0 -1px 0 0 inset, rgba(65,73,88,0.06) 0 8px 22px 0",
+        transition: "box-shadow 0.2s",
+        cursor: "default",
+      }}
+    >
+      {/* Brand logo or name */}
+      <div style={{ color: "#1e2229", opacity: 0.72 }}>
+        {logo || <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>{brand}</span>}
+      </div>
+      {/* Bottom */}
+      <div>
+        {label && <p style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3 }}>{label}</p>}
+        <p style={{ fontSize: 10, color: "#6a707c", marginTop: 2, lineHeight: 1.3 }}>
+          {desc || "Lançamento em breve"}
+        </p>
+      </div>
     </div>
   );
 }
@@ -225,8 +297,6 @@ export default function Links() {
 
   const socialLinks = [
     { key: "instagram", href: cfg.instagramUrl, label: "Instagram" },
-    { key: "telegram",  href: cfg.telegramUrl,  label: "Telegram",  onClick: trackLead },
-    { key: "discord",   href: cfg.discordUrl,   label: "Discord" },
     { key: "x",         href: cfg.xUrl,         label: "X (Twitter)" },
     { key: "facebook",  href: cfg.facebookUrl,  label: "Facebook" },
   ];
@@ -349,36 +419,37 @@ export default function Links() {
 
           {/* Banner cards */}
           <div className="fade-up" style={{ "--d": "0.32s", marginTop: 20, display: "flex", flexDirection: "column", gap: 12 }}>
-            {/* TDO Premium — primeiro card */}
+            {/* Card 1 — Telegram */}
             <BannerCard
-              href="/bot"
-              bgImage="/bot-card.jpg"
+              href={cfg.telegramUrl}
+              bgImage="/card01-site.png"
               icon={ICONS.telegram}
-              label="TDO Premium · Deals do seu interesse no privado"
+              label="Canal do Telegram · Deals em primeira mão"
               primary
-              internal
+              onClick={trackLead}
             />
+            {/* Card 2 — Discord */}
             <BannerCard
               href={cfg.discordUrl}
-              bgClass="linear-gradient(135deg, #1a1f2e 0%, #5865f2 100%)"
+              bgImage="/card02-site.png"
               icon={ICONS.discord}
               label="Comunidade no Discord · Discussão e novidades"
               primary={false}
             />
           </div>
 
-          {/* Mini cards bento grid */}
+          {/* Launch cards bento grid — logos de marcas em destaque */}
           <div className="fade-up" style={{
             "--d": "0.44s",
             marginTop: 12,
             display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12,
           }}>
-            <MiniCard href={cfg.telegramUrl} title="Ofertas" desc="Últimas ofertas publicadas no canal" span={3} />
-            <MiniCard href="#" title="Amazon BR" desc="Deals direto da Amazon Brasil" span={3} />
-            <MiniCard href={cfg.telegramUrl} title="Telegram" desc="Entrar no canal de deals" span={4} />
-            <MiniCard href={cfg.xUrl} title="X" desc="Seguir no Twitter" span={2} />
-            <MiniCard href={cfg.discordUrl} title="Discord" desc="Comunidade de entusiastas de tech" span={3} />
-            <MiniCard href={cfg.instagramUrl} title="Instagram" desc="Conteúdo e novidades" span={3} />
+            <LaunchCard brand="apple"   label="MacBook Air M4"     desc="Oferta disponível agora"    span={3} />
+            <LaunchCard brand="logitech" label="MX Keys S"         desc="Em breve no canal"          span={3} />
+            <LaunchCard brand="samsung" label="Odyssey G5"         desc="Oferta verificada"          span={4} />
+            <LaunchCard brand="sony"    label="WH-1000XM5"         desc="Em breve no canal"          span={2} />
+            <LaunchCard brand="hyperx"  label="Cloud III Wireless" desc="Em breve no canal"          span={3} />
+            <LaunchCard brand="razer"   label="Blade 16"           desc="Em breve no canal"          span={3} />
 
             {/* Full-width dark pill CTA */}
             <div style={{ gridColumn: "span 6", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 4 }}>
