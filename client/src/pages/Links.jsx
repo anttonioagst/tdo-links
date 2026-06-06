@@ -151,7 +151,7 @@ function LaunchCard({ brand = "logitech", span = 3 }) {
       boxShadow: "rgba(255,255,255,0.9) 0 1px 0 0 inset, rgba(65,73,88,0.04) 0 -1px 0 0 inset, rgba(65,73,88,0.06) 0 8px 22px 0",
       cursor: "default",
     }}>
-      <div style={{ opacity: 0.55, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ opacity: 0.55, color: "#1e2229", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {logo || <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#1e2229" }}>{brand}</span>}
       </div>
     </div>
