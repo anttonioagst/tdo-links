@@ -43,10 +43,27 @@ export async function runOrchestratorCycle(db, config, options = {}) {
   const stale = isTelegramStale(db.state.publishLog || [], config, now);
   const pending = (db.state.offers || []).filter((o) => PENDING_STATUSES.includes(o.status));
 
+  // Fallback mode: channel is stale — surface lower-discount premium offers that
+  // were previously rejected only for discount_too_low.
+  const fallbackMode = stale;
+  const fallbackCandidates = fallbackMode ? buildFallbackCandidates(db) : [];
+
+  if (fallbackMode) {
+    console.log("orchestrator_fallback_mode", JSON.stringify({
+      reason: "channel_stale",
+      fallbackCandidates: fallbackCandidates.length,
+      pending: pending.length
+    }));
+  }
+
   // Cost gate: only pay for the agent loop when there is something productive to
   // do. Nothing pending and channel not stale → nothing to decide.
   if (!stale && (pending.length === 0 || !cadence.allowed)) {
     return { ok: true, skipped: true, reason: pending.length === 0 ? "no_pending_offers" : "cadence_blocked", scraped: scraped.inserted, steps: 0 };
+  }
+  // Stale but truly nothing to work with → skip to avoid empty LLM loops.
+  if (stale && pending.length === 0 && fallbackCandidates.length === 0 && !cadence.allowed) {
+    return { ok: true, skipped: true, reason: "stale_no_candidates", scraped: scraped.inserted, steps: 0 };
   }
 
   if (!config.anthropicApiKey) {
@@ -54,7 +71,7 @@ export async function runOrchestratorCycle(db, config, options = {}) {
   }
 
   const client = options.client || new Anthropic({ apiKey: config.anthropicApiKey });
-  const ctx = { db, config, now, actions: [], published: 0 };
+  const ctx = { db, config, now, actions: [], published: 0, fallbackMode, fallbackCandidates };
 
   const result = await runAgentLoop(client, ctx, {
     model: config.orchestratorModel || DEFAULT_MODEL,
@@ -127,23 +144,25 @@ async function runAgentLoop(client, ctx, { model, maxSteps }) {
 
 const SYSTEM_PROMPT = `Você é o operador autônomo do TDO Links — canal premium de tech deals no Brasil. Padrão alto. Sem concessões.
 
-MARCAS APROVADAS (apenas estas): Logitech, HyperX, Razer, Sony, JBL, Samsung, LG, Dell, Apple, Anker, Soundcore, TP-Link, Corsair, SteelSeries, ASUS, Lenovo, Acer, AOC, BenQ, Kingston, Seagate, WD, MSI, Gigabyte, TCL, Philips, Flexform, Husky, Bose, Sennheiser, Jabra, Elgato, Marshall.
+MARCAS APROVADAS (apenas estas): Logitech, HyperX, Razer, Sony, PlayStation, DualSense, DualShock, Bravia, JBL, Samsung, LG, Dell, Apple, Anker, Soundcore, TP-Link, Corsair, SteelSeries, ASUS, Lenovo, Acer, AOC, BenQ, Kingston, Seagate, WD, MSI, Gigabyte, TCL, Philips, Flexform, Husky, Bose, Sennheiser, Jabra, Elgato, Marshall, Panasonic, Xbox, Microsoft Surface.
 CATEGORIAS APROVADAS: notebooks, monitores, TVs, headsets/fones premium, SSDs, teclados mecânicos, mouses premium de marca (G502, MX Master, Basilisk, DeathAdder — nunca genérico), soundbars, roteadores mesh, câmeras, GPUs, componentes.
 
 REGRAS INEGOCIÁVEIS:
 1. MARCA: se não está na lista de marcas aprovadas → archive_offer imediatamente, sem validar.
-2. DESCONTO: mínimo 18% de desconto real (preço anterior genuíno, não inflado).
+2. DESCONTO (modo normal): mínimo 18% de desconto real (preço anterior genuíno, não inflado).
+2B. DESCONTO (modo fallback — quando "modo_fallback: true" no prompt): mínimo 10%. Mesmas marcas, mesmo padrão de produto — apenas o desconto aceito é menor para dias fracos de promoções.
 3. PREÇO: mínimo R$120 — produtos abaixo disso não convertem vendas.
 4. PROMOÇÃO: só publique com promoção real (preco_anterior > preco_atual).
 5. DUPLICATA: se publish_offer retornar "duplicate" ou "already_published" → archive_offer e siga.
 6. CADÊNCIA: se "cadence_blocked" → pare de publicar, encerre o ciclo com finish_cycle.
 7. Ofertas "auto_ready" na lista 'prontas_para_publicar' já foram validadas — publique diretamente.
 8. Ofertas "new/queued" em 'precisam_validacao' — use validate_offer primeiro.
+9. MODO FALLBACK: se "modo_fallback: true", processe também a lista 'candidatos_fallback' com validate_offer. São ofertas de marca premium rejeitadas antes por desconto baixo — reavalie com critério 2B.
 
 ESTILO: aja direto com as ferramentas. No máximo uma linha antes de chamar. Pode chamar várias ferramentas de uma vez. Encerre sempre com finish_cycle.`;
 
 function buildInitialPrompt(ctx) {
-  const { db, config, now } = ctx;
+  const { db, config, now, fallbackMode, fallbackCandidates } = ctx;
   const cadence = telegramPublicationStatus(db.state.publishLog || [], config, now);
   const recentPosts = (db.state.publishLog || [])
     .filter((e) => e.channel === "telegram" && e.result?.ok === true && e.offerId)
@@ -170,8 +189,13 @@ function buildInitialPrompt(ctx) {
     .slice(0, 15)
     .map((o) => summarizeOffer(o, db));
 
-  return JSON.stringify({
-    instruction: "Rode um ciclo. Publique primeiro as 'prontas_para_publicar' (se a cadência permitir). Valide as 'precisam_validacao' e arquive as que não têm promoção real. Encerre com finish_cycle.",
+  const instruction = fallbackMode
+    ? "MODO FALLBACK ATIVO — canal sem posts recentes. Publique 'prontas_para_publicar' primeiro. Se vazio, valide os 'candidatos_fallback' com validate_offer (critério relaxado: marca premium + 10%+ desconto + produto desejável). Encerre com finish_cycle."
+    : "Rode um ciclo. Publique primeiro as 'prontas_para_publicar' (se a cadência permitir). Valide as 'precisam_validacao' e arquive as que não têm promoção real. Encerre com finish_cycle.";
+
+  const payload = {
+    instruction,
+    modo_fallback: fallbackMode || false,
     agora: now.toISOString(),
     cadencia: {
       pode_publicar_agora: cadence.allowed,
@@ -183,7 +207,13 @@ function buildInitialPrompt(ctx) {
     posts_recentes: recentPosts,
     prontas_para_publicar: prontasParaPublicar,
     precisam_validacao: precisamValidacao
-  });
+  };
+
+  if (fallbackMode && fallbackCandidates.length > 0) {
+    payload.candidatos_fallback = fallbackCandidates.map((o) => summarizeOffer(o, db));
+  }
+
+  return JSON.stringify(payload);
 }
 
 function summarizeOffer(offer, db) {
@@ -307,7 +337,7 @@ export async function toolValidate(ctx, offerId) {
     } catch { /* enrichment is best-effort */ }
   }
 
-  const verdict = await validateDeal(offer, config);
+  const verdict = await validateDeal(offer, config, { fallback: ctx.fallbackMode || false });
   const threshold = config.aiConfidenceThreshold ?? 70;
   const passes = verdict.valid === true && verdict.confidence >= threshold && hasRealPromotion(offer);
 
@@ -573,6 +603,32 @@ function isTelegramStale(publishLog, config, now) {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
   if (!lastOk) return true;
   return now.getTime() - new Date(lastOk.createdAt).getTime() >= minutes * 60 * 1000;
+}
+
+// Returns offers that were rejected solely because of low discount but are otherwise
+// premium — valid fallback candidates when the channel is stale.
+function buildFallbackCandidates(db) {
+  const now = Date.now();
+  return (db.state.offers || [])
+    .filter((o) => {
+      if (o.status !== "rejected") return false;
+      // Must be rejected for discount reason only (not brand/price/promotion)
+      const reason = String(o.validationSummary || "");
+      if (!reason.includes("discount_too_low")) return false;
+      if (extractPremiumBrand(o, {}).tier !== "premium") return false;
+      if (!hasRealPromotion(o)) return false;
+      // Skip offers that are too old (> 24h) — price data may be stale
+      const age = (now - new Date(o.updatedAt || o.createdAt || 0).getTime()) / 3_600_000;
+      if (age > 24) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      // Prefer higher discounts within the fallback pool
+      const discA = a.discountPercent || 0;
+      const discB = b.discountPercent || 0;
+      return discB - discA;
+    })
+    .slice(0, 10);
 }
 
 async function safeReport(db, config, event) {
