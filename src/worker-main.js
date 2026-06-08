@@ -9,6 +9,7 @@ import { runSupervisorCheck } from "./agents/supervisor.js";
 import { runOrchestratorCycle } from "./agents/orchestrator.js";
 import { runWatchdogCheck } from "./agents/watchdog.js";
 import { runDailyInstagramBatch } from "./agents/instagram-agent.js";
+import { runCarouselAgent } from "./agents/carousel-agent.js";
 import { enqueuePendingTelegramOffers } from "./publication-recovery.js";
 import { setupDiscordServer } from "./discord/setup.js";
 import cron from "node-cron";
@@ -100,6 +101,19 @@ if (config.orchestratorEnabled) {
       console.error("instagram_batch_failed", JSON.stringify({ error: err.message }));
     }
   });
+
+  // Carousel agent — gera carrossel editorial (Higgsfield + template) dos top deals do dia
+  // Roda às 14h e 21h UTC (11h e 18h BRT) — após o orchestrator ter publicado as ofertas
+  cron.schedule("0 14,21 * * *", async () => {
+    try {
+      const maxCarousels = Number(process.env.CAROUSEL_MAX_PER_BATCH || 1);
+      const result = await runCarouselAgent(db, config, maxCarousels);
+      console.log("carousel_agent_cycle", JSON.stringify(result));
+    } catch (err) {
+      console.error("carousel_agent_failed", JSON.stringify({ error: err.message }));
+    }
+  });
+  console.log("carousel_agent_scheduled", JSON.stringify({ schedule: "0 14,21 * * * (UTC)" }));
 
   console.log("worker_ready — orquestrador autônomo ativo", JSON.stringify({ intervalMinutes: interval, model: config.orchestratorModel }));
 } else {
