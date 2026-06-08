@@ -102,18 +102,8 @@ if (config.orchestratorEnabled) {
     }
   });
 
-  // Carousel agent — gera carrossel editorial (Higgsfield + template) dos top deals do dia
-  // Roda às 14h e 21h UTC (11h e 18h BRT) — após o orchestrator ter publicado as ofertas
-  cron.schedule("0 14,21 * * *", async () => {
-    try {
-      const maxCarousels = Number(process.env.CAROUSEL_MAX_PER_BATCH || 1);
-      const result = await runCarouselAgent(db, config, maxCarousels);
-      console.log("carousel_agent_cycle", JSON.stringify(result));
-    } catch (err) {
-      console.error("carousel_agent_failed", JSON.stringify({ error: err.message }));
-    }
-  });
-  console.log("carousel_agent_scheduled", JSON.stringify({ schedule: "0 14,21 * * * (UTC)" }));
+  // Carousel agent — roda localmente no Mac (Higgsfield CLI não disponível no Railway)
+  // Veja: src/scripts/run-carousel-local.js (executado via launchd no Mac)
 
   console.log("worker_ready — orquestrador autônomo ativo", JSON.stringify({ intervalMinutes: interval, model: config.orchestratorModel }));
 } else {
