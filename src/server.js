@@ -15,6 +15,7 @@ import { testDiscord } from "./publishers/discord.js";
 import { testTelegram } from "./publishers/telegram.js";
 import { handleTelegramUpdate } from "./telegram-bot.js";
 import { enqueueScrape, enqueuePublish, enqueueImagegen } from "./queues/producers.js";
+import { buildMetricsOverview, trackPageView } from "./metrics.js";
 import { buildRecommendations } from "./recommendations.js";
 
 const mimeTypes = {
@@ -41,6 +42,10 @@ export function createApp({ db, config, publicDir }) {
       if (url.pathname.startsWith("/go/")) {
         await handleRedirect(req, res, url, db, config);
         return;
+      }
+      if (url.pathname === "/" || url.pathname === "/links") {
+        trackPageView(db, url.pathname, req, { source: "links-page" });
+        await db.save();
       }
       if (url.pathname === "/links") {
         // React Router handles this route — serve the SPA entry point
@@ -100,6 +105,37 @@ async function handleApi(req, res, url, db, config) {
     sendJson(res, 200, { ok: true });
     return;
   }
+  // Carousel agent: top offers with full data for local carousel generation
+  if (req.method === "GET" && url.pathname === "/api/carousel/top-offers") {
+    const today = new Date().toISOString().slice(0, 10);
+    const alreadyProcessed = new Set(
+      (db.state.carouselLog || []).filter(e => e.date === today).map(e => e.offerId)
+    );
+    const offers = Object.values(db.state.offers || {})
+      .filter(o =>
+        o.status === "published" &&
+        o.publishedAt?.startsWith(today) &&
+        !alreadyProcessed.has(o.id)
+      )
+      .sort((a, b) => ((b.score || 0) + (b.discountPercent || 0) * 0.5) - ((a.score || 0) + (a.discountPercent || 0) * 0.5))
+      .slice(0, 3)
+      .map(o => ({
+        id: o.id,
+        title: o.title,
+        brand: o.brand || "",
+        category: o.category || "",
+        price: o.currentPrice,
+        discountPercent: o.discountPercent,
+        imageUrl: o.imageUrl || o.imageUrls?.[0] || null,
+        imageUrls: o.imageUrls || [],
+        score: o.score || 0,
+        publishedAt: o.publishedAt,
+      }));
+    res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+    res.end(JSON.stringify({ ok: true, date: today, offers }));
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/recent-deals") {
     const published = (db.state.publishLog || [])
       .filter(e => e.channel === "telegram" && e.result?.ok === true)
@@ -133,6 +169,10 @@ async function handleApi(req, res, url, db, config) {
   }
   if (req.method === "GET" && url.pathname === "/api/diagnostics") {
     sendJson(res, 200, buildDiagnostics({ config, state: db.state }));
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/api/metrics/overview") {
+    sendJson(res, 200, buildMetricsOverview(db, config));
     return;
   }
   if (req.method === "GET" && url.pathname === "/api/recommendations") {
@@ -556,6 +596,18 @@ async function handleRedirect(req, res, url, db, config) {
     referer: req.headers.referer || "",
     country: ""
   });
+  if (Array.isArray(db.state.pageViews)) {
+    db.state.pageViews.unshift({
+      id: db.nextId("pv"),
+      path: `/go/${shortCode}`,
+      timestamp: new Date().toISOString(),
+      referer: req.headers.referer || "",
+      userAgent: req.headers["user-agent"] || "",
+      source: draft.channel,
+      metadata: { offerId: offer.id, shortCode }
+    });
+    db.state.pageViews = db.state.pageViews.slice(0, 5000);
+  }
   await db.save();
   res.writeHead(302, { location: buildAffiliateUrl(offer, config, draft.channel) });
   res.end();
@@ -574,6 +626,7 @@ function publicState(db, config) {
   const clicksByOffer = Object.fromEntries(
     db.state.offers.map((offer) => [offer.id, db.state.clicks.filter((click) => click.offerId === offer.id).length])
   );
+  const metricsOverview = buildMetricsOverview(db, config);
   return {
     offers: db.state.offers,
     drafts: db.state.drafts,
@@ -594,7 +647,8 @@ function publicState(db, config) {
       drafts: db.state.drafts.length,
       clicks: db.state.clicks.length,
       published: db.state.drafts.filter((draft) => draft.status === "published").length,
-      clicksByOffer
+      clicksByOffer,
+      overview: metricsOverview
     }
   };
 }
